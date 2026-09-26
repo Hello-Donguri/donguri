@@ -116,6 +116,7 @@ async function replaceWordFormsAndExamples(wordId: string, formData: FormData): 
     formId: example.formClientId ? (formIdByClientId.get(example.formClientId) ?? null) : null,
     en: example.en,
     ja: example.ja,
+    romanization: example.romanization || null,
     position: index + 1,
   }));
 
@@ -872,6 +873,7 @@ export async function importWords(
                   formId: example.formId ? (formIdBySourceId.get(example.formId) ?? null) : null,
                   en: example.en,
                   ja: example.ja,
+                  romanization: example.romanization,
                   position: example.position,
                 })),
               }),
@@ -900,7 +902,13 @@ type ImportedWordRow = {
   wordType: string | null;
 };
 type ImportedFormRow = { id: string; wordId: string; labelEn: string; labelJa: string; value: string };
-type ImportedExampleRow = { wordId: string; formId: string | null; en: string; ja: string };
+type ImportedExampleRow = {
+  wordId: string;
+  formId: string | null;
+  en: string;
+  ja: string;
+  romanization: string | null;
+};
 type ImportedQuizRow = { wordId: string; prompt: string; promptJa: string | null; options: string[]; correctIndex: number };
 
 type ProcessedWordSheet = {
@@ -969,7 +977,11 @@ function processWordSheet(
       continue;
     }
 
-    const examplesResult = parseExamplesColumns(data.examplesEn ?? "", data.examplesJa ?? "");
+    const examplesResult = parseExamplesColumns(
+      data.examplesEn ?? "",
+      data.examplesJa ?? "",
+      data.examplesRomanization ?? "",
+    );
     if (!examplesResult.ok) {
       rowErrors.push(`${sheetLabel} row ${row.rowNumber}: ${examplesResult.error}`);
       continue;
@@ -1077,6 +1089,7 @@ function processWordSheet(
           formId: null,
           en: example.en,
           ja: example.ja,
+          romanization: example.romanization,
         })),
       );
     }

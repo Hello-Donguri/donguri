@@ -1,7 +1,11 @@
 import "server-only";
 import OpenAI from "openai";
 import { cacheLife } from "next/cache";
-import { JAPANESE_FEEDBACK_RULE, type DailyChallengeResult } from "@/lib/daily-challenge";
+import {
+  JAPANESE_FEEDBACK_RULE,
+  challengeLanguage,
+  type DailyChallengeResult,
+} from "@/lib/daily-challenge";
 
 const REVIEW_TIMEOUT_MS = 12000;
 
@@ -38,10 +42,12 @@ function describeAttempt(result: DailyChallengeResult, index: number): string {
 // for a new review. Throws on failure so a failed call is never cached.
 async function generateReview(
   results: DailyChallengeResult[],
+  targetLanguage: string,
 ): Promise<DailyChallengeReview> {
   "use cache";
   cacheLife("days");
 
+  const language = challengeLanguage(targetLanguage);
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const response = await openai.chat.completions.create(
     {
@@ -50,7 +56,7 @@ async function generateReview(
       messages: [
         {
           role: "system",
-          content: `You are Charles Duck, a kind English-speaking friend who has just finished today's chat challenges with a Japanese beginner learning English. In each challenge they had to use a target word or grammar pattern naturally in a chat with you. Here is how each one went:
+          content: `You are Charles Duck, a kind ${language.target}-speaking friend who has just finished today's chat challenges with ${language.learner} who is a beginner learning ${language.target}. In each challenge they had to use a target word or grammar pattern naturally in a chat with you. Here is how each one went:
 
 ${results.map(describeAttempt).join("\n\n")}
 
@@ -60,9 +66,15 @@ Look across all of them together, not one at a time, and write:
 
 Write in very simple, beginner-friendly English — short words, short sentences, no grammar jargon. Be warm and encouraging but honest; don't invent problems that didn't happen.
 
-Also write "feedbackJa" and "focusJa". ${JAPANESE_FEEDBACK_RULE}
+${
+            language.feedbackIn === "Japanese"
+              ? `Also write "feedbackJa" and "focusJa". ${JAPANESE_FEEDBACK_RULE}
 
-Return only a JSON object: { "feedback": "...", "focus": "...", "feedbackJa": "...", "focusJa": "..." }`,
+Return only a JSON object: { "feedback": "...", "focus": "...", "feedbackJa": "...", "focusJa": "..." }`
+              : `When you quote Cantonese, write the characters followed by their Jyutping in brackets.
+
+Return only a JSON object: { "feedback": "...", "focus": "..." }`
+          }`,
         },
       ],
     },
@@ -95,6 +107,7 @@ Return only a JSON object: { "feedback": "...", "focus": "...", "feedbackJa": ".
 // fails — the summary still shows each attempt's own notes without it.
 export async function getDailyChallengeReview(
   results: DailyChallengeResult[],
+  targetLanguage: string,
 ): Promise<DailyChallengeReview | null> {
   if (
     !process.env.OPENAI_API_KEY ||
@@ -104,7 +117,7 @@ export async function getDailyChallengeReview(
   }
 
   try {
-    return await generateReview(results);
+    return await generateReview(results, targetLanguage);
   } catch (error) {
     console.error("Daily challenge review generation failed:", error);
     return null;

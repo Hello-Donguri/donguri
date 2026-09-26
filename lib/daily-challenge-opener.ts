@@ -1,14 +1,20 @@
 import "server-only";
 import OpenAI from "openai";
 import { cacheLife } from "next/cache";
-import type { ChallengeItem, ChallengeOpener, ChallengeTarget } from "@/lib/daily-challenge";
+import {
+  challengeLanguage,
+  type ChallengeItem,
+  type ChallengeOpener,
+  type ChallengeTarget,
+} from "@/lib/daily-challenge";
 
 const MAX_OPENER_LENGTH = 200;
 const OPENER_TIMEOUT_MS = 8000;
 
 function describeItem(kind: string, item: ChallengeItem): string {
+  const romanization = item.romanization ? ` [${item.romanization}]` : "";
   const explanation = item.explanation ? ` — ${item.explanation}` : "";
-  return `${kind}: "${item.term}" (${item.translation}${explanation})`;
+  return `${kind}: "${item.term}"${romanization} (${item.translation}${explanation})`;
 }
 
 // Just the first word of the profile's full name; null when there isn't
@@ -19,17 +25,31 @@ export function firstNameOf(fullName: string | null | undefined): string | null 
 }
 
 // Works the learner's name into a fixed opener's greeting: "Hi! How was
-// your day?" → "Hi Will! How was your day?", "やあ！…" → "やあ、Will！…".
-// Left as it is when it doesn't open with a greeting.
+// your day?" → "Hi Will! How was your day?", "やあ！…" → "やあ、Will！…",
+// "你好！…" → "你好，Will！…". Left as it is when it doesn't open with a
+// greeting.
 function personalise(opener: ChallengeOpener, firstName: string | null): ChallengeOpener {
   if (!firstName) return opener;
-  return {
-    english: opener.english.replace(/^(Hi|Hey|Hello)([!,])/, `$1 ${firstName}$2`),
-    japanese: opener.japanese.replace(/^([^！!、。]{1,6})([！!])/, `$1、${firstName}$2`),
-  };
+
+  const english = (text: string) => text.replace(/^(Hi|Hey|Hello)([!,])/, `$1 ${firstName}$2`);
+  const cjk = (text: string, comma: string) =>
+    text.replace(/^([^！!、，。]{1,6})([！!])/, `$1${comma}${firstName}$2`);
+
+  return opener.romanization
+    ? {
+        text: cjk(opener.text, "，"),
+        romanization: opener.romanization.replace(/^([^!,?.]+)!/, `$1, ${firstName}!`),
+        translation: english(opener.translation),
+      }
+    : {
+        text: english(opener.text),
+        romanization: null,
+        translation: cjk(opener.translation, "、"),
+      };
 }
 
 function buildOpenerPrompt(target: ChallengeTarget, firstName: string | null): string {
+  const language = challengeLanguage(target.targetLanguage);
   const targets = [
     target.vocab && describeItem("Word", target.vocab),
     target.grammar && describeItem("Grammar pattern", target.grammar),
@@ -37,23 +57,36 @@ function buildOpenerPrompt(target: ChallengeTarget, firstName: string | null): s
     .filter(Boolean)
     .join("\n");
 
-  return `You write the very first text message that Charles Duck, a friendly English-speaking duck, sends to start a casual chat with a Japanese beginner who is learning English.
+  const cantonese = target.targetLanguage === "yue";
+  const style = cantonese
+    ? `- Write in natural, colloquial Hong Kong Cantonese as people really text it, in traditional characters (係, 唔, 嘅, 咗, 喺, 佢, 乜嘢 — not Mandarin forms like 是, 不, 的, 了, 在, 他, 什麼).
+- Only very common, everyday words a total beginner knows. No slang, no idioms, no hard grammar.`
+    : `- Only very common, everyday words a total beginner knows. No idioms, no slang, no phrasal verbs like "been up to", no hard grammar.`;
+  const fields = cantonese
+    ? `{
+	"text": "Charles Duck's opening message, in Cantonese characters",
+	"romanization": "The same message in Jyutping with tone numbers — exactly one syllable per Chinese character, keeping the punctuation",
+	"translation": "A natural, casual English translation of the same message"
+}`
+    : `{
+	"text": "Charles Duck's opening message",
+	"translation": "A natural, casual Japanese translation of the same message"
+}`;
+
+  return `You write the very first text message that Charles Duck, a friendly ${language.target}-speaking duck, sends to start a casual chat with ${language.learner} who is a beginner learning ${language.target}.
 
 Later in the chat, the learner will try to use this naturally:
 ${targets}
 
 How to write the opener:
 - A casual greeting plus ONE simple question. At most 2 short sentences and about 15 words.
-${firstName ? `- Greet them by their first name, "${firstName}", in the greeting (e.g. "Hi ${firstName}!"). Use it once only, and keep it exactly as written in the Japanese too.\n` : ""}- Only very common, everyday words a total beginner knows. No idioms, no slang, no phrasal verbs like "been up to", no hard grammar.
+${firstName ? `- Greet them by their first name, "${firstName}", in the greeting. Use it once only, and keep it exactly as written in the translation too.\n` : ""}${style}
 - It must sound natural — exactly how a friend would really text.
 - Pick an everyday topic that is loosely related to the target, so the chat can drift towards it later. Only loosely: never use the target word or pattern yourself, and don't ask a question whose obvious answer is just the target.
-- If the target doesn't point to a clear everyday topic (for example a small word like "the" or "some", or an abstract grammar pattern), don't force it. Instead use the topic of this general opener, reworded in your own way: "${target.fallbackOpener.english}"
+- If the target doesn't point to a clear everyday topic (for example a small function word, or an abstract grammar pattern), don't force it. Instead use the topic of this general opener, reworded in your own way: "${target.fallbackOpener.text}" (${target.fallbackOpener.translation})
 
 Return only a JSON object:
-{
-	"english": "Charles Duck's opening message",
-	"japanese": "A natural, casual Japanese translation of the same message"
-}`;
+${fields}`;
 }
 
 // Cached per target (the fallback opener in it is seeded per user, day and
@@ -78,17 +111,23 @@ async function generateOpener(
   );
 
   const parsed: unknown = JSON.parse(response.choices[0]?.message.content ?? "");
-  const opener = parsed as Partial<ChallengeOpener> | null;
+  const opener = parsed as Partial<Record<keyof ChallengeOpener, unknown>> | null;
+  const needsRomanization = challengeLanguage(target.targetLanguage).hasRomanization;
   if (
-    typeof opener?.english !== "string" ||
-    typeof opener.japanese !== "string" ||
-    !opener.english.trim() ||
-    opener.english.length > MAX_OPENER_LENGTH
+    typeof opener?.text !== "string" ||
+    typeof opener.translation !== "string" ||
+    !opener.text.trim() ||
+    opener.text.length > MAX_OPENER_LENGTH ||
+    (needsRomanization && typeof opener.romanization !== "string")
   ) {
     throw new Error("Invalid opener from model");
   }
 
-  return { english: opener.english.trim(), japanese: opener.japanese.trim() };
+  return {
+    text: opener.text.trim(),
+    romanization: needsRomanization ? (opener.romanization as string).trim() : null,
+    translation: opener.translation.trim(),
+  };
 }
 
 // Charles Duck's first message for an attempt, greeting the learner by

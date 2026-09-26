@@ -10,13 +10,22 @@ import {
   refreshDashboardHeader,
 } from "@/lib/actions/vocab";
 import type { QuizOption, QuizQuestion } from "@/lib/definitions";
-import { SpeakButton, ProgressDots } from "@/components/vocab/session-ui";
+import {
+  SpeakButton,
+  ProgressDots,
+  ClozeCard,
+  FormChoiceOptions,
+  MultipleChoiceOptions,
+  type ChoiceFeedback,
+} from "@/components/vocab/session-ui";
 import { WordImage } from "@/components/ui/word-image";
 import { XpCounter } from "@/components/xp/xp-counter";
 import { LevelUpModal } from "@/components/donguri/level-up-modal";
 import { Button } from "@/components/ui/button";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
 import { useTranslations } from "@/components/i18n/locale-provider";
+import { Jyutping, JyutpingInput } from "@/components/vocab/jyutping";
+import { LessonButton } from "@/components/vocab/word-lesson";
 import { parseDonguriConfig, formatXp, type AccessoryId } from "@/lib/levels";
 
 type TestSessionProps = {
@@ -26,7 +35,7 @@ type TestSessionProps = {
   initialDonguriConfig: unknown;
 };
 
-type Feedback = { correct: boolean; correctAnswer: string; selected: string };
+type Feedback = ChoiceFeedback;
 
 type LevelUpInfo = {
   newLevel: number;
@@ -86,7 +95,13 @@ export const TestSession = ({
 
     try {
       const result = await submitFormAnswer(question.wordId, question.formId, typedAnswer, false);
-      setFeedback({ selected: typedAnswer, correct: result.correct, correctAnswer: result.correctAnswer });
+      setFeedback({
+        selected: typedAnswer,
+        correct: result.correct,
+        correctAnswer: result.correctAnswer,
+        alternatives: result.alternatives,
+        fullAnswer: result.fullAnswer,
+      });
       recordResult(result.correct);
       setXp(result.xp);
     } finally {
@@ -146,7 +161,13 @@ export const TestSession = ({
 
     try {
       const result = await submitTypedAnswer(question.wordId, question.direction, typedAnswer, false);
-      setFeedback({ selected: typedAnswer, correct: result.correct, correctAnswer: result.correctAnswer });
+      setFeedback({
+        selected: typedAnswer,
+        correct: result.correct,
+        correctAnswer: result.correctAnswer,
+        alternatives: result.alternatives,
+        fullAnswer: result.fullAnswer,
+      });
       recordResult(result.correct);
       setXp(result.xp);
     } finally {
@@ -298,13 +319,13 @@ export const TestSession = ({
 
       {question.kind === "type-form" || question.kind === "form-choice" ? (
         <>
-          <div className="w-full rounded-3xl border border-card-border bg-washi-soft p-7 text-center shadow-sm sm:p-9">
-            <p className="text-xs font-medium uppercase tracking-wide text-sumi-soft">
-              {t("test_session.fill_in_the_blank", "Fill in the blank")}
-            </p>
-            <p className="mt-3 text-lg text-sumi-soft">{question.clozeSentenceJa}</p>
-            <p className="mt-2 text-2xl font-semibold text-sumi">{question.clozeSentence}</p>
-          </div>
+          <ClozeCard
+            sentence={question.clozeSentence}
+            translation={question.clozeSentenceJa}
+            romanization={question.clozeRomanization}
+            path={question.path}
+            feedback={feedback}
+          />
 
           {question.kind === "type-form" ? (
             <form
@@ -340,35 +361,12 @@ export const TestSession = ({
               )}
             </form>
           ) : (
-            <div className="mt-5 grid w-full grid-cols-2 gap-3 sm:grid-cols-3">
-              {question.options.map((option) => {
-                const isSelected = feedback?.selected === option;
-                const isCorrectOption = feedback && option === feedback.correctAnswer;
-
-                let style =
-                  "border-sumi/10 bg-washi hover:-translate-y-0.5 hover:border-ai/40 hover:bg-ai-soft/30 hover:shadow-sm";
-
-                if (feedback && isCorrectOption) {
-                  style = "border-matcha bg-matcha-soft text-matcha-dark shadow-sm";
-                } else if (feedback && isSelected && !feedback.correct) {
-                  style = "border-shu bg-shu/5 text-shu-dark";
-                } else if (feedback) {
-                  style = "border-sumi/10 bg-washi opacity-60";
-                }
-
-                return (
-                  <button
-                    key={option}
-                    type="button"
-                    disabled={pending || Boolean(feedback)}
-                    onClick={() => handleFormChoiceAnswer(option)}
-                    className={`flex min-h-16 items-center justify-center rounded-2xl border p-3 text-center font-medium transition disabled:cursor-not-allowed ${style}`}
-                  >
-                    {option}
-                  </button>
-                );
-              })}
-            </div>
+            <FormChoiceOptions
+              options={question.options}
+              feedback={feedback}
+              disabled={pending || Boolean(feedback)}
+              onChoose={handleFormChoiceAnswer}
+            />
           )}
         </>
       ) : question.kind === "custom-choice" || question.kind === "custom-type" ? (
@@ -471,7 +469,9 @@ export const TestSession = ({
               )}
             </div>
             {question.promptRomanization && (
-              <p className="mt-2 text-sm text-sumi-soft">{question.promptRomanization}</p>
+              <p className="mt-2 text-sm text-sumi-soft">
+                <Jyutping text={question.promptRomanization} chart />
+              </p>
             )}
           </div>
 
@@ -482,22 +482,32 @@ export const TestSession = ({
               handleTypeAnswerSubmit();
             }}
           >
-            <input
-              type="text"
-              value={typedAnswer}
-              onChange={(event) => setTypedAnswer(event.target.value)}
-              disabled={pending || Boolean(feedback)}
-              autoFocus
-              autoComplete="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              placeholder={
-                question.answerRomanized
-                  ? t("test_session.type_romanized_placeholder", "Type the romanization")
-                  : t("test_session.type_answer_placeholder", "Type your answer")
-              }
-              className="h-14 w-full rounded-2xl border border-sumi/15 bg-washi px-5 text-lg text-sumi outline-none transition focus:border-ai/50 disabled:opacity-60"
-            />
+            {question.answerRomanized && question.targetLanguage === "yue" ? (
+              <JyutpingInput
+                value={typedAnswer}
+                onChange={setTypedAnswer}
+                disabled={pending || Boolean(feedback)}
+                placeholder={t("test_session.type_jyutping_placeholder", "Type the Jyutping")}
+                className="h-14 w-full rounded-2xl border border-sumi/15 bg-washi px-5 text-lg text-sumi outline-none transition focus:border-ai/50 disabled:opacity-60"
+              />
+            ) : (
+              <input
+                type="text"
+                value={typedAnswer}
+                onChange={(event) => setTypedAnswer(event.target.value)}
+                disabled={pending || Boolean(feedback)}
+                autoFocus
+                autoComplete="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                placeholder={
+                  question.answerRomanized
+                    ? t("test_session.type_romanized_placeholder", "Type the romanization")
+                    : t("test_session.type_answer_placeholder", "Type your answer")
+                }
+                className="h-14 w-full rounded-2xl border border-sumi/15 bg-washi px-5 text-lg text-sumi outline-none transition focus:border-ai/50 disabled:opacity-60"
+              />
+            )}
 
             {!feedback && (
               <Button
@@ -535,80 +545,18 @@ export const TestSession = ({
               )}
             </div>
             {question.promptRomanization && (
-              <p className="mt-2 text-sm text-sumi-soft">{question.promptRomanization}</p>
+              <p className="mt-2 text-sm text-sumi-soft">
+                <Jyutping text={question.promptRomanization} chart />
+              </p>
             )}
           </div>
 
-          <div className="mt-5 grid w-full grid-cols-1 gap-3 md:grid-cols-2">
-            {question.options.map((option) => {
-              const isSelected = feedback?.selected === option.text;
-              const isCorrectOption = feedback && option.text === feedback.correctAnswer;
-              const promptIsTargetLanguage = question.direction === "term-to-translation";
-
-              let style =
-                "border-sumi/10 bg-washi hover:-translate-y-0.5 hover:border-ai/40 hover:bg-ai-soft/30 hover:shadow-sm";
-
-              if (feedback && isCorrectOption) {
-                style = "border-matcha bg-matcha-soft text-matcha-dark shadow-sm";
-              } else if (feedback && isSelected && !feedback.correct) {
-                style = "border-shu bg-shu/5 text-shu-dark";
-              } else if (feedback) {
-                style = "border-sumi/10 bg-washi opacity-60";
-              }
-
-              return (
-                <div
-                  key={option.text}
-                  className={`flex min-h-20 items-center gap-4 rounded-2xl border p-3 transition ${style}`}
-                >
-                  {promptIsTargetLanguage && option.image && (
-                    <WordImage
-                      src={option.image}
-                      alt=""
-                      className="h-16 w-16 shrink-0 rounded-xl bg-washi-soft object-contain p-1"
-                    />
-                  )}
-                  <button
-                    type="button"
-                    disabled={pending || Boolean(feedback)}
-                    onClick={() => handleMultipleChoiceAnswer(option)}
-                    aria-label={t("test_session.choose_option", "Choose {{option}}", {
-                      option: option.text,
-                    })}
-                    className="flex min-w-0 flex-1 items-center self-stretch text-left font-medium disabled:cursor-not-allowed"
-                  >
-                    <span className="capitalize">
-                      {option.text}
-                      {option.romanization && (
-                        <span className="mt-0.5 block text-xs font-normal opacity-70 lowercase">
-                          {option.romanization}
-                        </span>
-                      )}
-                    </span>
-                  </button>
-                  {feedback && isCorrectOption && (
-                    <span
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-matcha text-sm text-washi"
-                      aria-label={t("test_session.correct_answer_aria", "Correct answer")}
-                    >
-                      ✓
-                    </span>
-                  )}
-                  {feedback && isSelected && !feedback.correct && (
-                    <span
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-shu text-sm text-washi"
-                      aria-label={t("test_session.incorrect_answer_aria", "Incorrect answer")}
-                    >
-                      ×
-                    </span>
-                  )}
-                  {!promptIsTargetLanguage && (
-                    <SpeakButton text={option.text} language={question.targetLanguage} />
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <MultipleChoiceOptions
+            question={question}
+            feedback={feedback}
+            disabled={pending || Boolean(feedback)}
+            onChoose={handleMultipleChoiceAnswer}
+          />
         </>
       )}
 
@@ -628,7 +576,24 @@ export const TestSession = ({
           {!feedback.correct && (
             <p className="mt-1 text-sm">
               {t("test_session.correct_answer_is", "The correct answer is")}{" "}
-              <strong>{feedback.correctAnswer}</strong>.
+              <strong>
+                <Jyutping text={feedback.correctAnswer} />
+              </strong>
+              .
+            </p>
+          )}
+
+          {feedback.correct && feedback.fullAnswer && (
+            <p className="mt-1 text-sm">
+              {t("test_session.full_answer_is", "Just note the full answer:")}{" "}
+              <strong>{feedback.fullAnswer}</strong>
+            </p>
+          )}
+
+          {feedback.correct && feedback.alternatives && feedback.alternatives.length > 1 && (
+            <p className="mt-1 text-sm">
+              {t("test_session.either_is_fine", "Either answer is fine:")}{" "}
+              <strong>{feedback.alternatives.join(" / ")}</strong>
             </p>
           )}
         </div>
@@ -645,6 +610,12 @@ export const TestSession = ({
             ? t("test_session.next_question", "Next question")
             : t("test_session.see_my_results", "See my results")}
         </Button>
+      )}
+
+      {feedback && (
+        <div className="mt-3 flex justify-center">
+          <LessonButton courseSlug={courseSlug} wordId={question.wordId} />
+        </div>
       )}
     </section>
   );

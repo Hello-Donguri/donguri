@@ -6,27 +6,53 @@ import { prisma } from "@/lib/prisma";
 export type ChallengeItem = {
   term: string;
   translation: string;
+  // Pronunciation (Jyutping for Cantonese) — typing it counts as using a
+  // vocab word too, for learners who can't type the characters.
+  romanization: string | null;
   explanation: string | null;
   // Inflected forms (went/gone for "go") — any of them counts as using a
   // vocab word.
   forms: string[];
 };
 
-// Charles Duck's first message of an attempt. Always English (it's what
-// the learner is practising against, so it never goes through the UI's
-// i18n), with a Japanese translation behind the chat's Translate button.
-// Normally generated to suit the target (see getChallengeOpener in
-// lib/daily-challenge-opener.ts); the fixed ones below are the fallback.
+// Charles Duck's first message of an attempt, in the language the learner
+// is practising (English, or written Cantonese) — never through the UI's
+// i18n — with the learner's own language behind the chat's Translate
+// button, and Jyutping for Cantonese. Normally generated to suit the target
+// (see getChallengeOpener in lib/daily-challenge-opener.ts); the fixed
+// ones below are the fallback.
 export type ChallengeOpener = {
-  english: string;
-  japanese: string;
+  text: string;
+  romanization: string | null;
+  translation: string;
 };
 
 export type ChallengeTarget = {
+  // The course's target language ("en", "yue") — what Charles chats in.
+  targetLanguage: string;
   vocab: ChallengeItem | null;
   grammar: ChallengeItem | null;
   fallbackOpener: ChallengeOpener;
 };
+
+// The course languages the chat knows how to run in: who Charles is
+// talking to, and how his messages and feedback are written. Anything
+// else falls back to the English course's setup.
+export function challengeLanguage(targetLanguage: string) {
+  return targetLanguage === "yue"
+    ? {
+        target: "Cantonese",
+        learner: "an English speaker",
+        feedbackIn: "English",
+        hasRomanization: true,
+      }
+    : {
+        target: "English",
+        learner: "a Japanese speaker",
+        feedbackIn: "Japanese",
+        hasRomanization: false,
+      };
+}
 
 // How every piece of learner-facing feedback gets its Japanese twin (the
 // chat's per-reply tip, the end-of-attempt summary, the end-of-day review):
@@ -54,13 +80,17 @@ export type DailyChallengeResult = {
   tips: string[];
   tipsJa: string[];
   betterVersion: string | null;
+  // Jyutping for a Cantonese betterVersion; null otherwise.
+  betterVersionRomanization: string | null;
 };
 
 // Short, everyday openers a total beginner can read: common words, one
 // clear question each, spread across topics so consecutive attempts don't
 // feel the same. Used as-is when generation fails, and as the topic
 // suggestion when the target doesn't point to an everyday topic of its own.
-const OPENERS: ChallengeOpener[] = [
+type FixedOpener = { english: string; japanese: string };
+
+const OPENERS: FixedOpener[] = [
   { english: "Hi! How was your day?", japanese: "やあ！今日はどうだった？" },
   {
     english: "Hey! Did you eat anything good today?",
@@ -148,6 +178,29 @@ const OPENERS: ChallengeOpener[] = [
   },
 ];
 
+// The Cantonese course's fixed openers: colloquial written Cantonese a
+// beginner can read, with Jyutping and English.
+const CANTONESE_OPENERS: ChallengeOpener[] = [
+  { text: "你好！你今日點呀？", romanization: "nei5 hou2! nei5 gam1 jat6 dim2 aa3?", translation: "Hi! How are you today?" },
+  { text: "你好！你食咗飯未呀？", romanization: "nei5 hou2! nei5 sik6 zo2 faan6 mei6 aa3?", translation: "Hi! Have you eaten yet?" },
+  { text: "你好！你鍾意食乜嘢？", romanization: "nei5 hou2! nei5 zung1 ji3 sik6 mat1 je5?", translation: "Hi! What do you like to eat?" },
+  { text: "你好！你今日做咗乜嘢呀？", romanization: "nei5 hou2! nei5 gam1 jat6 zou6 zo2 mat1 je5 aa3?", translation: "Hi! What did you do today?" },
+  { text: "你好！你有冇養寵物呀？", romanization: "nei5 hou2! nei5 jau5 mou5 joeng5 cung2 mat6 aa3?", translation: "Hi! Do you have any pets?" },
+  { text: "你好！你鍾意飲咖啡定茶呀？", romanization: "nei5 hou2! nei5 zung1 ji3 jam2 gaa3 fe1 ding6 caa4 aa3?", translation: "Hi! Do you like coffee or tea?" },
+  { text: "你好！你週末想做乜嘢呀？", romanization: "nei5 hou2! nei5 zau1 mut6 soeng2 zou6 mat1 je5 aa3?", translation: "Hi! What do you want to do this weekend?" },
+  { text: "你好！你鍾意咩運動呀？", romanization: "nei5 hou2! nei5 zung1 ji3 me1 wan6 dung6 aa3?", translation: "Hi! What sports do you like?" },
+];
+
+function fixedOpeners(targetLanguage: string): ChallengeOpener[] {
+  return targetLanguage === "yue"
+    ? CANTONESE_OPENERS
+    : OPENERS.map(({ english, japanese }) => ({
+        text: english,
+        romanization: null,
+        translation: japanese,
+      }));
+}
+
 // cyrb53-style string hash → mulberry32 PRNG. Deterministic so the page and
 // the chat action (which never trusts a client-supplied target) agree on the
 // same target, and reloading the page can't reroll an easier one.
@@ -178,38 +231,52 @@ const challengeWordSelect = {
   path: true,
   term: true,
   translation: true,
+  romanization: true,
   explanation: true,
   forms: { select: { value: true }, orderBy: { position: "asc" } },
 } as const;
 
+// XP (profile-wide, the same XP that sets the Donguri level) at which the
+// challenge steps up: words only to begin with, then grammar patterns, then
+// a word and a grammar pattern together in the same message. Lined up with
+// the level-2 and level-3 thresholds in lib/levels.ts.
+export const CHALLENGE_GRAMMAR_XP = 50;
+export const CHALLENGE_COMBINED_XP = 120;
+
+type ChallengeMode = "vocab" | "grammar" | "both";
+
+// The hardest mode the learner's XP allows, stepped down to what they've
+// actually learnt — e.g. a combined-tier learner who hasn't learnt any
+// grammar yet still gets a word.
+function challengeModeFor(xp: number, hasVocab: boolean, hasGrammar: boolean): ChallengeMode {
+  if (xp >= CHALLENGE_COMBINED_XP && hasVocab && hasGrammar) return "both";
+  if (xp >= CHALLENGE_GRAMMAR_XP && hasGrammar) return "grammar";
+  return hasVocab ? "vocab" : "grammar";
+}
+
 // Picks the target for the user's `attemptIndex`-th attempt (0-based) of
-// `challengeDate` in this course. Draws from words the user has already
-// started learning; falls back to the whole course when they haven't
-// learned anything yet. Null only when the course has no content at all.
+// `challengeDate` in this course. Only draws from words and grammar the user
+// has learnt (introduced, not skipped); how hard it is depends on their XP
+// (see challengeModeFor). Null when they haven't learnt anything yet.
 export async function pickChallengeTarget(
   userId: string,
   courseId: string,
   challengeDate: Date,
   attemptIndex: number,
 ): Promise<ChallengeTarget | null> {
-  const activeWord = {
-    active: true,
-    languageDeck: { courseId, active: true },
-  };
-
-  let words = await prisma.word.findMany({
-    where: { ...activeWord, progress: { some: { userId } } },
-    select: challengeWordSelect,
-    orderBy: { id: "asc" },
-  });
-
-  if (words.length === 0) {
-    words = await prisma.word.findMany({
-      where: activeWord,
+  const [words, profile, course] = await Promise.all([
+    prisma.word.findMany({
+      where: {
+        active: true,
+        languageDeck: { courseId, active: true },
+        progress: { some: { userId, skipped: false } },
+      },
       select: challengeWordSelect,
       orderBy: { id: "asc" },
-    });
-  }
+    }),
+    prisma.profile.findUnique({ where: { id: userId }, select: { xp: true } }),
+    prisma.course.findUniqueOrThrow({ where: { id: courseId }, select: { targetLanguage: true } }),
+  ]);
 
   const vocab = words.filter((word) => word.path !== "grammar");
   const grammar = words.filter((word) => word.path === "grammar");
@@ -220,15 +287,12 @@ export async function pickChallengeTarget(
   const random = mulberry32(hashSeed(seed));
   const pick = <T>(items: T[]): T => items[Math.floor(random() * items.length)];
 
-  const modes: ("vocab" | "grammar" | "both")[] = [];
-  if (vocab.length > 0) modes.push("vocab");
-  if (grammar.length > 0) modes.push("grammar");
-  if (vocab.length > 0 && grammar.length > 0) modes.push("both");
-  const mode = pick(modes);
+  const mode = challengeModeFor(profile?.xp ?? 0, vocab.length > 0, grammar.length > 0);
 
   const toItem = (word: (typeof words)[number]): ChallengeItem => ({
     term: word.term,
     translation: word.translation,
+    romanization: word.romanization,
     explanation: word.explanation,
     forms: word.forms.map((form) => form.value),
   });
@@ -237,9 +301,12 @@ export async function pickChallengeTarget(
   // word or grammar point an attempt picks.
   const openerRandom = mulberry32(hashSeed(`${seed}:opener`));
 
+  const openers = fixedOpeners(course.targetLanguage);
+
   return {
+    targetLanguage: course.targetLanguage,
     vocab: mode === "grammar" ? null : toItem(pick(vocab)),
     grammar: mode === "vocab" ? null : toItem(pick(grammar)),
-    fallbackOpener: OPENERS[Math.floor(openerRandom() * OPENERS.length)],
+    fallbackOpener: openers[Math.floor(openerRandom() * openers.length)],
   };
 }

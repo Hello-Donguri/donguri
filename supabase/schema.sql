@@ -1577,3 +1577,11 @@ drop policy if exists "Users can view own subscription" on public.subscriptions;
 create policy "Users can view own subscription"
   on public.subscriptions for select
   using (auth.uid() = user_id);
+
+-- 38. Example sentence romanization ---------------------------------------------
+-- A pronunciation aid for an example sentence, the same idea as
+-- `words.romanization` but for the whole sentence (e.g. Jyutping for a
+-- Cantonese example). Optional — only courses whose target script isn't
+-- Latin need it.
+
+alter table public.word_examples add column if not exists romanization text;

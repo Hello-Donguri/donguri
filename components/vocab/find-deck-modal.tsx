@@ -1,12 +1,38 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useEffectEvent } from "react";
+import { useAnimate } from "framer-motion";
 import { DeckList, isComplete } from "@/components/vocab/deck-list";
 import { WordImage } from "@/components/ui/word-image";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import type { LanguageDeckSummary } from "@/lib/definitions";
 import { getContrastTextClass } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
+
+// Lets other parts of the page (e.g. the Learn card once the active decks
+// run dry) open the Find a deck dialog without lifting its state up.
+const OPEN_EVENT = "find-deck:open";
+
+export function BrowseDecksTrigger({
+  className,
+  style,
+  children,
+}: {
+  className?: string;
+  style?: React.CSSProperties;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => window.dispatchEvent(new Event(OPEN_EVENT))}
+      className={className}
+      style={style}
+    >
+      {children}
+    </button>
+  );
+}
 
 type FindDeckModalProps = {
   slug: string;
@@ -20,12 +46,50 @@ export function FindDeckModal({
   activeDeckIds,
 }: FindDeckModalProps) {
   const t = useTranslations();
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [dialogRef, animate] = useAnimate<HTMLDialogElement>();
   const activeSet = new Set(activeDeckIds);
   // Finished decks live in the modal's "Completed" tab instead.
   const activeDecks = decks.filter(
     (deck) => activeSet.has(deck.id) && !isComplete(deck),
   );
+
+  // The native <dialog> gives us focus trapping and Escape handling, so it
+  // stays in the DOM and we animate it in/out around showModal()/close().
+  const openDialog = () => {
+    const dialog = dialogRef.current;
+    if (!dialog || dialog.open) return;
+    // Start hidden before it's shown, or it paints one full-opacity frame
+    // before the animation's first keyframe lands.
+    dialog.style.opacity = "0";
+    dialog.style.transform = "translateY(8px) scale(0.97)";
+    delete dialog.dataset.closing;
+    dialog.showModal();
+    animate(
+      dialog,
+      { opacity: 1, scale: 1, y: 0 },
+      { duration: 0.2, ease: "easeOut" },
+    );
+  };
+
+  const closeDialog = async () => {
+    const dialog = dialogRef.current;
+    if (!dialog?.open) return;
+    dialog.dataset.closing = "";
+    await animate(
+      dialog,
+      { opacity: 0, scale: 0.97, y: 8 },
+      { duration: 0.15, ease: "easeIn" },
+    );
+    dialog.close();
+  };
+
+  const onOpenEvent = useEffectEvent(openDialog);
+
+  useEffect(() => {
+    const open = () => onOpenEvent();
+    window.addEventListener(OPEN_EVENT, open);
+    return () => window.removeEventListener(OPEN_EVENT, open);
+  }, []);
 
   const closeOnBackdropClick = (event: React.MouseEvent<HTMLDialogElement>) => {
     const rect = dialogRef.current?.getBoundingClientRect();
@@ -36,7 +100,7 @@ export function FindDeckModal({
       rect.left <= event.clientX &&
       event.clientX <= rect.left + rect.width;
     if (!inDialog) {
-      dialogRef.current?.close();
+      closeDialog();
     }
   };
 
@@ -49,7 +113,7 @@ export function FindDeckModal({
           </h2>
           <button
             type="button"
-            onClick={() => dialogRef.current?.showModal()}
+            onClick={openDialog}
             className="group flex shrink-0 items-center gap-2 rounded-full bg-ai-soft px-3 py-2 text-sm font-semibold text-ai-dark shadow-sm transition hover:bg-ai/20"
           >
             {t("find_deck.browse", "Browse decks")}
@@ -82,7 +146,12 @@ export function FindDeckModal({
       <dialog
         ref={dialogRef}
         onClick={closeOnBackdropClick}
-        className="m-auto h-[85vh] w-[calc(100%_-_2rem)] max-w-2xl rounded-3xl border border-card-border bg-washi p-0 shadow-2xl backdrop:bg-sumi/40 backdrop:backdrop-blur-[2px]"
+        onCancel={(event) => {
+          // Escape: run the exit animation instead of closing instantly.
+          event.preventDefault();
+          closeDialog();
+        }}
+        className="find-deck-dialog m-auto h-[85vh] w-[calc(100%_-_2rem)] max-w-2xl rounded-3xl border border-card-border bg-washi p-0 shadow-2xl backdrop:bg-sumi/40 backdrop:backdrop-blur-[2px]"
       >
         {/* Fixed height, not max-height, so switching between the Browse and
             Completed tabs doesn't resize the dialog around a shorter list. */}
@@ -93,7 +162,7 @@ export function FindDeckModal({
             </h2>
             <button
               type="button"
-              onClick={() => dialogRef.current?.close()}
+              onClick={closeDialog}
               aria-label={t("common.close", "Close")}
               className="flex h-9 w-9 items-center justify-center rounded-full bg-sumi/5 text-sumi-soft transition hover:bg-sumi/10 hover:text-sumi"
             >

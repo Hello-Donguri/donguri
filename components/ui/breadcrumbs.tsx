@@ -1,8 +1,9 @@
 import Link from "next/link";
 
 export type BreadcrumbItem = {
-  // Omit on the last item (the current page) — rendered as plain text
-  // instead of a link.
+  // Omit on the last item when it's the current page, so it renders as
+  // plain text. A last item with an href is still a link — e.g. a lone
+  // "My courses" crumb pointing back up.
   href?: string;
   label: string;
   // Per-link prefetch (see <Link prefetch>) — set on crumbs whose page
@@ -31,7 +32,7 @@ export function Breadcrumbs({
                   /
                 </span>
               )}
-              {item.href && !isLast ? (
+              {item.href ? (
                 <Link href={item.href} prefetch={item.prefetch} className="text-sumi-soft transition hover:text-sumi">
                   {item.label}
                 </Link>

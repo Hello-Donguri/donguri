@@ -70,11 +70,27 @@
   --chart-challenge: #178a3d;
   --chart-review: #d4402f; /* red, matching the Review action card */
 
+  /* Cantonese tones 1-6, colouring Jyutping syllables (see
+     components/vocab/jyutping.tsx). Six clearly separate hues, darkened in
+     light mode so tone 5's yellow still reads on the cream page. */
+  --tone-1: #d6336c;
+  --tone-2: #e8590c;
+  --tone-3: #1c7ed6;
+  --tone-4: #7048e8;
+  --tone-5: #b08400;
+  --tone-6: #2b8a3e;
+
   --background: var(--outer);
   --foreground: var(--sumi);
 }
 
 @theme inline {
+  --color-tone-1: var(--tone-1);
+  --color-tone-2: var(--tone-2);
+  --color-tone-3: var(--tone-3);
+  --color-tone-4: var(--tone-4);
+  --color-tone-5: var(--tone-5);
+  --color-tone-6: var(--tone-6);
   --color-outer: var(--outer);
   --color-washi: var(--washi);
   --color-washi-soft: var(--washi-soft);
@@ -161,6 +177,12 @@
   --chart-grammar: #3a6099;
   --chart-challenge: #2fae54;
   --chart-review: #e5604f;
+  --tone-1: #f06595;
+  --tone-2: #ff922b;
+  --tone-3: #4dabf7;
+  --tone-4: #9775fa;
+  --tone-5: #ffd43b;
+  --tone-6: #69db7c;
 
   --background: var(--outer);
   --foreground: var(--sumi);
@@ -224,5 +246,28 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .completed-stamp {
     animation: none;
+  }
+}
+
+/* Find a deck modal: Framer animates the dialog itself, but ::backdrop
+   can't be reached from JS, so it fades here. data-closing is set by the
+   component while its exit animation runs. */
+.find-deck-dialog::backdrop {
+  animation: backdrop-fade-in 200ms ease-out;
+}
+
+.find-deck-dialog[data-closing]::backdrop {
+  animation: backdrop-fade-out 150ms ease-in forwards;
+}
+
+@keyframes backdrop-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes backdrop-fade-out {
+  to {
+    opacity: 0;
   }
 }

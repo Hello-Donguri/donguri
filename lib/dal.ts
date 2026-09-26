@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { cacheLife } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@/generated/prisma/client";
 import type {
   AdminCategoryDetail,
   AdminCategorySummary,
@@ -47,6 +48,8 @@ import {
   findClozeMatchesByForm,
   findTermClozeMatches,
   pickRandomClozeMatch,
+  romanizeFromExamples,
+  type ClozeMatch,
 } from "@/lib/cloze";
 import { isLatinTypeable } from "@/lib/language";
 import { parseDonguriConfig, type AccessoryId } from "@/lib/levels";
@@ -187,6 +190,16 @@ export const requireAdminProfile = cache(async (): Promise<Profile> => {
   }
 
   return profile;
+});
+
+// How many active courses the user is enrolled in — just the count, for
+// deciding whether to show a way back to the course list (see the course
+// home's "My courses" breadcrumb) without loading every course's progress.
+export const getEnrolledCourseCount = cache(async (): Promise<number> => {
+  const user = await requireSubscriber();
+  return prisma.courseEnrollment.count({
+    where: { userId: user.id, course: { active: true } },
+  });
 });
 
 export const getEnrolledCourses = cache(
@@ -429,7 +442,13 @@ function toAdminWordSummary(word: {
   path: string;
   category: { id: string; name: string; color: string } | null;
   forms: { id: string; labelEn: string; labelJa: string; value: string }[];
-  examples: { id: string; formId: string | null; en: string; ja: string }[];
+  examples: {
+    id: string;
+    formId: string | null;
+    en: string;
+    ja: string;
+    romanization: string | null;
+  }[];
   alternateAnswers: { id: string; value: string }[];
 }): AdminWordSummary {
   return {
@@ -457,6 +476,7 @@ function toAdminWordSummary(word: {
       formId: example.formId,
       en: example.en,
       ja: example.ja,
+      romanization: example.romanization,
     })),
     alternateAnswers: word.alternateAnswers.map((alt) => ({ id: alt.id, value: alt.value })),
   };
@@ -474,7 +494,7 @@ export const getAdminWordQuizQuestions = cache(async (wordId: string) => {
         select: {
           id: true,
           title: true,
-          course: { select: { slug: true, title: true } },
+          course: { select: { slug: true, title: true, targetLanguage: true } },
         },
       },
       forms: { orderBy: { position: "asc" } },
@@ -491,7 +511,11 @@ export const getAdminWordQuizQuestions = cache(async (wordId: string) => {
   // just a count — so an admin can see (and fix, via the forms/examples
   // editor) a form that's under-represented, like "hottest" only ever
   // having one demonstrating example against "hot"'s six.
-  const clozeByForm = findClozeMatchesByForm(word.forms, word.examples);
+  const clozeByForm = findClozeMatchesByForm(
+    word.forms,
+    word.examples,
+    word.languageDeck.course.targetLanguage,
+  );
 
   return {
     word: { id: word.id, term: word.term, translation: word.translation },
@@ -503,8 +527,8 @@ export const getAdminWordQuizQuestions = cache(async (wordId: string) => {
       labelJa: form.labelJa,
       value: form.value,
       examples: (clozeByForm.get(form.id) ?? []).map((match) => ({
-        en: match.en,
-        ja: match.ja,
+        en: match.sentence,
+        ja: match.translation,
       })),
     })),
     questions: word.quizQuestions.map(
@@ -1098,15 +1122,19 @@ export const getDailyChallengeResults = cache(
           ? review.tipsJa.filter((tip): tip is string => typeof tip === "string")
           : [],
         betterVersion: typeof review.betterVersion === "string" ? review.betterVersion : null,
+        betterVersionRomanization:
+          typeof review.betterVersionRomanization === "string"
+            ? review.betterVersionRomanization
+            : null,
       };
     });
   },
 );
 
 // The status plus the word/grammar target for the user's next attempt —
-// null once today's attempts are used up, or when the course has no
-// content. Picked by the same deterministic pickChallengeTarget the chat
-// action uses, so the two always agree.
+// null once today's attempts are used up, or when the user hasn't learnt
+// any words or grammar in this course yet. Picked by the same deterministic
+// pickChallengeTarget the chat action uses, so the two always agree.
 export const getDailyChallenge = cache(
   async (
     courseSlug: string,
@@ -1299,32 +1327,63 @@ export const getLearnQueueForCourse = cache(
 
     const newWords = shuffle(candidates).slice(0, SET_SIZE);
 
-    return newWords.map((word) => ({
-      id: word.id,
-      term: word.term,
-      translation: word.translation,
-      romanization: word.romanization,
-      exampleSentence: word.exampleSentence,
-      explanation: word.explanation,
-      explanationJa: word.explanationJa,
-      forms: word.forms.map((form) => ({
-        id: form.id,
-        labelEn: form.labelEn,
-        labelJa: form.labelJa,
-        value: form.value,
-      })),
-      examples: word.examples.map((example) => ({
-        id: example.id,
-        formId: example.formId,
-        en: example.en,
-        ja: example.ja,
-      })),
-      image: wordImagePath(word),
-      targetLanguage: course.targetLanguage,
-      path: word.path as "vocab" | "grammar",
-    }));
+    return newWords.map((word) => toRevealWord(word, course));
   },
 );
+
+const revealWordInclude = {
+  forms: { orderBy: { position: "asc" } },
+  examples: { orderBy: { position: "asc" } },
+} as const;
+
+// What the learn card shows for one word — shared by the learn queue and
+// the quiz's "See the lesson" modal (see getLessonWord).
+function toRevealWord(
+  word: Prisma.WordGetPayload<{ include: typeof revealWordInclude }>,
+  course: { targetLanguage: string },
+): RevealWord {
+  return {
+    id: word.id,
+    term: word.term,
+    translation: word.translation,
+    romanization: word.romanization,
+    exampleSentence: word.exampleSentence,
+    explanation: word.explanation,
+    explanationJa: word.explanationJa,
+    forms: word.forms.map((form) => ({
+      id: form.id,
+      labelEn: form.labelEn,
+      labelJa: form.labelJa,
+      value: form.value,
+    })),
+    examples: word.examples.map((example) => ({
+      id: example.id,
+      formId: example.formId,
+      en: example.en,
+      ja: example.ja,
+      romanization: example.romanization,
+    })),
+    image: wordImagePath(word),
+    targetLanguage: course.targetLanguage,
+    path: word.path as "vocab" | "grammar",
+  };
+}
+
+// One word's learn card, for re-reading it mid-quiz. Scoped to a course the
+// user is enrolled in, since the id comes from the client.
+export async function getLessonWord(
+  courseSlug: string,
+  wordId: string,
+): Promise<RevealWord | null> {
+  const { course } = await requireEnrolledCourse(courseSlug);
+
+  const word = await prisma.word.findFirst({
+    where: { id: wordId, languageDeck: { courseId: course.id } },
+    include: revealWordInclude,
+  });
+
+  return word ? toRevealWord(word, course) : null;
+}
 
 // Commits a batch handed out by `getLearnQueueForCourse`: creates the
 // words' `UserWordProgress` rows (stage 1, first review due 4 hours out) and
@@ -1450,8 +1509,10 @@ export const getTestQueueForCourse = cache(
       .filter((progress) => progress.word.path === "vocab")
       .map((progress) => ({ ...progress.word, path: "vocab" as const }));
 
+    const grammarPool =
+      grammarWords.length > 0 ? await loadGrammarPool(course) : null;
     const grammarQuestions = grammarWords.flatMap((word) =>
-      buildAllClozeQuestions(word, course),
+      buildAllClozeQuestions(word, course, grammarPool),
     );
 
     let vocabQuestions: QuizQuestion[] = [];
@@ -1600,6 +1661,10 @@ export const getReviewQueue = cache(
       return [];
     }
 
+    const grammarPool = dueProgress.some((progress) => progress.word.path === "grammar")
+      ? await loadGrammarPool(course)
+      : null;
+
     return shuffle(
       dueProgress.map((progress) =>
         buildTypedQuestion(
@@ -1608,6 +1673,7 @@ export const getReviewQueue = cache(
             path: progress.word.path as "vocab" | "grammar",
           },
           course,
+          grammarPool,
         ),
       ),
     );
@@ -1657,7 +1723,7 @@ type QuestionWord = {
   // candidates) — cross-referenced against `examples` to build fill-in-the-
   // blank "cloze" questions.
   forms?: { id: string; value: string }[];
-  examples?: { en: string; ja: string }[];
+  examples?: { en: string; ja: string; romanization: string | null }[];
 };
 
 // Distractors lean heavily toward the word's own category: 2 of the 3 come
@@ -1732,38 +1798,184 @@ function buildMultipleChoiceQuestion(
   };
 }
 
+// Grammar from the rest of the course, for a non-Latin-script grammar
+// point's questions: the forms to offer as wrong answers in a form-choice
+// cloze (see buildClozeQuestion), and whole grammar points as distractors
+// for the multiple-choice fallback when it has no cloze content at all.
+// Loaded once per quiz by the queue builders, only when they have grammar
+// to ask about.
+type GrammarPool = {
+  // Every grammar form's value, with its romanization where the examples
+  // can supply one (see romanizeFromExamples).
+  forms: Map<string, string | null>;
+  words: QuestionWord[];
+};
+
+async function loadGrammarPool(course: {
+  id: string;
+  targetLanguage: string;
+}): Promise<GrammarPool> {
+  const courseId = course.id;
+  const words = await prisma.word.findMany({
+    where: {
+      languageDeck: { courseId, active: true },
+      path: "grammar",
+      active: true,
+    },
+    select: {
+      id: true,
+      term: true,
+      translation: true,
+      romanization: true,
+      languageDeckId: true,
+      imageKey: true,
+      forms: { select: { value: true } },
+      examples: { select: { en: true, ja: true, romanization: true } },
+    },
+  });
+
+  const forms = new Map<string, string | null>();
+  for (const word of words) {
+    for (const form of word.forms) {
+      if (forms.get(form.value)) continue;
+      forms.set(
+        form.value,
+        romanizeFromExamples(form.value, word.examples, course.targetLanguage),
+      );
+    }
+  }
+
+  return {
+    forms,
+    words: words.map((word) => ({
+      id: word.id,
+      term: word.term,
+      translation: word.translation,
+      romanization: word.romanization,
+      languageDeckId: word.languageDeckId,
+      imageKey: word.imageKey,
+      path: "grammar" as const,
+    })),
+  };
+}
+
+const FORM_CHOICE_OPTION_COUNT = 4;
+
+// The right answer plus up to three wrong ones — the word's own other forms
+// first (個 against 隻), since those are the ones worth telling apart, then
+// other grammar points' forms from the course (係 against 喺).
+function buildFormChoiceOptions(
+  answer: string,
+  ownForms: string[],
+  pool: string[],
+): string[] {
+  const others = [
+    ...shuffle(ownForms.filter((value) => value !== answer)),
+    ...shuffle(pool.filter((value) => value !== answer && !ownForms.includes(value))),
+  ];
+  return shuffle([answer, ...new Set(others)].slice(0, FORM_CHOICE_OPTION_COUNT));
+}
+
+// One cloze match as a question. A Latin-script answer is typed; anything
+// else (a Cantonese 係) can't be typed on an ordinary keyboard, so it's
+// picked from options instead — as long as there's something to pick
+// between.
+function buildClozeQuestion(
+  word: QuestionWord,
+  match: ClozeMatch,
+  course: { targetLanguage: string; sourceLanguage: string },
+  grammarPool: GrammarPool | null,
+): QuizQuestion {
+  const base = {
+    wordId: word.id,
+    path: word.path,
+    formId: match.formId,
+    clozeSentence: match.sentence,
+    clozeSentenceJa: match.translation,
+    clozeRomanization: match.romanization,
+    targetLanguage: course.targetLanguage,
+  };
+
+  const ownForms = (word.forms ?? []).map((form) => form.value);
+  const answer =
+    match.formId === null
+      ? word.term
+      : (word.forms?.find((form) => form.id === match.formId)?.value ?? word.term);
+
+  if (!isLatinTypeable(answer)) {
+    const options = buildFormChoiceOptions(answer, ownForms, [
+      ...(grammarPool?.forms.keys() ?? []),
+    ]);
+    if (options.length > 1) {
+      return {
+        kind: "form-choice",
+        ...base,
+        options: options.map((text) => ({
+          text,
+          romanization:
+            romanizeFromExamples(text, word.examples ?? [], course.targetLanguage) ??
+            grammarPool?.forms.get(text) ??
+            null,
+        })),
+      };
+    }
+  }
+
+  return { kind: "type-form", ...base };
+}
+
+// A non-Latin-script grammar point with no cloze content can't fall back
+// to a typed question the way everything else does: the term can't be
+// typed, and its translation is a whole explanation ("Say that someone
+// is…"), not something to type from memory. It's asked as multiple choice
+// against the course's other grammar points instead.
+function grammarChoiceFallback(
+  word: QuestionWord,
+  course: { targetLanguage: string; sourceLanguage: string },
+  grammarPool: GrammarPool | null,
+): QuizQuestion | null {
+  if (word.path !== "grammar" || isLatinTypeable(word.term) || !grammarPool) return null;
+  if (!grammarPool.words.some((candidate) => candidate.id !== word.id)) return null;
+  return buildMultipleChoiceQuestion(word, grammarPool.words, course);
+}
+
 // The typed counterpart to `buildMultipleChoiceQuestion` — prefers a
 // fill-in-the-blank cloze question built from the word's own forms/examples
 // when one exists (reusing the admin-authored example-sentence content),
-// then one blanking the term itself out of an example, falling back to a generic "type the term/translation" question for words
-// with no form data. Used both for the typed half of the post-learn quiz
-// and, exclusively, for every review-queue question.
+// then one blanking the term itself out of an example, falling back to a
+// generic "type the term/translation" question for words with no form
+// data. Used both for the typed half of the post-learn quiz and,
+// exclusively, for every review-queue question. "Typed" loosely: a cloze
+// with a non-Latin answer, and a non-Latin grammar point with no cloze at
+// all, are asked with options instead (see buildClozeQuestion and
+// grammarChoiceFallback).
 function buildTypedQuestion(
   word: QuestionWord,
   course: { targetLanguage: string; sourceLanguage: string },
+  grammarPool: GrammarPool | null = null,
 ): QuizQuestion {
   const clozeByForm = findClozeMatchesByForm(
     word.forms ?? [],
     word.examples ?? [],
+    course.targetLanguage,
   );
 
   // No form appears in any example — try blanking the term itself instead
-  // (e.g. "I have ___ pencils" for "four").
+  // (e.g. "I have ___ pencils" for "four"). Only for a Latin-script term:
+  // a Cantonese vocab word already has its romanized typed question below,
+  // and form-choice options are drawn from grammar, not vocab.
   const match =
     pickRandomClozeMatch(clozeByForm) ??
-    shuffle(findTermClozeMatches(word.term, word.examples ?? []))[0];
+    (isLatinTypeable(word.term)
+      ? shuffle(findTermClozeMatches(word.term, word.examples ?? [], course.targetLanguage))[0]
+      : undefined);
 
   if (match) {
-    return {
-      kind: "type-form",
-      wordId: word.id,
-      path: word.path,
-      formId: match.formId,
-      clozeSentence: match.en,
-      clozeSentenceJa: match.ja,
-      targetLanguage: course.targetLanguage,
-    };
+    return buildClozeQuestion(word, match, course, grammarPool);
   }
+
+  const choiceFallback = grammarChoiceFallback(word, course, grammarPool);
+  if (choiceFallback) return choiceFallback;
 
   // A word whose term isn't Latin-typeable can only be typed *back* (the
   // translation-to-term direction) when its romanization is a full
@@ -1801,31 +2013,25 @@ function buildTypedQuestion(
 // `getTestQueue`), where the point is meant to be drilled across all of its
 // example sentences at once, not just one at random the way
 // `buildTypedQuestion` picks for ordinary review. Falls back to a single
-// generic typed question for the rare word with no matchable forms/examples
-// at all, so a quiz question is always produced.
+// `buildTypedQuestion` question for the rare word with no matchable
+// forms/examples at all, so a quiz question is always produced.
 function buildAllClozeQuestions(
   word: QuestionWord,
   course: { targetLanguage: string; sourceLanguage: string },
+  grammarPool: GrammarPool | null,
 ): QuizQuestion[] {
   const clozeByForm = findClozeMatchesByForm(
     word.forms ?? [],
     word.examples ?? [],
+    course.targetLanguage,
   );
   const matches = [...clozeByForm.values()].flat();
 
   if (matches.length === 0) {
-    return [buildTypedQuestion(word, course)];
+    return [buildTypedQuestion(word, course, grammarPool)];
   }
 
-  return matches.map((match) => ({
-    kind: "type-form",
-    wordId: word.id,
-    path: word.path,
-    formId: match.formId,
-    clozeSentence: match.en,
-    clozeSentenceJa: match.ja,
-    targetLanguage: course.targetLanguage,
-  }));
+  return matches.map((match) => buildClozeQuestion(word, match, course, grammarPool));
 }
 
 function shuffle<T>(items: T[]): T[] {

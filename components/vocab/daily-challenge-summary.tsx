@@ -7,6 +7,7 @@ import { getTranslator } from "@/lib/i18n/server";
 import { Button } from "@/components/ui/button";
 import { scoreTone } from "@/components/vocab/challenge-score";
 import { BilingualText } from "@/components/vocab/bilingual-text";
+import { Jyutping } from "@/components/vocab/jyutping";
 import { cn } from "@/lib/utils";
 import { RainbowAvatar } from "@/components/donguri/rainbow-avatar";
 import { ScoreBar } from "@/components/vocab/score-bar";
@@ -227,6 +228,11 @@ export async function DailyChallengeSummary({
                           <p className="mt-0.5 text-sm font-semibold text-ai">
                             {result.betterVersion}
                           </p>
+                          {result.betterVersionRomanization && (
+                            <p className="mt-0.5 text-xs">
+                              <Jyutping text={result.betterVersionRomanization} />
+                            </p>
+                          )}
                         </div>
                       </>
                     )}

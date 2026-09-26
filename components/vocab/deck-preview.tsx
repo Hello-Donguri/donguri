@@ -1,4 +1,5 @@
 import { WordImage } from "@/components/ui/word-image";
+import { Jyutping } from "@/components/vocab/jyutping";
 import { CompletedStamp } from "@/components/vocab/completed-stamp";
 import type { TFunction } from "@/lib/i18n/translate";
 import type { LanguageDeckSummary } from "@/lib/definitions";
@@ -98,7 +99,10 @@ export function DeckPreview({
               <span className="text-sumi">
                 {word.term}
                 {word.romanization && (
-                  <span className="text-sumi-soft"> ({word.romanization})</span>
+                  <span className="text-sumi-soft">
+                    {" ("}
+                    <Jyutping text={word.romanization} />)
+                  </span>
                 )}
               </span>
               <span className="shrink-0 text-sumi-soft">{word.translation}</span>

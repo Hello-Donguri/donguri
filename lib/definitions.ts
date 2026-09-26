@@ -195,6 +195,9 @@ export type WordExampleSummary = {
   formId: string | null;
   en: string;
   ja: string;
+  // Pronunciation aid for the `ja`-side sentence (e.g. Jyutping) — see
+  // WordExample.romanization.
+  romanization: string | null;
 };
 
 // An extra accepted spelling/answer for a word's typed-answer questions —
@@ -256,9 +259,10 @@ export type MultipleChoiceQuestion = {
 // A cloze/fill-in-the-blank exercise built from one of the word's own
 // example sentences with the tested form blanked out (e.g. "Yesterday I
 // ___ to the shops." for "went") — only generated for a (form, example)
-// pair where the form's value actually appears in that example's English
-// text. `clozeSentenceJa` is that same example's Japanese sentence, shown
-// underneath as context/translation. `formId` is null when the blank is
+// pair where the form's value actually appears in that example's
+// target-language sentence. `clozeSentenceJa` is the same example in the
+// learner's own language (Japanese, or English for the Cantonese course —
+// the name predates that), shown underneath as context/translation. `formId` is null when the blank is
 // the word's own term rather than one of its forms — the fallback for
 // words with no forms (e.g. the numbers deck), where the answer is the term
 // or any of its alternate answers ("four" or "4").
@@ -267,6 +271,9 @@ type FormClozeQuestion = {
   formId: string | null;
   clozeSentence: string;
   clozeSentenceJa: string;
+  // The target sentence's romanization with the answer blanked too (e.g.
+  // "ngo5 ___ uk1 kei2." for Cantonese) — null when there isn't one.
+  clozeRomanization: string | null;
   targetLanguage: string;
   path: "vocab" | "grammar";
 };
@@ -274,12 +281,15 @@ type FormClozeQuestion = {
 // Free-text version: the learner types the missing form.
 export type TypeFormQuestion = FormClozeQuestion & { kind: "type-form" };
 
-// Multiple-choice version: the options are the word's own forms (e.g.
-// go/goes/went/gone/going) rather than other words — only generated for
-// words with 2+ forms, so there's something to choose between.
+// Multiple-choice version, for an answer that can't be typed on a Latin
+// keyboard (a Cantonese 係): the options are the word's own other forms,
+// topped up with other grammar points' forms from the course (see
+// buildFormChoiceOptions in lib/dal.ts).
 export type FormChoiceQuestion = FormClozeQuestion & {
   kind: "form-choice";
-  options: string[];
+  // `romanization` is each option's pronunciation (e.g. "hai2"), where the
+  // examples can supply one — see romanizeFromExamples in lib/cloze.ts.
+  options: { text: string; romanization: string | null }[];
 };
 
 // A hand-authored question an admin added for this specific word (see
@@ -313,11 +323,9 @@ export type CustomTypeQuestion = CustomQuestionBase & { kind: "custom-type" };
 export type TypeAnswerQuestion = {
   kind: "type-answer";
   wordId: string;
-  // Always "vocab" in practice — a fresh grammar point's post-learn quiz
-  // always has cloze content to build type-form questions from instead
-  // (see buildAllClozeQuestions), and the review queue's fallback only
-  // hits this for a word with no matching forms, which grammar rows
-  // always have (see buildTypedQuestion). Present for the same uniform
+  // "grammar" only for a Latin-script grammar point with no cloze content;
+  // a non-Latin one is asked as multiple choice instead (see
+  // grammarChoiceFallback in lib/dal.ts). Present for the same uniform
   // labelling reason as MultipleChoiceQuestion.path.
   path: "vocab" | "grammar";
   direction: QuizDirection;
@@ -640,6 +648,7 @@ export const WordExampleInputSchema = z.object({
     .trim()
     .min(1, { error: "Japanese sentence is required." })
     .max(500),
+  romanization: z.string().trim().max(500).optional(),
   // Empty string means "not tied to a form" — the browser <select> submits
   // "" for its blank option, so this stays a string rather than an optional.
   formClientId: z.string(),
@@ -832,6 +841,7 @@ export const WordImportRowSchema = z.object({
   forms: z.string().trim().max(2000).optional(),
   examplesEn: z.string().trim().max(3000).optional(),
   examplesJa: z.string().trim().max(3000).optional(),
+  examplesRomanization: z.string().trim().max(3000).optional(),
   wordId: z.string().trim().max(100).optional(),
 });
 

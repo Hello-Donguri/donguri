@@ -243,15 +243,18 @@ model WordForm {
 // to one form.
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model WordExample {
-  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  wordId    String    @map("word_id") @db.Uuid
-  formId    String?   @map("form_id") @db.Uuid
-  en        String
-  ja        String
-  position  Int
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  form      WordForm? @relation(fields: [formId], references: [id], onUpdate: NoAction)
-  word      Word      @relation(fields: [wordId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  wordId       String    @map("word_id") @db.Uuid
+  formId       String?   @map("form_id") @db.Uuid
+  en           String
+  ja           String
+  // Pronunciation aid for the non-English sentence (e.g. Jyutping for a
+  // Cantonese example) — optional, like `Word.romanization`.
+  romanization String?
+  position     Int
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  form         WordForm? @relation(fields: [formId], references: [id], onUpdate: NoAction)
+  word         Word      @relation(fields: [wordId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([wordId, position])
   @@map("word_examples")

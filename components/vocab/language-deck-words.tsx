@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { LanguageDeckWordSummary } from "@/lib/definitions";
 import { useTranslations } from "@/components/i18n/locale-provider";
+import { Jyutping } from "@/components/vocab/jyutping";
 
 export function LanguageDeckWords({ words }: { words: LanguageDeckWordSummary[] }) {
   const t = useTranslations();
@@ -34,7 +35,10 @@ export function LanguageDeckWords({ words }: { words: LanguageDeckWordSummary[] 
             >
               {word.term}
               {word.romanization && (
-                <span className="opacity-70"> ({word.romanization})</span>
+                <span className="opacity-70">
+                  {" ("}
+                  <Jyutping text={word.romanization} />)
+                </span>
               )}
               <span className="opacity-70"> — {word.translation}</span>
             </li>

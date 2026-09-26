@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import {
   FormEvent,
@@ -35,6 +36,7 @@ import { useLocale, useTranslations } from "@/components/i18n/locale-provider";
 import { cn } from "@/lib/utils";
 import { scoreTone } from "@/components/vocab/challenge-score";
 import { BilingualText } from "@/components/vocab/bilingual-text";
+import { Jyutping, JyutpingInput } from "@/components/vocab/jyutping";
 import { RainbowAvatar } from "@/components/donguri/rainbow-avatar";
 import { ScoreBar } from "@/components/vocab/score-bar";
 import type { AccessoryId } from "@/lib/levels";
@@ -44,8 +46,10 @@ type Message = {
   role: "ai" | "user";
   text: string;
   sentAt: number;
-  // Japanese translation of Charles's messages, behind the Translate button.
-  japanese?: string;
+  // Charles's messages only: the Jyutping for Cantonese, and the learner's-
+  // language translation behind the Translate button.
+  romanization?: string | null;
+  translation?: string;
   reply?: ChatReply;
 };
 
@@ -196,8 +200,9 @@ function DailyChallengeChat({
               {
                 id: 1,
                 role: "ai",
-                text: opener.english,
-                japanese: opener.japanese,
+                text: opener.text,
+                romanization: opener.romanization,
+                translation: opener.translation,
                 sentAt: Date.now(),
               },
             ],
@@ -291,8 +296,9 @@ function DailyChallengeChat({
         {
           id: Date.now(),
           role: "ai",
-          text: result.reply.english,
-          japanese: result.reply.japanese,
+          text: result.reply.text,
+          romanization: result.reply.romanization,
+          translation: result.reply.translation,
           sentAt: Date.now(),
           reply: result.reply,
         },
@@ -401,6 +407,7 @@ function DailyChallengeChat({
           className="scroll-mt-6 lg:col-span-2"
         >
           <CompletionBanner
+            courseSlug={courseSlug}
             completion={completion}
             finalItem={finalItem}
             equippedAccessory={equippedAccessory}
@@ -499,9 +506,14 @@ function DailyChallengeChat({
                           )}
                         >
                           {message.text}
-                          {showTranslation && message.japanese && (
+                          {message.romanization && (
+                            <span className="mt-1 block text-xs">
+                              <Jyutping text={message.romanization} />
+                            </span>
+                          )}
+                          {showTranslation && message.translation && (
                             <span className="mt-1.5 block border-t border-card-border pt-1.5 text-sm text-sumi-soft">
-                              {message.japanese}
+                              {message.translation}
                             </span>
                           )}
                         </p>
@@ -516,7 +528,7 @@ function DailyChallengeChat({
                           >
                             {timeFormat.format(message.sentAt)}
                           </time>
-                          {message.japanese && (
+                          {message.translation && (
                             <button
                               type="button"
                               onClick={() => toggleTranslation(message.id)}
@@ -613,22 +625,50 @@ function DailyChallengeChat({
               <label htmlFor="message" className="sr-only">
                 {t("chat.your_message", "Your message")}
               </label>
-              <input
-                ref={inputRef}
-                id="message"
-                name="message"
-                value={draft}
-                maxLength={500}
-                autoComplete="off"
-                onChange={(event) => setDraft(event.target.value)}
-                placeholder={
-                  isComplete
-                    ? t("chat.session_complete_short", "Session complete!")
-                    : t("chat.type_a_message", "Type a message")
-                }
-                disabled={isReplying || isComplete}
-                className="h-11 min-w-0 flex-1 rounded-full border border-card-border bg-washi-soft/60 px-4 text-sumi outline-none transition placeholder:text-sumi-soft/70 focus:border-ai/50 focus:bg-washi focus:ring-4 focus:ring-ai/10 disabled:opacity-60"
-              />
+              {target.targetLanguage === "yue" ? (
+                <div className="min-w-0 flex-1">
+                  <JyutpingInput
+                    inputRef={(element) => {
+                      inputRef.current = element;
+                    }}
+                    id="message"
+                    name="message"
+                    value={draft}
+                    maxLength={500}
+                    onChange={setDraft}
+                    autoFocus={false}
+                    showHint={false}
+                    placement="above"
+                    placeholder={
+                      isComplete
+                        ? t("chat.session_complete_short", "Session complete!")
+                        : t(
+                            "daily_challenge.reply_cantonese_placeholder",
+                            "Reply in Chinese characters or Jyutping",
+                          )
+                    }
+                    disabled={isReplying || isComplete}
+                    className="h-11 w-full rounded-full border border-card-border bg-washi-soft/60 px-4 text-sumi outline-none transition placeholder:text-sumi-soft/70 focus:border-ai/50 focus:bg-washi focus:ring-4 focus:ring-ai/10 disabled:opacity-60"
+                  />
+                </div>
+              ) : (
+                <input
+                  ref={inputRef}
+                  id="message"
+                  name="message"
+                  value={draft}
+                  maxLength={500}
+                  autoComplete="off"
+                  onChange={(event) => setDraft(event.target.value)}
+                  placeholder={
+                    isComplete
+                      ? t("chat.session_complete_short", "Session complete!")
+                      : t("chat.type_a_message", "Type a message")
+                  }
+                  disabled={isReplying || isComplete}
+                  className="h-11 min-w-0 flex-1 rounded-full border border-card-border bg-washi-soft/60 px-4 text-sumi outline-none transition placeholder:text-sumi-soft/70 focus:border-ai/50 focus:bg-washi focus:ring-4 focus:ring-ai/10 disabled:opacity-60"
+                />
+              )}
               <button
                 type="submit"
                 disabled={isCharlesTyping || isComplete || !draft.trim()}
@@ -748,6 +788,25 @@ function DailyChallengeChat({
             </p>
           </div>
         </details>
+
+        <div className="flex gap-3 rounded-3xl border border-kin/30 bg-kin/10 p-5 text-sm">
+          <BulbIcon className="mt-0.5 h-5 w-5 shrink-0 text-kin" />
+          <div className="flex flex-col gap-2">
+            <p className="text-sumi">
+              <strong className="font-semibold">{t("daily_challenge.struggling_tip_label", "Tip:")}</strong>{" "}
+              {t(
+                "daily_challenge.struggling_tip",
+                "If you're struggling, try learning a few more words and coming back — the more you know, the easier it gets to chat.",
+              )}
+            </p>
+            <Link
+              href={`/dashboard/courses/${courseSlug}/learn`}
+              className="self-start font-semibold text-ai-dark transition hover:text-ai"
+            >
+              {t("daily_challenge.learn_more_words", "Learn more words →")}
+            </Link>
+          </div>
+        </div>
       </aside>
     </div>
   );
@@ -814,6 +873,11 @@ function TargetBanner({
                 <strong className="text-sm font-semibold leading-snug text-sumi">
                   {item.term}
                 </strong>
+                {item.romanization && target.targetLanguage === "yue" && (
+                  <span className="text-xs leading-snug">
+                    <Jyutping text={item.romanization} />
+                  </span>
+                )}
                 <span className="text-xs leading-snug text-sumi-soft">
                   {item.translation}
                 </span>
@@ -932,6 +996,7 @@ function XpBreakdown({
 // one-line verdict and the way on. The full breakdown of how the score
 // became XP folds out below; the written feedback lives in the side panel.
 function CompletionBanner({
+  courseSlug,
   completion,
   finalItem,
   equippedAccessory,
@@ -939,6 +1004,7 @@ function CompletionBanner({
   isAdvancing,
   onNext,
 }: {
+  courseSlug: string;
   completion: ChallengeCompletion;
   finalItem: FeedbackItem;
   equippedAccessory: AccessoryId | null;
@@ -1021,17 +1087,22 @@ function CompletionBanner({
           />
         </button>
 
-        <Button
-          variant="secondary"
-          disabled={isAdvancing}
-          onClick={onNext}
-          className="shrink-0 sm:min-w-48"
-        >
-          {hasMoreAttempts
-            ? t("daily_challenge.next", "Next challenge")
-            : t("daily_challenge.see_summary", "See today's summary")}
-          <ChevronIcon className="h-4 w-4 -rotate-90" />
-        </Button>
+        <div className="flex shrink-0 flex-col-reverse gap-2 sm:flex-row sm:items-center">
+          <Button variant="outline" href={`/dashboard/courses/${courseSlug}`}>
+            {t("daily_challenge.back_to_course", "Back to course")}
+          </Button>
+          <Button
+            variant="secondary"
+            disabled={isAdvancing}
+            onClick={onNext}
+            className="sm:min-w-48"
+          >
+            {hasMoreAttempts
+              ? t("daily_challenge.next", "Next challenge")
+              : t("daily_challenge.see_summary", "See today's summary")}
+            <ChevronIcon className="h-4 w-4 -rotate-90" />
+          </Button>
+        </div>
       </div>
 
       <AnimatePresence initial={false}>
@@ -1098,6 +1169,11 @@ function FeedbackDetail({ item }: { item: FeedbackItem }) {
                 {t("daily_challenge.try_this", "Try")}
               </p>
               <p className="mt-0.5 font-semibold text-ai">{betterVersion}</p>
+              {summary?.betterVersionRomanization && (
+                <p className="mt-0.5 text-sm">
+                  <Jyutping text={summary.betterVersionRomanization} />
+                </p>
+              )}
             </div>
           </>
         )}

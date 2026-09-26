@@ -45,6 +45,7 @@ async function loadDailyChallenge(slug: string) {
 
   return {
     courseTitle: course.title,
+    targetLanguage: course.targetLanguage,
     challenge,
     results,
     equippedAccessory,
@@ -55,7 +56,10 @@ async function loadDailyChallenge(slug: string) {
 export default async function DailyChallengePage({ params }: PageProps) {
   const { slug } = await params;
 
-  const [{ courseTitle, challenge, results, equippedAccessory, firstName }, { t }] = await Promise.all([
+  const [
+    { courseTitle, targetLanguage, challenge, results, equippedAccessory, firstName },
+    { t },
+  ] = await Promise.all([
     loadDailyChallenge(slug),
     getTranslator(),
   ]);
@@ -108,19 +112,24 @@ export default async function DailyChallengePage({ params }: PageProps) {
               results={results}
               maxAttemptsPerDay={challenge.maxAttemptsPerDay}
               equippedAccessory={equippedAccessory}
-              reviewPromise={getDailyChallengeReview(results)}
+              reviewPromise={getDailyChallengeReview(results, targetLanguage)}
             />
           ) : (
             <div className="flex flex-col items-center gap-4 rounded-3xl border border-card-border bg-washi-soft px-6 py-16 text-center">
               <p className="max-w-sm text-sm text-sumi-soft">
                 {t(
-                  "daily_challenge.no_content",
-                  "This course doesn't have any words or grammar to practise yet.",
+                  "daily_challenge.nothing_learnt",
+                  "Learn some words first to unlock the daily challenge.",
                 )}
               </p>
-              <Button variant="secondary" href={`/dashboard/courses/${slug}`}>
-                {t("daily_challenge.back_to_course", "Back to course")}
-              </Button>
+              <div className="flex flex-wrap justify-center gap-3">
+                <Button href={`/dashboard/courses/${slug}/learn`}>
+                  {t("daily_challenge.start_learning", "Start learning")}
+                </Button>
+                <Button variant="secondary" href={`/dashboard/courses/${slug}`}>
+                  {t("daily_challenge.back_to_course", "Back to course")}
+                </Button>
+              </div>
             </div>
           )
         }

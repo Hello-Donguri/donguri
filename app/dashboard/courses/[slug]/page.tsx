@@ -8,6 +8,7 @@ import {
   getCourseTitle,
   getDailyActivityCounts,
   getDailyChallengeStatus,
+  getEnrolledCourseCount,
   getGlobalStreak,
   getWeeklyStats,
   getLeaderboards,
@@ -16,12 +17,16 @@ import {
   requireProfile,
 } from "@/lib/dal";
 import { getTranslator } from "@/lib/i18n/server";
+import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 
 import { ActivityOverviewCard } from "@/components/vocab/activity-overview-card";
 import { Greeting } from "@/components/dashboard/greeting";
 import { LeaderboardTabs } from "@/components/leaderboard/leaderboard-tabs";
 import { DeckCompleteCelebration } from "@/components/vocab/deck-complete-celebration";
-import { FindDeckModal } from "@/components/vocab/find-deck-modal";
+import {
+  BrowseDecksTrigger,
+  FindDeckModal,
+} from "@/components/vocab/find-deck-modal";
 import { ResetProgressButton } from "@/components/vocab/reset-progress-button";
 import { ReviewQueueDevPanel } from "@/components/vocab/review-queue-dev-panel";
 import { DailyChallengeDevReset } from "@/components/vocab/daily-challenge-dev-reset";
@@ -59,6 +64,7 @@ async function loadCourseHome(slug: string) {
     profile,
     weeklyStats,
     challengeStatus,
+    enrolledCourseCount,
   ] = await Promise.all([
     getCourseDecks(slug),
     getGlobalStreak(),
@@ -68,6 +74,7 @@ async function loadCourseHome(slug: string) {
     requireProfile(),
     getWeeklyStats(slug),
     getDailyChallengeStatus(slug),
+    getEnrolledCourseCount(),
   ]);
 
   const isAdmin = profile.role === "admin";
@@ -86,6 +93,7 @@ async function loadCourseHome(slug: string) {
     profile,
     weeklyStats,
     challengeStatus,
+    enrolledCourseCount,
     isAdmin,
     reviewQueueDebug,
   };
@@ -107,6 +115,7 @@ export default async function CourseHomePage({ params }: PageProps) {
       profile,
       weeklyStats,
       challengeStatus,
+      enrolledCourseCount,
       isAdmin,
       reviewQueueDebug,
     },
@@ -114,6 +123,13 @@ export default async function CourseHomePage({ params }: PageProps) {
   ] = await Promise.all([loadCourseHome(slug), getTranslator()]);
 
   const hasReviews = reviewQueue.dueCount > 0;
+  // Mirrors the learn queue: an active deck with any word not yet started.
+  // No active decks at all counts as nothing to learn too.
+  const activeDeckSet = new Set(activeDeckIds);
+  const hasNewWords = decks.some(
+    (deck) => activeDeckSet.has(deck.id) && deck.learntWords < deck.totalWords,
+  );
+  const noActiveDecks = !decks.some((deck) => activeDeckSet.has(deck.id));
   const challengesLeft = Math.max(
     challengeStatus.maxAttemptsPerDay - challengeStatus.attemptsToday,
     0,
@@ -173,6 +189,64 @@ export default async function CourseHomePage({ params }: PageProps) {
 
       <img
         src="/images/rabbit-flash.webp"
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none absolute bottom-3 right-2 z-0 h-28 select-none object-contain transition-transform duration-300 group-hover:-translate-y-1"
+      />
+    </>
+  );
+
+  const learnCardClassName =
+    "group cursor-pointer relative flex min-h-[220px] flex-col overflow-hidden rounded-2xl border border-card-border bg-cover bg-center p-5 sm:min-h-[240px] sm:p-6 shadow-sm transition duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.015] hover:brightness-105 hover:shadow-md";
+  const learnCardContent = (
+    <>
+      <div className="relative z-10">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-100/95 text-2xl font-bold leading-none text-blue-700 shadow-sm backdrop-blur-sm">
+            学
+          </div>
+
+          <span className="text-sm font-bold uppercase tracking-[0.2em] text-ink-on-dark/90">
+            {t("course_home.learn_label", "Learn")}
+          </span>
+        </div>
+
+        <h2 className="mt-4 text-2xl font-extrabold leading-tight sm:text-3xl text-ink-on-dark">
+          {hasNewWords
+            ? t("course_home.learn_title", "Learn new words")
+            : noActiveDecks
+              ? t("course_home.learn_no_decks_title", "Pick a deck to start")
+              : t("course_home.learn_empty_title", "Ready for more?")}
+        </h2>
+
+        <p className="mt-2 max-w-[65%] text-sm leading-relaxed sm:max-w-[60%] text-ink-on-dark/85">
+          {hasNewWords
+            ? t(
+                "course_home.learn_subtitle_three",
+                "Learn 3 new words or grammar patterns from your active decks.",
+              )
+            : noActiveDecks
+              ? t(
+                  "course_home.learn_no_decks_subtitle",
+                  "You don't have any active decks yet. Browse decks and activate one to start learning new words.",
+                )
+              : t(
+                  "course_home.learn_empty_subtitle",
+                  "You've learnt every word in your active decks. Browse decks to find something new.",
+                )}
+        </p>
+      </div>
+
+      <div className="relative z-10 mt-auto pt-5">
+        <FakeButton className="bg-blue-100/95 text-blue-700">
+          {hasNewWords
+            ? t("course_home.learn_cta", "Learn 3 new words")
+            : t("course_home.learn_browse_cta", "Browse decks")}
+        </FakeButton>
+      </div>
+
+      <img
+        src="/images/rabbit-reading.webp"
         alt=""
         aria-hidden="true"
         className="pointer-events-none absolute bottom-3 right-2 z-0 h-28 select-none object-contain transition-transform duration-300 group-hover:-translate-y-1"
@@ -247,6 +321,16 @@ export default async function CourseHomePage({ params }: PageProps) {
 
       <main className="flex min-w-0 flex-col gap-6 sm:gap-8">
         <div>
+          {enrolledCourseCount > 1 && (
+            <Breadcrumbs
+              items={[
+                {
+                  href: "/dashboard/courses",
+                  label: t("breadcrumbs.my_courses", "My courses"),
+                },
+              ]}
+            />
+          )}
           <Greeting firstName={profile.first_name ?? profile.email} />
 
           {isAdmin && (
@@ -287,50 +371,24 @@ export default async function CourseHomePage({ params }: PageProps) {
               </div>
             )}
 
-            {/* LEARN */}
-            <Link
-              href={`/dashboard/courses/${slug}/learn`}
-              className="group relative flex min-h-[220px] flex-col overflow-hidden rounded-2xl border border-card-border bg-cover bg-center p-5 sm:min-h-[240px] sm:p-6 shadow-sm transition duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.015] hover:brightness-105 hover:shadow-md"
-              style={{
-                backgroundImage: "url(/images/blue-bg2.webp)",
-              }}
-            >
-              <div className="relative z-10">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-100/95 text-2xl font-bold leading-none text-blue-700 shadow-sm backdrop-blur-sm">
-                    学
-                  </div>
-
-                  <span className="text-sm font-bold uppercase tracking-[0.2em] text-ink-on-dark/90">
-                    {t("course_home.learn_label", "Learn")}
-                  </span>
-                </div>
-
-                <h2 className="mt-4 text-2xl font-extrabold leading-tight sm:text-3xl text-ink-on-dark">
-                  {t("course_home.learn_title", "Learn new words")}
-                </h2>
-
-                <p className="mt-2 max-w-[65%] text-sm leading-relaxed sm:max-w-[60%] text-ink-on-dark/85">
-                  {t(
-                    "course_home.learn_subtitle_three",
-                    "Learn 3 new words or grammar patterns from your active decks.",
-                  )}
-                </p>
-              </div>
-
-              <div className="relative z-10 mt-auto pt-5">
-                <FakeButton className="bg-blue-100/95 text-blue-700">
-                  {t("course_home.learn_cta", "Learn 3 new words")}
-                </FakeButton>
-              </div>
-
-              <img
-                src="/images/rabbit-reading.webp"
-                alt=""
-                aria-hidden="true"
-                className="pointer-events-none absolute bottom-3 right-2 z-0 h-28 select-none object-contain transition-transform duration-300 group-hover:-translate-y-1"
-              />
-            </Link>
+            {/* LEARN — turns into a browse-decks prompt once the active
+                decks have nothing new left (or none are active). */}
+            {hasNewWords ? (
+              <Link
+                href={`/dashboard/courses/${slug}/learn`}
+                className={learnCardClassName}
+                style={{ backgroundImage: "url(/images/blue-bg2.webp)" }}
+              >
+                {learnCardContent}
+              </Link>
+            ) : (
+              <BrowseDecksTrigger
+                className={`${learnCardClassName} text-left`}
+                style={{ backgroundImage: "url(/images/blue-bg2.webp)" }}
+              >
+                {learnCardContent}
+              </BrowseDecksTrigger>
+            )}
 
             {/* DAILY CHALLENGE */}
             {challengesDone ? (

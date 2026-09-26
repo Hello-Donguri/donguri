@@ -49,6 +49,7 @@ const WORD_COLUMNS = [
   { header: "Forms", key: "forms", width: 40 },
   { header: "Examples (English)", key: "examplesEn", width: 40 },
   { header: "Examples (Japanese)", key: "examplesJa", width: 40 },
+  { header: "Examples (Romanization)", key: "examplesRomanization", width: 40 },
   { header: "Word ID", key: "wordId", width: 38 },
 ] as const;
 
@@ -116,6 +117,7 @@ function wrapPackedColumns(sheet: ExcelJS.Worksheet): void {
   sheet.getColumn("forms").alignment = { wrapText: true, vertical: "top" };
   sheet.getColumn("examplesEn").alignment = { wrapText: true, vertical: "top" };
   sheet.getColumn("examplesJa").alignment = { wrapText: true, vertical: "top" };
+  sheet.getColumn("examplesRomanization").alignment = { wrapText: true, vertical: "top" };
 }
 
 // Shared by the vocab and grammar sheet pairs (Words/Quiz questions and
@@ -216,6 +218,10 @@ function addInstructionsSheet(workbook: ExcelJS.Workbook, cleanCategoryNames: st
     [
       "Examples (English) / Examples (Japanese)",
       'Optional. Example sentences using this word — one "|"-separated list per language, e.g. "Yesterday I ate an apple.| I eat every day." in the English column and "昨日私はりんごを食べた。| 私は毎日食べます。" in the Japanese column. The two lists must have the same number of entries (checked on upload) — the Nth entry in each is paired up as one example.',
+    ],
+    [
+      "Examples (Romanization)",
+      'Optional. A pronunciation aid for each example in the "Examples (Japanese)" column (e.g. Jyutping for a Cantonese sentence), "|"-separated in the same order. Leave it blank, or give one entry per example — an entry can be left empty (e.g. "ngo5 hai6 hok6 saang1.| |nei5 hou2.") to skip one example.',
     ],
     [
       "Word ID",
@@ -348,7 +354,7 @@ export async function buildWordImportTemplate(categoryNames: string[]): Promise<
 // `buildWordImportTemplate` above. `forms`/`examples`/`quizQuestions` are
 // each already in the order they should appear in their cell/sheet.
 export type WordExportForm = { labelEn: string; labelJa: string; value: string };
-export type WordExportExample = { en: string; ja: string };
+export type WordExportExample = { en: string; ja: string; romanization: string | null };
 export type WordExportQuizQuestion = {
   prompt: string;
   promptJa: string | null;
@@ -420,6 +426,10 @@ function writeWordsAndQuizSheets(
       forms: serializeFormsCell(word.forms),
       examplesEn: serializeExamplesColumn(word.examples.map((example) => example.en)),
       examplesJa: serializeExamplesColumn(word.examples.map((example) => example.ja)),
+      // All-blank stays blank rather than a row of bare "|" separators.
+      examplesRomanization: word.examples.some((example) => example.romanization)
+        ? serializeExamplesColumn(word.examples.map((example) => example.romanization ?? ""))
+        : "",
       wordId: word.id,
     });
 
@@ -528,8 +538,8 @@ export function parseFormsCell(text: string): ParsedFormsCell {
 }
 
 // One example, paired up from the same-position entries of the "Examples
-// (English)"/"Examples (Japanese)" columns.
-export type ParsedExampleEntry = { en: string; ja: string };
+// (English)"/"Examples (Japanese)"/"Examples (Romanization)" columns.
+export type ParsedExampleEntry = { en: string; ja: string; romanization: string | null };
 
 export type ParsedExamplesColumns = { ok: true; examples: ParsedExampleEntry[] } | { ok: false; error: string };
 
@@ -537,8 +547,15 @@ export type ParsedExamplesColumns = { ok: true; examples: ParsedExampleEntry[] }
 // above — and the two lists are paired up by position (1st with 1st, 2nd
 // with 2nd, ...), so they must have the same number of entries: mismatched
 // counts are a hard error, not a silently-dropped/misaligned example. Both
-// empty parses to zero examples, not an error.
-export function parseExamplesColumns(enText: string, jaText: string): ParsedExamplesColumns {
+// empty parses to zero examples, not an error. The romanization column is
+// optional on top: blank means none, otherwise it needs one entry per
+// example — empty entries are kept (not filtered like the other two) so an
+// example can go without one and the rest stay lined up.
+export function parseExamplesColumns(
+  enText: string,
+  jaText: string,
+  romanizationText = "",
+): ParsedExamplesColumns {
   const enEntries = enText
     .split(FIELD_SEPARATOR)
     .map((entry) => entry.trim())
@@ -555,7 +572,25 @@ export function parseExamplesColumns(enText: string, jaText: string): ParsedExam
     };
   }
 
-  return { ok: true, examples: enEntries.map((en, index) => ({ en, ja: jaEntries[index] })) };
+  const romanizationEntries = romanizationText.trim()
+    ? romanizationText.split(FIELD_SEPARATOR).map((entry) => entry.trim())
+    : [];
+
+  if (romanizationEntries.length > 0 && romanizationEntries.length !== enEntries.length) {
+    return {
+      ok: false,
+      error: `"Examples (Romanization)" has ${romanizationEntries.length} entr${romanizationEntries.length === 1 ? "y" : "ies"} but there ${enEntries.length === 1 ? "is" : "are"} ${enEntries.length} example${enEntries.length === 1 ? "" : "s"} — give one per example, matched by position (separate them with "|"), or leave it blank.`,
+    };
+  }
+
+  return {
+    ok: true,
+    examples: enEntries.map((en, index) => ({
+      en,
+      ja: jaEntries[index],
+      romanization: romanizationEntries[index] || null,
+    })),
+  };
 }
 
 function parseSheetRows(sheet: ExcelJS.Worksheet, columns: readonly { header: string; key: string }[]): ParsedSheetRow[] {

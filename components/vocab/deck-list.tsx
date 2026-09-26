@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useOptimistic, useRef, useState, useTransition } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { restartDeck, toggleDeckActivation } from "@/lib/actions/vocab";
 import { LanguageDeckWords } from "@/components/vocab/language-deck-words";
@@ -310,71 +310,11 @@ export function DeckList({ slug, decks, activeDeckIds }: DeckListProps) {
                   {complete ? (
                     <RestartDeckButton slug={slug} deck={deck} />
                   ) : (
-                    <form
-                      action={toggleDeckActivation.bind(
-                        null,
-                        slug,
-                        deck.id,
-                        !isActive,
-                      )}
-                    >
-                      <button
-                        type="submit"
-                        aria-label={
-                          isActive
-                            ? t(
-                                "deck_list.remove_from_word_list",
-                                "Remove {{title}} from my word list",
-                                { title: deck.title },
-                              )
-                            : t(
-                                "deck_list.add_deck_to_word_list",
-                                "Add {{title}} to my word list",
-                                { title: deck.title },
-                              )
-                        }
-                        className={`group inline-flex min-h-9 items-center justify-center gap-2 rounded-full border px-4 py-1.5 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ai ${
-                          isActive
-                            ? "border-ai/40 bg-ai-soft text-ai-dark hover:border-shu/40 hover:bg-shu/10 hover:text-shu-dark focus-visible:border-shu/40 focus-visible:bg-shu/10 focus-visible:text-shu-dark"
-                            : "border-ai bg-ai text-washi hover:bg-ai-dark"
-                        }`}
-                      >
-                        {isActive ? (
-                          // Swaps to the remove label on hover/focus so it's clear
-                          // what clicking an already-added deck will do.
-                          <>
-                            <Check
-                              className="h-4 w-4 group-hover:hidden group-focus-visible:hidden"
-                              aria-hidden="true"
-                            />
-                            <X
-                              className="hidden h-4 w-4 group-hover:block group-focus-visible:block"
-                              aria-hidden="true"
-                            />
-                            <span className="group-hover:hidden group-focus-visible:hidden">
-                              {t(
-                                "deck_list.added_to_word_list",
-                                "Added to my word list",
-                              )}
-                            </span>
-                            <span className="hidden group-hover:inline group-focus-visible:inline">
-                              {t(
-                                "deck_list.remove_short",
-                                "Remove from my word list",
-                              )}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="h-4 w-4" aria-hidden="true" />
-                            {t(
-                              "deck_list.add_to_word_list",
-                              "Add to my word list",
-                            )}
-                          </>
-                        )}
-                      </button>
-                    </form>
+                    <ToggleDeckButton
+                      slug={slug}
+                      deck={deck}
+                      isActive={isActive}
+                    />
                   )}
                 </div>
               </div>
@@ -385,6 +325,102 @@ export function DeckList({ slug, decks, activeDeckIds }: DeckListProps) {
 
       <DeckPreviewModal dialogRef={previewRef} slug={slug} deck={previewDeck} />
     </div>
+  );
+}
+
+// Optimistic, so the button flips the moment it's clicked — the action plus
+// the course page's re-render take a few seconds against the remote DB, and
+// with no feedback in the meantime (and the hovered button still reading
+// "Remove from my word list") it looked like the click did nothing. Falls
+// back to the server's answer once the action settles, so a failed toggle
+// reverts on its own.
+function ToggleDeckButton({
+  slug,
+  deck,
+  isActive,
+}: {
+  slug: string;
+  deck: LanguageDeckSummary;
+  isActive: boolean;
+}) {
+  const t = useTranslations();
+  const [pending, startTransition] = useTransition();
+  const [optimisticActive, setOptimisticActive] = useOptimistic(isActive);
+
+  function handleClick() {
+    const next = !optimisticActive;
+
+    startTransition(async () => {
+      setOptimisticActive(next);
+      try {
+        await toggleDeckActivation(slug, deck.id, next);
+      } catch (error) {
+        console.error("Failed to update word list:", error);
+      }
+    });
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={pending}
+      aria-label={
+        optimisticActive
+          ? t(
+              "deck_list.remove_from_word_list",
+              "Remove {{title}} from my word list",
+              { title: deck.title },
+            )
+          : t(
+              "deck_list.add_deck_to_word_list",
+              "Add {{title}} to my word list",
+              { title: deck.title },
+            )
+      }
+      className={`group inline-flex min-h-9 items-center justify-center gap-2 rounded-full border px-4 py-1.5 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ai disabled:cursor-wait ${
+        optimisticActive
+          ? `border-ai/40 bg-ai-soft text-ai-dark ${
+              pending
+                ? ""
+                : "hover:border-shu/40 hover:bg-shu/10 hover:text-shu-dark focus-visible:border-shu/40 focus-visible:bg-shu/10 focus-visible:text-shu-dark"
+            }`
+          : "border-ai bg-ai text-washi hover:bg-ai-dark disabled:hover:bg-ai"
+      }`}
+    >
+      {optimisticActive ? (
+        // Swaps to the remove label on hover/focus so it's clear what
+        // clicking an already-added deck will do — but not mid-request,
+        // or a just-added deck would immediately read "Remove".
+        <>
+          <Check
+            className={`h-4 w-4 ${pending ? "" : "group-hover:hidden group-focus-visible:hidden"}`}
+            aria-hidden="true"
+          />
+          {!pending && (
+            <X
+              className="hidden h-4 w-4 group-hover:block group-focus-visible:block"
+              aria-hidden="true"
+            />
+          )}
+          <span
+            className={pending ? "" : "group-hover:hidden group-focus-visible:hidden"}
+          >
+            {t("deck_list.added_to_word_list", "Added to my word list")}
+          </span>
+          {!pending && (
+            <span className="hidden group-hover:inline group-focus-visible:inline">
+              {t("deck_list.remove_short", "Remove from my word list")}
+            </span>
+          )}
+        </>
+      ) : (
+        <>
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          {t("deck_list.add_to_word_list", "Add to my word list")}
+        </>
+      )}
+    </button>
   );
 }
 

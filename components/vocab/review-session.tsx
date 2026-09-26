@@ -2,19 +2,29 @@
 
 import { useState } from "react";
 import {
+  submitAnswer,
   submitFormAnswer,
   submitTypedAnswer,
   completeQuiz,
   refreshDashboardHeader,
 } from "@/lib/actions/vocab";
 import type { QuizQuestion } from "@/lib/definitions";
-import { SpeakButton, ProgressDots } from "@/components/vocab/session-ui";
+import {
+  SpeakButton,
+  ProgressDots,
+  ClozeCard,
+  FormChoiceOptions,
+  MultipleChoiceOptions,
+  type ChoiceFeedback,
+} from "@/components/vocab/session-ui";
 import { WordImage } from "@/components/ui/word-image";
 import { XpCounter } from "@/components/xp/xp-counter";
 import { LevelUpModal } from "@/components/donguri/level-up-modal";
 import { Button } from "@/components/ui/button";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
 import { useTranslations } from "@/components/i18n/locale-provider";
+import { Jyutping, JyutpingInput } from "@/components/vocab/jyutping";
+import { LessonButton } from "@/components/vocab/word-lesson";
 import { parseDonguriConfig, formatXp, type AccessoryId } from "@/lib/levels";
 
 type ReviewSessionProps = {
@@ -24,7 +34,7 @@ type ReviewSessionProps = {
   initialDonguriConfig: unknown;
 };
 
-type Feedback = { correct: boolean; correctAnswer: string; selected: string };
+type Feedback = ChoiceFeedback;
 
 type LevelUpInfo = {
   newLevel: number;
@@ -34,10 +44,11 @@ type LevelUpInfo = {
 
 // One review queue per course (see `getReviewQueue` in lib/dal.ts), mixing
 // due words from every deck's vocab and grammar together — not scoped to a
-// single deck. Every question here is typed — never multiple choice, unlike
-// `TestSession` — so this only ever needs to render `type-form` (a cloze
-// sentence) or `type-answer` (the plain term/translation prompt), both
-// answered the same way: one text input.
+// single deck. Questions are typed — `type-form` (a cloze sentence) or
+// `type-answer` (the plain term/translation prompt) — except where typing
+// can't work: a cloze whose answer isn't Latin script is `form-choice`, and
+// a non-Latin grammar point with no cloze content is `multiple-choice` (see
+// buildTypedQuestion in lib/dal.ts).
 export const ReviewSession = ({
   quiz,
   courseSlug,
@@ -61,11 +72,16 @@ export const ReviewSession = ({
 
   const question = quiz[quizIndex];
 
-  // `getReviewQueue` (lib/dal.ts) only ever builds `type-form`/`type-answer`
-  // questions via `buildTypedQuestion` — narrowing here (rather than a
-  // broader QuizQuestion prop type) is what lets the JSX below access
+  // `getReviewQueue` (lib/dal.ts) only ever builds these four kinds via
+  // `buildTypedQuestion` — narrowing here (rather than a broader
+  // QuizQuestion prop type) is what lets the JSX below access
   // `clozeSentence`/`prompt`/etc. without a cast.
-  if (question.kind !== "type-form" && question.kind !== "type-answer") {
+  if (
+    question.kind !== "type-form" &&
+    question.kind !== "type-answer" &&
+    question.kind !== "form-choice" &&
+    question.kind !== "multiple-choice"
+  ) {
     throw new Error(`ReviewSession received an unexpected question kind: ${question.kind}`);
   }
 
@@ -85,9 +101,40 @@ export const ReviewSession = ({
       const result =
         question.kind === "type-form"
           ? await submitFormAnswer(question.wordId, question.formId, typedAnswer, true)
-          : await submitTypedAnswer(question.wordId, question.direction, typedAnswer, true);
+          : question.kind === "type-answer"
+            ? await submitTypedAnswer(question.wordId, question.direction, typedAnswer, true)
+            : null;
+      if (!result) return;
 
-      setFeedback({ selected: typedAnswer, correct: result.correct, correctAnswer: result.correctAnswer });
+      setFeedback({
+        selected: typedAnswer,
+        correct: result.correct,
+        correctAnswer: result.correctAnswer,
+        alternatives: result.alternatives,
+        fullAnswer: result.fullAnswer,
+      });
+      recordResult(result.correct);
+      setXp(result.xp);
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const handleChoice = async (option: string) => {
+    if (feedback || pending) return;
+
+    setPending(true);
+
+    try {
+      const result =
+        question.kind === "form-choice"
+          ? await submitFormAnswer(question.wordId, question.formId, option, true)
+          : question.kind === "multiple-choice"
+            ? await submitAnswer(question.wordId, question.direction, option, true)
+            : null;
+      if (!result) return;
+
+      setFeedback({ selected: option, correct: result.correct, correctAnswer: result.correctAnswer });
       recordResult(result.correct);
       setXp(result.xp);
     } finally {
@@ -229,14 +276,14 @@ export const ReviewSession = ({
         <ProgressDots current={quizIndex + 1} total={quiz.length} />
       </div>
 
-      {question.kind === "type-form" ? (
-        <div className="w-full rounded-3xl border border-card-border bg-washi-soft p-7 text-center shadow-sm sm:p-9">
-          <p className="text-xs font-medium uppercase tracking-wide text-sumi-soft">
-            {t("test_session.fill_in_the_blank", "Fill in the blank")}
-          </p>
-          <p className="mt-3 text-lg text-sumi-soft">{question.clozeSentenceJa}</p>
-          <p className="mt-2 text-2xl font-semibold text-sumi">{question.clozeSentence}</p>
-        </div>
+      {question.kind === "type-form" || question.kind === "form-choice" ? (
+        <ClozeCard
+          sentence={question.clozeSentence}
+          translation={question.clozeSentenceJa}
+          romanization={question.clozeRomanization}
+          path={question.path}
+          feedback={feedback}
+        />
       ) : (
         <div className="w-full rounded-3xl border border-card-border bg-washi-soft p-7 text-center shadow-sm sm:p-9">
           {question.direction === "translation-to-term" ? null : (
@@ -247,11 +294,15 @@ export const ReviewSession = ({
             />
           )}
           <p className="text-xs font-medium uppercase tracking-wide text-sumi-soft">
-            {question.answerRomanized
-              ? t("test_session.type_the_romanized_word", "Type the romanized word")
-              : question.direction === "translation-to-term"
+            {question.kind === "multiple-choice"
+              ? question.direction === "translation-to-term"
                 ? t("test_session.what_does_this_mean", "What does this mean?")
-                : t("test_session.type_the_word", "Type the word")}
+                : t("test_session.find_the_right_word", "Can you find the right word?")
+              : question.answerRomanized
+                ? t("test_session.type_the_romanized_word", "Type the romanized word")
+                : question.direction === "translation-to-term"
+                  ? t("test_session.what_does_this_mean", "What does this mean?")
+                  : t("test_session.type_the_word", "Type the word")}
           </p>
           <div className="mt-3 flex items-center justify-center gap-3">
             <p className="text-3xl font-semibold text-sumi capitalize">{question.prompt}</p>
@@ -261,47 +312,77 @@ export const ReviewSession = ({
             )}
           </div>
           {question.promptRomanization && (
-            <p className="mt-2 text-sm text-sumi-soft">{question.promptRomanization}</p>
+            <p className="mt-2 text-sm text-sumi-soft">
+              <Jyutping text={question.promptRomanization} chart />
+            </p>
           )}
         </div>
       )}
 
-      <form
-        className="mt-5 flex w-full flex-col gap-3"
-        onSubmit={(event) => {
-          event.preventDefault();
-          handleSubmit();
-        }}
-      >
-        <input
-          type="text"
-          value={typedAnswer}
-          onChange={(event) => setTypedAnswer(event.target.value)}
+      {question.kind === "form-choice" ? (
+        <FormChoiceOptions
+          options={question.options}
+          feedback={feedback}
           disabled={pending || Boolean(feedback)}
-          autoFocus
-          autoComplete="off"
-          autoCapitalize="off"
-          spellCheck={false}
-          placeholder={
-            question.kind === "type-answer" && question.answerRomanized
-              ? t("test_session.type_romanized_placeholder", "Type the romanization")
-              : t("test_session.type_answer_placeholder", "Type your answer")
-          }
-          className="h-14 w-full rounded-2xl border border-sumi/15 bg-washi px-5 text-lg text-sumi outline-none transition focus:border-ai/50 disabled:opacity-60"
+          onChoose={handleChoice}
         />
+      ) : question.kind === "multiple-choice" ? (
+        <MultipleChoiceOptions
+          question={question}
+          feedback={feedback}
+          disabled={pending || Boolean(feedback)}
+          onChoose={(option) => handleChoice(option.text)}
+        />
+      ) : (
+        <form
+          className="mt-5 flex w-full flex-col gap-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            handleSubmit();
+          }}
+        >
+          {question.kind === "type-answer" &&
+          question.answerRomanized &&
+          question.targetLanguage === "yue" ? (
+            <JyutpingInput
+              value={typedAnswer}
+              onChange={setTypedAnswer}
+              disabled={pending || Boolean(feedback)}
+              placeholder={t("test_session.type_jyutping_placeholder", "Type the Jyutping")}
+              className="h-14 w-full rounded-2xl border border-sumi/15 bg-washi px-5 text-lg text-sumi outline-none transition focus:border-ai/50 disabled:opacity-60"
+            />
+          ) : (
+            <input
+              type="text"
+              value={typedAnswer}
+              onChange={(event) => setTypedAnswer(event.target.value)}
+              disabled={pending || Boolean(feedback)}
+              autoFocus
+              autoComplete="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              placeholder={
+                question.kind === "type-answer" && question.answerRomanized
+                  ? t("test_session.type_romanized_placeholder", "Type the romanization")
+                  : t("test_session.type_answer_placeholder", "Type your answer")
+              }
+              className="h-14 w-full rounded-2xl border border-sumi/15 bg-washi px-5 text-lg text-sumi outline-none transition focus:border-ai/50 disabled:opacity-60"
+            />
+          )}
 
-        {!feedback && (
-          <Button
-            type="submit"
-            disabled={pending || typedAnswer.trim() === ""}
-            size="lg"
-            fullWidth
-            className="shadow-sm hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0"
-          >
-            {t("test_session.check", "Check")}
-          </Button>
-        )}
-      </form>
+          {!feedback && (
+            <Button
+              type="submit"
+              disabled={pending || typedAnswer.trim() === ""}
+              size="lg"
+              fullWidth
+              className="shadow-sm hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0"
+            >
+              {t("test_session.check", "Check")}
+            </Button>
+          )}
+        </form>
+      )}
 
       {feedback && (
         <div
@@ -319,7 +400,24 @@ export const ReviewSession = ({
           {!feedback.correct && (
             <p className="mt-1 text-sm">
               {t("test_session.correct_answer_is", "The correct answer is")}{" "}
-              <strong>{feedback.correctAnswer}</strong>.
+              <strong>
+                <Jyutping text={feedback.correctAnswer} />
+              </strong>
+              .
+            </p>
+          )}
+
+          {feedback.correct && feedback.fullAnswer && (
+            <p className="mt-1 text-sm">
+              {t("test_session.full_answer_is", "Just note the full answer:")}{" "}
+              <strong>{feedback.fullAnswer}</strong>
+            </p>
+          )}
+
+          {feedback.correct && feedback.alternatives && feedback.alternatives.length > 1 && (
+            <p className="mt-1 text-sm">
+              {t("test_session.either_is_fine", "Either answer is fine:")}{" "}
+              <strong>{feedback.alternatives.join(" / ")}</strong>
             </p>
           )}
         </div>
@@ -336,6 +434,12 @@ export const ReviewSession = ({
             ? t("review_session.next_word", "Next word")
             : t("test_session.see_my_results", "See my results")}
         </Button>
+      )}
+
+      {feedback && (
+        <div className="mt-3 flex justify-center">
+          <LessonButton courseSlug={courseSlug} wordId={question.wordId} />
+        </div>
       )}
     </section>
   );

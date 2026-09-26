@@ -14,7 +14,13 @@ import { useTranslations } from "@/components/i18n/locale-provider";
 // being added in this same submission, on create especially).
 
 type FormRow = { clientId: string; labelEn: string; labelJa: string; value: string };
-type ExampleRow = { clientId: string; en: string; ja: string; formClientId: string };
+type ExampleRow = {
+  clientId: string;
+  en: string;
+  ja: string;
+  romanization: string;
+  formClientId: string;
+};
 
 export type WordFormsFieldsInitialForm = { id: string; labelEn: string; labelJa: string; value: string };
 export type WordFormsFieldsInitialExample = {
@@ -22,6 +28,7 @@ export type WordFormsFieldsInitialExample = {
   formId: string | null;
   en: string;
   ja: string;
+  romanization: string | null;
 };
 
 type WordFormsFieldsProps = {
@@ -51,6 +58,7 @@ export function WordFormsFields({
       clientId: example.id,
       en: example.en,
       ja: example.ja,
+      romanization: example.romanization ?? "",
       formClientId: example.formId ?? "",
     })),
   );
@@ -76,7 +84,7 @@ export function WordFormsFields({
   const addExample = () =>
     setExamples((current) => [
       ...current,
-      { clientId: newClientId(), en: "", ja: "", formClientId: "" },
+      { clientId: newClientId(), en: "", ja: "", romanization: "", formClientId: "" },
     ]);
 
   const removeExample = (clientId: string) =>
@@ -196,6 +204,21 @@ export function WordFormsFields({
                 />
               </label>
             </div>
+            <label className="flex flex-col gap-1 text-xs text-sumi-soft">
+              <span>
+                {t("admin_word_forms.example_romanization", "Romanization")}{" "}
+                <span className="opacity-70">{t("common.optional_paren", "(optional)")}</span>
+              </span>
+              <input
+                name={`examples.${index}.romanization`}
+                value={example.romanization}
+                onChange={(event) =>
+                  updateExample(example.clientId, "romanization", event.target.value)
+                }
+                placeholder="ngo5 hai6 lou5 si1."
+                className={inputClass}
+              />
+            </label>
             <div className="flex items-end gap-2">
               <label className="flex flex-1 flex-col gap-1 text-xs text-sumi-soft">
                 {t("admin_word_forms.demonstrates_form", "Demonstrates which form?")}

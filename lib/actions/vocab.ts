@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import {
   bumpStreak,
   ensureDeckActivations,
+  getLessonWord,
   introduceLearnBatch,
   requireSubscriber,
 } from "@/lib/dal";
@@ -16,19 +17,64 @@ import {
   toUTCDateString,
 } from "@/lib/srs";
 import { ACCESSORIES, levelForXp, parseDonguriConfig, type AccessoryId } from "@/lib/levels";
-import type { QuizDirection } from "@/lib/definitions";
+import type { QuizDirection, RevealWord } from "@/lib/definitions";
 import { isLatinTypeable } from "@/lib/language";
 
-// Case-insensitive, whitespace-trimmed match against one candidate answer —
-// or, when the stored value is a comma-separated list (e.g. a translation
-// with more than one accepted reading, "こんにちは, もしもし"), against any
-// one of its segments. Shared by every typed-answer check.
-function matchesTypedAnswer(typed: string, stored: string): boolean {
-  const guess = typed.trim().toLowerCase();
+// How loosely a typed answer is read. Vocab answers are lenient: slashes
+// separate alternatives ("they / them") and a bracketed note is optional
+// ("you (plural)"). Grammar keeps both — they're part of the pattern
+// ("You / We / They + are + adjective/noun"), so "noun" mustn't count.
+type AnswerLeniency = { vocab: boolean };
+
+// The separate readings packed into one stored answer: a comma-separated
+// list ("こんにちは, もしもし") or, for vocab, slash-separated alternatives.
+// Any one of them on its own is a correct answer.
+function answerReadings(stored: string, { vocab }: AnswerLeniency): string[] {
   return stored
-    .split(",")
-    .map((segment) => segment.trim().toLowerCase())
-    .some((segment) => segment === guess);
+    .split(vocab ? /[,/]/ : ",")
+    .map((segment) => segment.trim())
+    .filter((segment) => segment !== "");
+}
+
+// A bracketed note on a reading — "(plural)", or full-width "（に）".
+const READING_NOTE = /\s*[(（][^()（）]*[)）]/g;
+
+type TypedAnswerMatch = {
+  correct: boolean;
+  // The reading in full when the learner left its bracketed note off
+  // ("you" for "you (plural)") — still correct, but worth showing them.
+  fullAnswer: string | null;
+};
+
+// Case-insensitive, whitespace-trimmed match against any one reading of
+// the stored answer (see answerReadings), then — for vocab — against each
+// reading with its bracketed note taken off. Shared by every typed-answer
+// check.
+function matchTypedAnswer(typed: string, stored: string, leniency: AnswerLeniency): TypedAnswerMatch {
+  const guess = typed.trim().toLowerCase();
+  const readings = answerReadings(stored, leniency);
+
+  if (readings.some((reading) => reading.toLowerCase() === guess)) {
+    return { correct: true, fullAnswer: null };
+  }
+
+  if (leniency.vocab) {
+    const noteless = readings.find((reading) => {
+      const bare = reading.replace(READING_NOTE, "").trim();
+      return bare !== "" && bare !== reading && bare.toLowerCase() === guess;
+    });
+    if (noteless) return { correct: true, fullAnswer: noteless };
+  }
+
+  return { correct: false, fullAnswer: null };
+}
+
+// Every reading of the answer, when there's more than one — so a learner
+// who typed "they" for "they / them" is told "them" would have been fine
+// too. Empty for a single-reading answer.
+function alternativeReadings(stored: string, leniency: AnswerLeniency): string[] {
+  const readings = answerReadings(stored, leniency);
+  return readings.length > 1 ? readings : [];
 }
 
 // +1 XP per correct quiz answer (both multiple-choice and fill-in-the-form
@@ -131,12 +177,14 @@ async function recordAnswer(
   return { xp };
 }
 
-// Always the post-learn quiz — multiple choice never appears in the review
-// queue (see `getReviewQueue`), so this never advances stage.
+// Mostly the post-learn quiz (`advancesStage: false`). The review queue
+// only asks multiple choice for a non-Latin-script grammar point with no
+// cloze content (see grammarChoiceFallback in lib/dal.ts), and passes true.
 export async function submitAnswer(
   wordId: string,
   direction: QuizDirection,
   selectedAnswer: string,
+  advancesStage = false,
 ): Promise<{ correct: boolean; correctAnswer: string; xp: number }> {
   const user = await requireSubscriber();
 
@@ -148,7 +196,7 @@ export async function submitAnswer(
   const correctAnswer = direction === "term-to-translation" ? word.translation : word.term;
   const correct = selectedAnswer === correctAnswer;
 
-  const { xp } = await recordAnswer(user.id, wordId, correct, false);
+  const { xp } = await recordAnswer(user.id, wordId, correct, advancesStage);
 
   return { correct, correctAnswer, xp };
 }
@@ -170,7 +218,13 @@ export async function submitTypedAnswer(
   direction: QuizDirection,
   typedAnswer: string,
   advancesStage: boolean,
-): Promise<{ correct: boolean; correctAnswer: string; xp: number }> {
+): Promise<{
+  correct: boolean;
+  correctAnswer: string;
+  xp: number;
+  alternatives: string[];
+  fullAnswer: string | null;
+}> {
   const user = await requireSubscriber();
 
   const word = await prisma.word.findUniqueOrThrow({
@@ -200,12 +254,21 @@ export async function submitTypedAnswer(
         ? word.romanization!
         : word.term;
   const acceptedAnswers = [storedAnswer, ...word.alternateAnswers.map((alt) => alt.value)].join(",");
-  const correct = matchesTypedAnswer(typedAnswer, acceptedAnswers);
+  const leniency = { vocab: word.path === "vocab" };
+  const { correct, fullAnswer } = matchTypedAnswer(typedAnswer, acceptedAnswers, leniency);
+  // A comma list shows just its first reading; slash alternatives
+  // ("they / them") are shown whole, since they're one answer.
   const correctAnswer = storedAnswer.split(",")[0].trim();
 
   const { xp } = await recordAnswer(user.id, wordId, correct, advancesStage);
 
-  return { correct, correctAnswer, xp };
+  return {
+    correct,
+    correctAnswer,
+    xp,
+    alternatives: alternativeReadings(storedAnswer, leniency),
+    fullAnswer,
+  };
 }
 
 // Checks a typed answer against a word form's value — trimmed and
@@ -219,18 +282,31 @@ export async function submitFormAnswer(
   formId: string | null,
   typedAnswer: string,
   advancesStage: boolean,
-): Promise<{ correct: boolean; correctAnswer: string; xp: number }> {
+): Promise<{
+  correct: boolean;
+  correctAnswer: string;
+  xp: number;
+  alternatives?: string[];
+  fullAnswer?: string | null;
+}> {
   const user = await requireSubscriber();
 
   if (formId === null) {
     const word = await prisma.word.findUniqueOrThrow({
       where: { id: wordId },
-      select: { term: true, alternateAnswers: { select: { value: true } } },
+      select: { term: true, path: true, alternateAnswers: { select: { value: true } } },
     });
     const acceptedAnswers = [word.term, ...word.alternateAnswers.map((alt) => alt.value)].join(",");
-    const correct = matchesTypedAnswer(typedAnswer, acceptedAnswers);
+    const leniency = { vocab: word.path === "vocab" };
+    const { correct, fullAnswer } = matchTypedAnswer(typedAnswer, acceptedAnswers, leniency);
     const { xp } = await recordAnswer(user.id, wordId, correct, advancesStage);
-    return { correct, correctAnswer: word.term, xp };
+    return {
+      correct,
+      correctAnswer: word.term,
+      xp,
+      alternatives: alternativeReadings(word.term, leniency),
+      fullAnswer,
+    };
   }
 
   const form = await prisma.wordForm.findUniqueOrThrow({
@@ -568,4 +644,13 @@ export async function resetCourseProgress(courseId: string): Promise<void> {
   // "layout" scope too: the header's XP/level badge lives in the shared
   // dashboard layout, not just the vocab pages under this exact path.
   revalidatePath("/dashboard", "layout");
+}
+
+// The learn card for one word, for the quiz's "See the lesson" modal —
+// read-only, so it records nothing.
+export async function getWordLesson(
+  courseSlug: string,
+  wordId: string,
+): Promise<RevealWord | null> {
+  return getLessonWord(courseSlug, wordId);
 }
