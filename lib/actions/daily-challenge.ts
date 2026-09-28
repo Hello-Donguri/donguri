@@ -12,11 +12,16 @@ import { prisma } from "@/lib/prisma";
 import { startOfUTCDay, dailyChallengeXp } from "@/lib/srs";
 import { isLatinTypeable } from "@/lib/language";
 import {
+  CANTONESE_QUOTE_RULE,
   JAPANESE_FEEDBACK_RULE,
   challengeLanguage,
+  glossesPromptField,
+  glossesPromptRule,
+  parseGlosses,
   pickChallengeTarget,
   type ChallengeItem,
   type ChallengeTarget,
+  type WordGloss,
 } from "@/lib/daily-challenge";
 
 // A daily-challenge attempt is a chat with Charles Duck in which the learner
@@ -54,6 +59,9 @@ export type ChatReply = {
   text: string;
   romanization: string | null;
   translation: string;
+  // Word-by-word meanings of `text`, for hovering; null if the model left
+  // them out.
+  glosses: WordGloss[] | null;
   grammarScore: number;
   naturalnessScore: number;
   relevanceScore: number;
@@ -216,6 +224,21 @@ function vocabToneMismatch(
   return null;
 }
 
+// Whether feedback meant to be English came back mostly in Chinese — the
+// Cantonese chat sometimes drags the model's feedback into Cantonese too.
+// Quoted Cantonese is fine; it's the balance that matters.
+function mostlyChinese(texts: string[]): boolean {
+  const joined = texts.join(" ");
+  const han = joined.match(/\p{Script=Han}/gu)?.length ?? 0;
+  const latin = joined.match(/[a-z]/gi)?.length ?? 0;
+  return han > 0 && han * 2 > latin;
+}
+
+function feedbackTexts(parsed: { feedback: string; summary?: unknown }): string[] {
+  const summary = parseSummary(parsed.summary);
+  return [parsed.feedback, ...(summary ? [summary.overall, ...summary.tips] : [])];
+}
+
 function describeItem(item: ChallengeItem): string {
   const forms =
     item.forms.length > 0 ? ` — any form counts: ${item.forms.join(", ")}` : "";
@@ -267,14 +290,15 @@ function promptLanguage(target: ChallengeTarget) {
       replyFields: `	"text": "Charles Duck's simple, casual chat reply, in Cantonese characters",
 	"romanization": "The same reply in Jyutping with tone numbers — exactly one syllable per Chinese character, keeping the punctuation",
 	"translation": "A natural English translation of the same reply",`,
-      feedbackLanguage: `Write it in very simple, beginner-friendly English — short words, short sentences, no grammar jargon. When you quote Cantonese, write the characters followed by their Jyutping in brackets, e.g. 我係學生 (ngo5 hai6 hok6 saang1).`,
+      feedbackLanguage: `Write it in ENGLISH — the user is an English speaker and can't yet read Cantonese explanations. Only your chat reply ("text") is in Cantonese; "feedback" and everything in "summary" must be English. Use very simple, beginner-friendly English — short words, short sentences, no grammar jargon. ${CANTONESE_QUOTE_RULE} When you correct a word, name the right form, what it means, and what they wrote instead, e.g. "Use 飲 (jam2, "drink"), not yum2." When you suggest adding something, say what the addition means, e.g. "You could add 鍾意 (zung1 ji3, "like") to say you like it."`,
       feedbackJaField: "",
       texting:
         "This is casual texting, so ignore punctuation, and never count writing Jyutping instead of characters — or missing tone numbers — as a mistake. A wrong tone number in their Jyutping is a small mistake: take at most 1 point off grammarScore for it, never fail the target over it, and point out the correct tone in your feedback.",
       betterVersion: "in Cantonese characters",
       summaryExtraFields: `,
 	"betterVersionRomanization": "The betterVersion in Jyutping with tone numbers, one syllable per character"`,
-      feedbackRule: "Quote Cantonese in the summary as characters followed by Jyutping in brackets.",
+      feedbackRule:
+        `Write "overall" and every tip in ENGLISH, never Cantonese — only "betterVersion" is Cantonese. ${CANTONESE_QUOTE_RULE}`,
     };
   }
 
@@ -326,15 +350,17 @@ Return only a JSON object with exactly these fields, in this order:
 	"assessment": "Private notes for scoring, never shown to the user, 1-2 short sentences: what did you last say or ask, and does the user's latest message actually respond to it?",
 	"respondedToYou": true,
 ${language.replyFields}
+	${glossesPromptField(target.targetLanguage)},
 	"grammarScore": 0,
 	"naturalnessScore": 0,
 	"relevanceScore": 0,
 	"complexityScore": 0,
 	"usedTarget": false,
 	"summary": null,
-	"feedback": "One short, encouraging sentence with a concrete tip on how the user's latest message could be more natural, correct, or relevant to the conversation — or, if it's already good, richer (e.g. add a reason or a detail) — or a short specific compliment if it's already excellent. If respondedToYou is false, the tip must be about that (e.g. answer my question first, then ask yours)."${language.feedbackJaField}
+	"feedback": "One short, encouraging sentence with ONE concrete tip — a single point, never two joined with 'and' — on how the user's latest message could be more natural, correct, or relevant to the conversation — or, if it's already good, richer (e.g. add a reason or a detail) — or a short specific compliment if it's already excellent. If respondedToYou is false, the tip must be about that (e.g. answer my question first, then ask yours)."${language.feedbackJaField}
 }
 The feedback: ${language.feedbackLanguage}
+${glossesPromptRule(target.targetLanguage)}
 respondedToYou is true only if the user's latest message actually responds to what you last said. If you asked a question, it must answer it — even briefly or loosely ("Just some toast!", "I'm not sure"). It is false if the user ignores your question, changes the subject, or replies with a question of their own without answering yours. Asking a question back AFTER answering is great ("Pizza! What about you?") and counts as true.
 ${describeTargetUsage(target, vocabInMessage)} Judge the latest message only, not earlier ones.${toneNote}
 grammarScore is an integer from 0 to 10 for the grammatical correctness of the user's latest message, judged on its own, not on relevance. ${language.texting} When usedTarget is true, also judge whether the target is used correctly.
@@ -357,8 +383,8 @@ complexityScore is an integer from 0 to 10 for how rich and developed the user's
 Don't reward length for its own sake: rambling, repetitive or overlong messages should not score higher than a tight sentence that connects two ideas.
 When usedTarget is true, the chat is over, so "text" should be a short, warm reply that wraps up the chat, and "summary" must be an object reviewing the user's whole performance:
 {
-	"overall": "2-3 short sentences on how the user did across the whole chat — how well they used the target, and how natural and relevant their replies were",
-	"tips": ["Up to 3 short, concrete tips on what they could have done better, each about something they actually wrote. Use an empty list if there is truly nothing to improve."],
+	"overall": "2-3 short sentences on how the user did across the whole chat — how well they used the target, and how natural and relevant their replies were. A verdict, not advice: don't repeat any correction or suggestion from feedback or tips",
+	"tips": ["Up to 3 short, concrete tips on what they could have done better, each about something they actually wrote. They are shown in one list straight after your feedback, so never repeat or reword the feedback's point, and make each tip a different point. Use an empty list if there is nothing left to improve."],
 	"betterVersion": "A better version of the message where they used the target, still using it: fix any mistakes, make it sound natural, make it actually answer what you last said, and add a little detail if it was very short. Keep it short, simple and beginner-friendly — something they could realistically say. If that message was already perfect, repeat it unchanged.${language.betterVersion ? ` Write it ${language.betterVersion}.` : ""}"${language.summaryExtraFields}
 }
 When usedTarget is false, "summary" must be null. Write the summary in the same very simple, beginner-friendly English as the feedback, with no grammar jargon.
@@ -433,32 +459,55 @@ export async function sendDailyChallengeMessage(
   let reply: ChatReply;
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const response = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL ?? "gpt-5.6-luna",
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content: buildSystemPrompt(
-            target,
-            vocabInMessage,
-            target.vocab ? vocabToneMismatch(trimmedMessage, target.vocab) : null,
-          ),
-        },
-        ...history.slice(-MAX_HISTORY_TURNS).map((turn) => ({
-          role: turn.role === "assistant" ? ("assistant" as const) : ("user" as const),
-          content: String(turn.content).slice(0, MAX_MESSAGE_LENGTH * 2),
-        })),
-        { role: "user", content: trimmedMessage },
-      ],
-    });
+    const messages = [
+      {
+        role: "system" as const,
+        content: buildSystemPrompt(
+          target,
+          vocabInMessage,
+          target.vocab ? vocabToneMismatch(trimmedMessage, target.vocab) : null,
+        ),
+      },
+      ...history.slice(-MAX_HISTORY_TURNS).map((turn) => ({
+        role: turn.role === "assistant" ? ("assistant" as const) : ("user" as const),
+        content: String(turn.content).slice(0, MAX_MESSAGE_LENGTH * 2),
+      })),
+      { role: "user" as const, content: trimmedMessage },
+    ];
+    const ask = async (extra: { role: "system" | "assistant"; content: string }[] = []) => {
+      const response = await openai.chat.completions.create({
+        model: process.env.OPENAI_MODEL ?? "gpt-5.6-luna",
+        response_format: { type: "json_object" },
+        messages: [...messages, ...extra],
+      });
+      const content = response.choices[0]?.message.content;
+      return content ? (JSON.parse(content) as unknown) : null;
+    };
 
-    const content = response.choices[0]?.message.content;
-    if (!content) {
+    let parsed = await ask();
+    if (parsed === null) {
       return { ok: false, reason: "error", error: "Charles Duck did not send a reply." };
     }
 
-    const parsed: unknown = JSON.parse(content);
+    // The Cantonese chat's feedback must be English (the learner can't read
+    // Cantonese explanations yet); if it slipped into Cantonese, ask again
+    // once, saying so. Keep the first answer if the retry fails.
+    if (
+      target.targetLanguage === "yue" &&
+      isChatReply(parsed) &&
+      mostlyChinese(feedbackTexts(parsed))
+    ) {
+      const retried = await ask([
+        { role: "assistant", content: JSON.stringify(parsed) },
+        {
+          role: "system",
+          content:
+            `Your "feedback", "overall" and "tips" were written in Cantonese. Rewrite the whole JSON object with those in simple ENGLISH. ${CANTONESE_QUOTE_RULE} Keep "text", "romanization", "betterVersion" and the scores as they were.`,
+        },
+      ]).catch(() => null);
+      if (isChatReply(retried)) parsed = retried;
+    }
+
     if (!isChatReply(parsed)) {
       return { ok: false, reason: "error", error: "Charles Duck sent an invalid reply." };
     }
@@ -484,6 +533,10 @@ export async function sendDailyChallengeMessage(
         ? optionalString((parsed as { romanization?: unknown }).romanization)
         : null,
       translation: parsed.translation,
+      glosses: parseGlosses(
+        (parsed as { words?: unknown }).words,
+        challengeLanguage(target.targetLanguage).hasRomanization,
+      ),
       feedback: parsed.feedback,
       feedbackJa: optionalString((parsed as { feedbackJa?: unknown }).feedbackJa),
       grammarScore: Math.round(parsed.grammarScore),

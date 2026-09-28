@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { LocaleProvider } from "@/components/i18n/locale-provider";
 import { getLocale } from "@/lib/i18n/get-locale";
 import { getDictionary } from "@/lib/i18n/dictionaries";
+import PeeringDonguriAcorn from "@/components/auth/peering-donguri";
 
 // Site content — body text everywhere.
 const openSans = Open_Sans({

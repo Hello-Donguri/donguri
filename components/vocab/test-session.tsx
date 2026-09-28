@@ -1,6 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import Image from "next/image";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { ArrowRight, Check, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import {
   submitAnswer,
   submitFormAnswer,
@@ -12,10 +16,15 @@ import {
 import type { QuizOption, QuizQuestion } from "@/lib/definitions";
 import {
   SpeakButton,
-  ProgressDots,
   ClozeCard,
   FormChoiceOptions,
+  ProgressSegments,
+  reducedSessionCardVariants,
+  sessionCardVariants,
+  useAnswerFocus,
+  useEnterToContinue,
   MultipleChoiceOptions,
+  ToneRetryNote,
   type ChoiceFeedback,
 } from "@/components/vocab/session-ui";
 import { WordImage } from "@/components/ui/word-image";
@@ -25,8 +34,12 @@ import { Button } from "@/components/ui/button";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { Jyutping, JyutpingInput } from "@/components/vocab/jyutping";
-import { LessonButton } from "@/components/vocab/word-lesson";
+import { LessonButton, lessonAccent } from "@/components/vocab/word-lesson";
 import { parseDonguriConfig, formatXp, type AccessoryId } from "@/lib/levels";
+
+// The typed-answer form lives in the card, its Check button below it (like
+// the learn card's "Got it") — tied together by this id.
+const TYPED_ANSWER_FORM = "test-typed-answer";
 
 type TestSessionProps = {
   quiz: QuizQuestion[];
@@ -44,16 +57,26 @@ type LevelUpInfo = {
 };
 
 export const TestSession = ({
-  quiz,
+  quiz: initialQuiz,
   courseSlug,
   initialXp,
   initialDonguriConfig,
 }: TestSessionProps) => {
+  // The questions are fixed for the whole session. The page can re-render
+  // underneath it (e.g. the header refresh once it's finished), and the
+  // queue it hands down is rebuilt — reshuffled, possibly longer — every
+  // time; taking that mid-session swapped the current question and could
+  // turn "See my results" into yet another question.
+  const [quiz] = useState(initialQuiz);
   const t = useTranslations();
+  const reduceMotion = useReducedMotion();
+  const router = useRouter();
   const [quizIndex, setQuizIndex] = useState(0);
   const [pending, setPending] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [typedAnswer, setTypedAnswer] = useState("");
+  // The right Jyutping, while the learner retypes it after a tone slip.
+  const [toneRetry, setToneRetry] = useState<string | null>(null);
   const [score, setScore] = useState({ correct: 0, incorrect: 0 });
   const [finished, setFinished] = useState(false);
   const [xp, setXp] = useState(initialXp);
@@ -160,14 +183,27 @@ export const TestSession = ({
     setPending(true);
 
     try {
-      const result = await submitTypedAnswer(question.wordId, question.direction, typedAnswer, false);
+      const result = await submitTypedAnswer(
+        question.wordId,
+        question.direction,
+        typedAnswer,
+        false,
+        toneRetry !== null,
+      );
+      if (result.toneMiss) {
+        setToneRetry(result.correctAnswer);
+        setTypedAnswer("");
+        return;
+      }
       setFeedback({
         selected: typedAnswer,
         correct: result.correct,
         correctAnswer: result.correctAnswer,
         alternatives: result.alternatives,
         fullAnswer: result.fullAnswer,
+        toneFixed: toneRetry !== null && result.correct,
       });
+      setToneRetry(null);
       recordResult(result.correct);
       setXp(result.xp);
     } finally {
@@ -205,6 +241,28 @@ export const TestSession = ({
       });
     }
   };
+
+  useEnterToContinue(Boolean(feedback) && !finished, advance);
+  const answerInputRef = useAnswerFocus(
+    `${quizIndex}${toneRetry ? "-tone-retry" : ""}`,
+    !feedback && !finished,
+  );
+  // On the results screen, Enter is "Back to course" — held off while the
+  // level-up modal is up, which has its own button.
+  useEnterToContinue(finished && !levelUpInfo, () =>
+    router.push(`/dashboard/courses/${courseSlug}`),
+  );
+
+  // Landed with nothing to test (everything's been quizzed): straight back
+  // to the course rather than an empty screen. Only on arrival — once a
+  // quiz is finished its results stay put, even though the page behind
+  // them re-renders with an empty queue (see refreshDashboardHeader).
+  const nothingToTest = quiz.length === 0 && !finished;
+  useEffect(() => {
+    if (nothingToTest) router.replace(`/dashboard/courses/${courseSlug}`);
+  }, [nothingToTest, router, courseSlug]);
+
+  if (nothingToTest) return null;
 
   if (finished) {
     const totalAnswers = score.correct + score.incorrect;
@@ -288,335 +346,384 @@ export const TestSession = ({
     );
   }
 
-  return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col items-center">
-      <div className="mb-4 flex w-full justify-center">
-        <XpCounter value={xp} />
+  // Laid out like a learn card (see LearnSession and WordLesson): a vocab
+  // question puts the word's picture on the left and the question beside
+  // it; everything else is one column. Safe in either direction now the
+  // answer options never carry pictures of their own to match against.
+  const showPicture =
+    (question.kind === "multiple-choice" || question.kind === "type-answer") &&
+    question.path === "vocab";
+  const isTyped =
+    question.kind === "type-form" ||
+    question.kind === "custom-type" ||
+    question.kind === "type-answer";
+  const inputClass =
+    "h-14 w-full rounded-2xl border-2 border-sumi/10 bg-washi-soft/60 px-6 text-xl text-sumi outline-none transition focus:border-ai/60 focus:bg-washi focus:ring-4 focus:ring-ai/10 disabled:opacity-60";
+
+  const header = (
+    <div className="flex flex-col items-center text-center">
+      <span
+        className={`mb-3 rounded-full px-3.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${
+          question.path === "grammar"
+            ? "bg-matcha-soft text-matcha-dark"
+            : "bg-ai-soft text-ai-dark"
+        }`}
+      >
+        {question.path === "grammar"
+          ? t("course_home.grammar", "Grammar")
+          : t("course_home.vocabulary", "Vocabulary")}
+      </span>
+      <p className="text-xs font-medium uppercase tracking-[0.18em] text-sumi-soft">
+        {t("test_session.question_progress", "Question {{current}} of {{total}}", {
+          current: quizIndex + 1,
+          total: quiz.length,
+        })}
+      </p>
+      <div className="mt-2 flex w-full justify-center">
+        <ProgressSegments current={quizIndex + 1} total={quiz.length} />
       </div>
+    </div>
+  );
 
-      <div className="mb-7 flex flex-col items-center gap-3 text-center">
-        <span
-          className={`rounded-full px-4 py-1.5 text-sm font-medium ${
-            question.path === "grammar"
-              ? "bg-matcha-soft text-matcha-dark"
-              : "bg-ai-soft text-ai-dark"
-          }`}
-        >
-          {question.path === "grammar"
-            ? t("course_home.grammar", "Grammar")
-            : t("course_home.vocabulary", "Vocabulary")}
-        </span>
+  const typedInput = (onSubmit: () => void, placeholder: string) => (
+    <form
+      id={TYPED_ANSWER_FORM}
+      className="mt-6 w-full"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit();
+      }}
+    >
+      {question.kind === "type-answer" &&
+      question.answerRomanized &&
+      question.targetLanguage === "yue" ? (
+        <JyutpingInput
+          inputRef={answerInputRef}
+          autoFocus={false}
+          value={typedAnswer}
+          onChange={setTypedAnswer}
+          disabled={pending || Boolean(feedback)}
+          placeholder={t("test_session.type_jyutping_placeholder", "Type the Jyutping")}
+          className={inputClass}
+        />
+      ) : (
+        <input
+          type="text"
+          value={typedAnswer}
+          onChange={(event) => setTypedAnswer(event.target.value)}
+          disabled={pending || Boolean(feedback)}
+          ref={answerInputRef}
+          autoComplete="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          placeholder={placeholder}
+          className={inputClass}
+        />
+      )}
+    </form>
+  );
 
-        <p className="text-sm text-sumi-soft">
-          {t("test_session.question_progress", "Question {{current}} of {{total}}", {
-            current: quizIndex + 1,
-            total: quiz.length,
-          })}
-        </p>
-
-        <ProgressDots current={quizIndex + 1} total={quiz.length} />
-      </div>
-
-      {question.kind === "type-form" || question.kind === "form-choice" ? (
-        <>
+  // The question itself (prompt + answer area), whichever kind it is.
+  let body: React.ReactNode;
+  if (question.kind === "type-form" || question.kind === "form-choice") {
+    body = (
+      <>
+        <div className="mt-6 w-full">
           <ClozeCard
             sentence={question.clozeSentence}
             translation={question.clozeSentenceJa}
+            highlight={question.clozeHighlightJa}
             romanization={question.clozeRomanization}
             path={question.path}
             feedback={feedback}
           />
+        </div>
+        {question.kind === "type-form" ? (
+          typedInput(
+            handleTypeFormSubmit,
+            t("test_session.type_answer_placeholder", "Type your answer"),
+          )
+        ) : (
+          <FormChoiceOptions
+            options={question.options}
+            feedback={feedback}
+            disabled={pending || Boolean(feedback)}
+            onChoose={handleFormChoiceAnswer}
+          />
+        )}
+      </>
+    );
+  } else if (question.kind === "custom-choice" || question.kind === "custom-type") {
+    body = (
+      <>
+        <div className="mt-6 flex flex-col items-center text-center">
+          <p className="text-xs font-medium uppercase tracking-[0.14em] text-sumi-soft">
+            {t("test_session.quiz_question", "Quiz question")}
+          </p>
+          <p className="mt-3 text-2xl font-semibold text-sumi sm:text-3xl">{question.prompt}</p>
+          {question.promptJa && <p className="mt-2 text-sumi-soft">{question.promptJa}</p>}
+        </div>
+        {question.kind === "custom-type" ? (
+          typedInput(
+            handleCustomTypeSubmit,
+            t("test_session.type_answer_placeholder", "Type your answer"),
+          )
+        ) : (
+          <FormChoiceOptions
+            options={question.options.map((option) => ({ text: option, romanization: null }))}
+            feedback={feedback}
+            disabled={pending || Boolean(feedback)}
+            onChoose={handleCustomChoiceAnswer}
+          />
+        )}
+      </>
+    );
+  } else {
+    const promptLabel =
+      question.kind === "type-answer" && question.answerRomanized
+        ? t("test_session.type_the_romanized_word", "Type the romanized word")
+        : question.direction === "translation-to-term"
+          ? t("test_session.what_does_this_mean", "What does this mean?")
+          : question.kind === "type-answer"
+            ? t("test_session.type_the_word", "Type the word")
+            : t("test_session.find_the_right_word", "Can you find the right word?");
+    // A grammar point's translation is a whole explanation — too long for
+    // the big headline size a single word gets.
+    const longPrompt = question.prompt.length > 24;
 
-          {question.kind === "type-form" ? (
-            <form
-              className="mt-5 flex w-full flex-col gap-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-                handleTypeFormSubmit();
-              }}
+    body = (
+      <>
+        <div className="mt-6 flex flex-col items-center text-center">
+          <p className="text-xs font-medium uppercase tracking-[0.14em] text-sumi-soft">
+            {promptLabel}
+          </p>
+          <div className="mt-3 flex items-center justify-center gap-3">
+            <p
+              className={`font-extrabold tracking-tight text-sumi capitalize ${
+                longPrompt ? "text-2xl sm:text-3xl" : "text-4xl sm:text-5xl"
+              }`}
             >
-              <input
-                type="text"
-                value={typedAnswer}
-                onChange={(event) => setTypedAnswer(event.target.value)}
-                disabled={pending || Boolean(feedback)}
-                autoFocus
-                autoComplete="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                placeholder={t("test_session.type_answer_placeholder", "Type your answer")}
-                className="h-14 w-full rounded-2xl border border-sumi/15 bg-washi px-5 text-lg text-sumi outline-none transition focus:border-ai/50 disabled:opacity-60"
-              />
-
-              {!feedback && (
-                <Button
-                  type="submit"
-                  disabled={pending || typedAnswer.trim() === ""}
-                  size="lg"
-                  fullWidth
-                  className="shadow-sm hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0"
-                >
-                  {t("test_session.check", "Check")}
-                </Button>
-              )}
-            </form>
-          ) : (
-            <FormChoiceOptions
-              options={question.options}
-              feedback={feedback}
-              disabled={pending || Boolean(feedback)}
-              onChoose={handleFormChoiceAnswer}
-            />
+              {question.prompt}
+            </p>
+            {question.direction === "term-to-translation" && (
+              <SpeakButton text={question.prompt} language={question.targetLanguage} />
+            )}
+          </div>
+          {question.promptRomanization && (
+            <p className="mt-2 text-lg text-sumi-soft">
+              <Jyutping text={question.promptRomanization} chart />
+            </p>
           )}
-        </>
-      ) : question.kind === "custom-choice" || question.kind === "custom-type" ? (
-        <>
-          <div className="w-full rounded-3xl border border-card-border bg-washi-soft p-7 text-center shadow-sm sm:p-9">
-            <p className="text-xs font-medium uppercase tracking-wide text-sumi-soft">
-              {t("test_session.quiz_question", "Quiz question")}
-            </p>
-            <p className="mt-3 text-2xl font-semibold text-sumi">{question.prompt}</p>
-            {question.promptJa && <p className="mt-2 text-sumi-soft">{question.promptJa}</p>}
-          </div>
-
-          {question.kind === "custom-type" ? (
-            <form
-              className="mt-5 flex w-full flex-col gap-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-                handleCustomTypeSubmit();
-              }}
-            >
-              <input
-                type="text"
-                value={typedAnswer}
-                onChange={(event) => setTypedAnswer(event.target.value)}
-                disabled={pending || Boolean(feedback)}
-                autoFocus
-                autoComplete="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                placeholder={t("test_session.type_answer_placeholder", "Type your answer")}
-                className="h-14 w-full rounded-2xl border border-sumi/15 bg-washi px-5 text-lg text-sumi outline-none transition focus:border-ai/50 disabled:opacity-60"
-              />
-
-              {!feedback && (
-                <Button
-                  type="submit"
-                  disabled={pending || typedAnswer.trim() === ""}
-                  size="lg"
-                  fullWidth
-                  className="shadow-sm hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0"
-                >
-                  {t("test_session.check", "Check")}
-                </Button>
-              )}
-            </form>
-          ) : (
-            <div className="mt-5 grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
-              {question.options.map((option) => {
-                const isSelected = feedback?.selected === option;
-                const isCorrectOption = feedback && option === feedback.correctAnswer;
-
-                let style =
-                  "border-sumi/10 bg-washi hover:-translate-y-0.5 hover:border-ai/40 hover:bg-ai-soft/30 hover:shadow-sm";
-
-                if (feedback && isCorrectOption) {
-                  style = "border-matcha bg-matcha-soft text-matcha-dark shadow-sm";
-                } else if (feedback && isSelected && !feedback.correct) {
-                  style = "border-shu bg-shu/5 text-shu-dark";
-                } else if (feedback) {
-                  style = "border-sumi/10 bg-washi opacity-60";
-                }
-
-                return (
-                  <button
-                    key={option}
-                    type="button"
-                    disabled={pending || Boolean(feedback)}
-                    onClick={() => handleCustomChoiceAnswer(option)}
-                    className={`flex min-h-16 items-center justify-center rounded-2xl border p-3 text-center font-medium transition disabled:cursor-not-allowed ${style}`}
-                  >
-                    {option}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </>
-      ) : question.kind === "type-answer" ? (
-        <>
-          <div className="w-full rounded-3xl border border-card-border bg-washi-soft p-7 text-center shadow-sm sm:p-9">
-            {question.direction === "translation-to-term" ? null : (
-              <WordImage
-                src={question.image}
-                alt={question.prompt}
-                className="mx-auto mb-6 max-h-64 w-full object-contain sm:max-h-72"
-              />
+        </div>
+        {question.kind === "type-answer" ? (
+          <>
+            {toneRetry && !feedback && <ToneRetryNote correctAnswer={toneRetry} />}
+            {typedInput(
+              handleTypeAnswerSubmit,
+              question.answerRomanized
+                ? t("test_session.type_romanized_placeholder", "Type the romanization")
+                : t("test_session.type_answer_placeholder", "Type your answer"),
             )}
-            <p className="text-xs font-medium uppercase tracking-wide text-sumi-soft">
-              {question.answerRomanized
-                ? t("test_session.type_the_romanized_word", "Type the romanized word")
-                : question.direction === "translation-to-term"
-                  ? t("test_session.what_does_this_mean", "What does this mean?")
-                  : t("test_session.type_the_word", "Type the word")}
-            </p>
-            <div className="mt-3 flex items-center justify-center gap-3">
-              <p className="text-3xl font-semibold text-sumi capitalize">{question.prompt}</p>
-
-              {question.direction === "term-to-translation" && (
-                <SpeakButton text={question.prompt} language={question.targetLanguage} />
-              )}
-            </div>
-            {question.promptRomanization && (
-              <p className="mt-2 text-sm text-sumi-soft">
-                <Jyutping text={question.promptRomanization} chart />
-              </p>
-            )}
-          </div>
-
-          <form
-            className="mt-5 flex w-full flex-col gap-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              handleTypeAnswerSubmit();
-            }}
-          >
-            {question.answerRomanized && question.targetLanguage === "yue" ? (
-              <JyutpingInput
-                value={typedAnswer}
-                onChange={setTypedAnswer}
-                disabled={pending || Boolean(feedback)}
-                placeholder={t("test_session.type_jyutping_placeholder", "Type the Jyutping")}
-                className="h-14 w-full rounded-2xl border border-sumi/15 bg-washi px-5 text-lg text-sumi outline-none transition focus:border-ai/50 disabled:opacity-60"
-              />
-            ) : (
-              <input
-                type="text"
-                value={typedAnswer}
-                onChange={(event) => setTypedAnswer(event.target.value)}
-                disabled={pending || Boolean(feedback)}
-                autoFocus
-                autoComplete="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                placeholder={
-                  question.answerRomanized
-                    ? t("test_session.type_romanized_placeholder", "Type the romanization")
-                    : t("test_session.type_answer_placeholder", "Type your answer")
-                }
-                className="h-14 w-full rounded-2xl border border-sumi/15 bg-washi px-5 text-lg text-sumi outline-none transition focus:border-ai/50 disabled:opacity-60"
-              />
-            )}
-
-            {!feedback && (
-              <Button
-                type="submit"
-                disabled={pending || typedAnswer.trim() === ""}
-                size="lg"
-                fullWidth
-                className="shadow-sm hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0"
-              >
-                {t("test_session.check", "Check")}
-              </Button>
-            )}
-          </form>
-        </>
-      ) : (
-        <>
-          <div className="w-full rounded-3xl border border-card-border bg-washi-soft p-7 text-center shadow-sm sm:p-9">
-            {question.direction === "translation-to-term" ? null : (
-              <WordImage
-                src={question.image}
-                alt={question.prompt}
-                className="mx-auto mb-6 max-h-64 w-full object-contain sm:max-h-72"
-              />
-            )}
-            <p className="text-xs font-medium uppercase tracking-wide text-sumi-soft">
-              {question.direction === "translation-to-term"
-                ? t("test_session.what_does_this_mean", "What does this mean?")
-                : t("test_session.find_the_right_word", "Can you find the right word?")}
-            </p>
-            <div className="mt-3 flex items-center justify-center gap-3">
-              <p className="text-3xl font-semibold text-sumi capitalize">{question.prompt}</p>
-
-              {question.direction === "term-to-translation" && (
-                <SpeakButton text={question.prompt} language={question.targetLanguage} />
-              )}
-            </div>
-            {question.promptRomanization && (
-              <p className="mt-2 text-sm text-sumi-soft">
-                <Jyutping text={question.promptRomanization} chart />
-              </p>
-            )}
-          </div>
-
+          </>
+        ) : (
           <MultipleChoiceOptions
             question={question}
             feedback={feedback}
             disabled={pending || Boolean(feedback)}
             onChoose={handleMultipleChoiceAnswer}
+            singleColumn={showPicture}
           />
-        </>
-      )}
+        )}
+      </>
+    );
+  }
 
-      {feedback && (
-        <div
-          aria-live="polite"
-          className={`mt-5 w-full rounded-2xl px-5 py-4 text-center ${
-            feedback.correct ? "bg-matcha-soft text-matcha-dark" : "bg-shu/5 text-shu-dark"
+  const feedbackBanner = feedback && (
+    <motion.div
+      key={`${quizIndex}-feedback`}
+      aria-live="polite"
+      initial={{ opacity: 0, y: 12, scale: 0.96 }}
+      animate={
+        reduceMotion
+          ? { opacity: 1, y: 0, scale: 1 }
+          : feedback.correct
+            ? { opacity: 1, y: 0, scale: [0.96, 1.04, 1] }
+            : { opacity: 1, y: 0, scale: 1, x: [0, -10, 10, -6, 6, 0] }
+      }
+      transition={{ duration: 0.45, ease: "easeOut" }}
+      className={`relative mt-5 flex w-full items-center gap-4 overflow-hidden rounded-3xl px-5 py-4 sm:px-6 ${
+        feedback.correct
+          ? "bg-matcha-soft text-matcha-dark ring-2 ring-matcha/30"
+          : "bg-shu/10 text-shu-dark ring-2 ring-shu/25"
+      }`}
+    >
+      <span
+        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-washi shadow-sm ${
+          feedback.correct ? "bg-matcha" : "bg-shu"
+        }`}
+      >
+        {feedback.correct ? (
+          <Check aria-hidden className="h-7 w-7" strokeWidth={3} />
+        ) : (
+          <X aria-hidden className="h-7 w-7" strokeWidth={3} />
+        )}
+      </span>
+
+      <div className="min-w-0 flex-1">
+        <p className="text-lg font-bold">
+          {feedback.correct
+            ? t("test_session.great_job", "Great job! You got it.")
+            : t("test_session.almost", "Almost! You'll get it next time.")}
+        </p>
+
+        {!feedback.correct && (
+          <p className="mt-1">
+            {t("test_session.correct_answer_is", "The correct answer is")}{" "}
+            <strong>
+              <Jyutping text={feedback.correctAnswer} />
+            </strong>
+            .
+          </p>
+        )}
+
+        {feedback.correct && feedback.fullAnswer && (
+          <p className="mt-1 text-sm">
+            {t("test_session.full_answer_is", "Just note the full answer:")}{" "}
+            <strong>{feedback.fullAnswer}</strong>
+          </p>
+        )}
+
+        {feedback.correct && feedback.alternatives && feedback.alternatives.length > 1 && (
+          <p className="mt-1 text-sm">
+            {t("test_session.either_is_fine", "Either answer is fine:")}{" "}
+            <strong>{feedback.alternatives.join(" / ")}</strong>
+          </p>
+        )}
+
+        {feedback.toneFixed && (
+          <p className="mt-1 text-sm">
+            {t("test_session.tone_fixed", "Tones fixed — +0.5 XP this time.")}
+          </p>
+        )}
+      </div>
+
+      {/* Donguri cheering a right answer; the reading rabbit for one to
+          learn from. Decorative, so hidden from screen readers. */}
+      {feedback.correct ? (
+        <Image
+          src="/images/mascot.png"
+          alt=""
+          aria-hidden="true"
+          width={1224}
+          height={1285}
+          className="-my-3 hidden h-20 w-auto shrink-0 object-contain sm:block"
+        />
+      ) : (
+        <Image
+          src="/images/rabbit-reading.webp"
+          alt=""
+          aria-hidden="true"
+          width={905}
+          height={929}
+          className="-my-3 hidden h-20 w-auto shrink-0 object-contain sm:block"
+        />
+      )}
+    </motion.div>
+  );
+
+  return (
+    <section
+      className={`mx-auto w-full overflow-x-clip ${showPicture ? "max-w-6xl" : "max-w-3xl"}`}
+    >
+      <div className="mb-4 flex w-full justify-center">
+        <XpCounter value={xp} />
+      </div>
+
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={quizIndex}
+          variants={reduceMotion ? reducedSessionCardVariants : sessionCardVariants}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          className={`relative rounded-[2rem] border border-card-border bg-washi px-5 pb-5 pt-6 shadow-sm sm:px-10 sm:pb-8 sm:pt-8 ${
+            lessonAccent(question.path).card
           }`}
         >
-          <p className="font-semibold">
-            {feedback.correct
-              ? t("test_session.great_job", "Great job! You got it.")
-              : t("test_session.almost", "Almost! You'll get it next time.")}
-          </p>
-
-          {!feedback.correct && (
-            <p className="mt-1 text-sm">
-              {t("test_session.correct_answer_is", "The correct answer is")}{" "}
-              <strong>
-                <Jyutping text={feedback.correctAnswer} />
-              </strong>
-              .
-            </p>
+          {showPicture &&
+          (question.kind === "multiple-choice" || question.kind === "type-answer") ? (
+            <div className="grid items-center gap-8 md:grid-cols-[1.1fr_1fr] md:gap-12">
+              <div className="flex aspect-[4/3] max-h-[35vh] w-full items-center justify-center overflow-hidden rounded-3xl bg-washi-soft shadow-inner md:max-h-[55vh]">
+                <WordImage
+                  src={question.image}
+                  alt={question.direction === "term-to-translation" ? question.prompt : ""}
+                  className="h-full w-full object-cover"
+                  fallback={
+                    // No picture for this word yet: Donguri keeps the space.
+                    <Image
+                      src="/images/mascot.png"
+                      alt=""
+                      aria-hidden="true"
+                      width={1224}
+                      height={1285}
+                      className="h-1/2 w-auto object-contain opacity-90"
+                    />
+                  }
+                />
+              </div>
+              <div className="flex flex-col items-center py-2">
+                {header}
+                {body}
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center">
+              {header}
+              {body}
+            </div>
           )}
 
-          {feedback.correct && feedback.fullAnswer && (
-            <p className="mt-1 text-sm">
-              {t("test_session.full_answer_is", "Just note the full answer:")}{" "}
-              <strong>{feedback.fullAnswer}</strong>
+          {feedbackBanner}
+        </motion.div>
+      </AnimatePresence>
+
+      <div className="mx-auto mt-6 flex w-full max-w-md flex-col items-center gap-3">
+        {feedback ? (
+          <Button
+            onClick={advance}
+            size="lg"
+            fullWidth
+            className="h-14 text-lg shadow-sm hover:-translate-y-0.5 hover:shadow-md"
+          >
+            {quizIndex + 1 < quiz.length
+              ? t("test_session.next_question", "Next question")
+              : t("test_session.see_my_results", "See my results")}
+            <ArrowRight aria-hidden className="h-5 w-5" />
+          </Button>
+        ) : (
+          isTyped && (
+            <Button
+              type="submit"
+              form={TYPED_ANSWER_FORM}
+              disabled={pending || typedAnswer.trim() === ""}
+              size="lg"
+              fullWidth
+              className="h-14 text-lg shadow-sm hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0"
+            >
+              {t("test_session.check", "Check")}
+            </Button>
+          )
+        )}
+
+        {feedback && (
+          <>
+            <p className="hidden text-xs text-sumi-soft/80 sm:block">
+              {t("learn_session.enter_hint", "or press Enter")}
             </p>
-          )}
-
-          {feedback.correct && feedback.alternatives && feedback.alternatives.length > 1 && (
-            <p className="mt-1 text-sm">
-              {t("test_session.either_is_fine", "Either answer is fine:")}{" "}
-              <strong>{feedback.alternatives.join(" / ")}</strong>
-            </p>
-          )}
-        </div>
-      )}
-
-      {feedback && (
-        <Button
-          onClick={advance}
-          size="lg"
-          fullWidth
-          className="mt-5 shadow-sm hover:-translate-y-0.5 hover:shadow-md"
-        >
-          {quizIndex + 1 < quiz.length
-            ? t("test_session.next_question", "Next question")
-            : t("test_session.see_my_results", "See my results")}
-        </Button>
-      )}
-
-      {feedback && (
-        <div className="mt-3 flex justify-center">
-          <LessonButton courseSlug={courseSlug} wordId={question.wordId} />
-        </div>
-      )}
+            <LessonButton courseSlug={courseSlug} wordId={question.wordId} />
+          </>
+        )}
+      </div>
     </section>
   );
 };

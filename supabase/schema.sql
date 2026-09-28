@@ -1585,3 +1585,54 @@ create policy "Users can view own subscription"
 -- Latin need it.
 
 alter table public.word_examples add column if not exists romanization text;
+
+-- 39. Usernames -------------------------------------------------------------------
+-- A public handle, shown on the leaderboards in place of the user's real
+-- name. Chosen once — on the sign-up form, or on /onboarding for OAuth
+-- sign-ups and accounts from before this existed — and never changed after.
+-- Stored lowercase, so uniqueness is case-insensitive; the app normalises
+-- input the same way (see UsernameSchema in lib/definitions.ts).
+
+alter table public.profiles add column if not exists username text;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'profiles_username_key'
+  ) then
+    alter table public.profiles
+      add constraint profiles_username_key unique (username);
+  end if;
+  if not exists (
+    select 1 from pg_constraint where conname = 'profiles_username_format'
+  ) then
+    alter table public.profiles
+      add constraint profiles_username_format
+      check (username ~ '^[a-z0-9_]{3,20}$');
+  end if;
+end;
+$$;
+
+-- RLS lets a user update their own row through the Supabase API, so — like
+-- `prevent_role_self_update` above — a trigger stops them changing a
+-- username once it's set. Changes from the SQL editor (postgres role) still
+-- work, for support renames.
+
+create or replace function public.prevent_username_self_update()
+returns trigger
+language plpgsql
+as $$
+begin
+  if old.username is not null
+    and new.username is distinct from old.username
+    and auth.role() = 'authenticated' then
+    new.username := old.username;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists prevent_username_self_update on public.profiles;
+create trigger prevent_username_self_update
+  before update on public.profiles
+  for each row execute function public.prevent_username_self_update();

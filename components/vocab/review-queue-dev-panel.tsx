@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { ReviewQueueDebugEntry } from "@/lib/definitions";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { useDevMode } from "@/components/dashboard/dev-mode-context";
@@ -36,9 +37,21 @@ function formatDueIn(date: Date): string {
   return pastDue ? `${label} overdue` : `in ${label}`;
 }
 
+// Re-renders every `intervalMs` so relative times ("in 3h 12m") count down
+// live instead of freezing at whatever they were when the page rendered.
+function useTick(intervalMs: number, active: boolean) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const interval = setInterval(() => setTick((tick) => tick + 1), intervalMs);
+    return () => clearInterval(interval);
+  }, [intervalMs, active]);
+}
+
 export function ReviewQueueDevPanel({ entries }: ReviewQueueDevPanelProps) {
   const t = useTranslations();
   const { enabled } = useDevMode();
+  useTick(30 * 1000, enabled);
 
   if (!enabled) return null;
 
@@ -81,11 +94,14 @@ export function ReviewQueueDevPanel({ entries }: ReviewQueueDevPanelProps) {
                     {entry.stage}. {entry.stageName}
                   </td>
                   <td className="px-4 py-2 text-sumi-soft">
-                    {entry.lastSeenAt === null
-                      ? t("review_queue_dev.not_quizzed", "not quizzed yet")
-                      : entry.nextReviewAt === null
-                        ? t("review_queue_dev.mastered", "mastered")
-                        : formatDueIn(entry.nextReviewAt)}
+                    {entry.nextReviewAt === null
+                      ? t("review_queue_dev.mastered", "mastered")
+                      : formatDueIn(entry.nextReviewAt)}
+                    {entry.nextReviewAt !== null && entry.lastSeenAt === null && (
+                      <span className="ml-1.5 text-xs opacity-70">
+                        · {t("review_queue_dev.not_quizzed", "not quizzed yet")}
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}

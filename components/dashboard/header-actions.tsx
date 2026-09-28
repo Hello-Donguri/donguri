@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bug, ChevronDown, CreditCard, Flame, GraduationCap, LogOut, Menu, Settings, User, Users, X } from "lucide-react";
@@ -21,10 +22,20 @@ type HeaderActionsProps = {
     role: UserRole;
   };
   equippedAccessory: AccessoryId | null;
-  // Account-wide (see `getGlobalStreak` in lib/dal.ts), not per course.
-  currentStreak: number;
+  // Each enrolled course's current streak by slug (see `getCourseStreaks`
+  // in lib/dal.ts) — streaks are per course; see `useHeaderStreak`.
+  streaks: Record<string, number>;
   xp: number;
 };
+
+// The streak the header shows: the course you're in (from the URL), or —
+// anywhere else, like the dashboard — your best current streak.
+function useHeaderStreak(streaks: Record<string, number>): number {
+  const pathname = usePathname();
+  const slug = /^\/dashboard\/courses\/([^/]+)/.exec(pathname)?.[1];
+  if (slug && slug in streaks) return streaks[slug];
+  return Math.max(0, ...Object.values(streaks));
+}
 
 // Streak, then level + XP with a progress bar toward the next level — the
 // header's at-a-glance progress summary. Refreshed with the rest of the
@@ -301,8 +312,9 @@ function AccountLinks({
   );
 }
 
-export function HeaderActions({ profile, equippedAccessory, currentStreak, xp }: HeaderActionsProps) {
+export function HeaderActions({ profile, equippedAccessory, streaks, xp }: HeaderActionsProps) {
   const t = useTranslations();
+  const currentStreak = useHeaderStreak(streaks);
   const [desktopOpen, setDesktopOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const desktopRef = useDismissableMenu(desktopOpen, () => setDesktopOpen(false));

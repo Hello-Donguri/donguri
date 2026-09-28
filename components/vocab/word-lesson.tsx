@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition, type ReactNode } from "react";
 import { useAnimate } from "framer-motion";
 import { BookOpen, MessageSquareQuote } from "lucide-react";
-import type { RevealWord } from "@/lib/definitions";
+import type { RevealWord, WordType } from "@/lib/definitions";
 import { getWordLesson } from "@/lib/actions/vocab";
 import { ListenButton, SpeakButton } from "@/components/vocab/session-ui";
 import { Jyutping } from "@/components/vocab/jyutping";
@@ -139,13 +139,19 @@ export const WordLesson = ({ word, header }: { word: RevealWord; header?: ReactN
     <div className="flex flex-col items-center text-center">
       {header}
 
-      <p
-        className={`${header ? "mt-8" : "mt-2"} font-extrabold tracking-tight text-sumi ${
-          isGrammar ? "text-4xl sm:text-5xl" : "text-6xl sm:text-7xl"
-        }`}
-      >
-        {word.term}
-      </p>
+      {isGrammar && parsePattern(word.term) ? (
+        <div className={header ? "mt-8" : "mt-2"}>
+          <PatternChart term={word.term} />
+        </div>
+      ) : (
+        <p
+          className={`${header ? "mt-8" : "mt-2"} font-extrabold tracking-tight text-sumi ${
+            isGrammar ? "text-4xl sm:text-5xl" : "text-6xl sm:text-7xl"
+          }`}
+        >
+          {word.term}
+        </p>
+      )}
 
       {word.romanization && (
         <p className="mt-2 text-lg text-sumi-soft">
@@ -153,26 +159,41 @@ export const WordLesson = ({ word, header }: { word: RevealWord; header?: ReactN
         </p>
       )}
 
+      {/* Belongs to the pronunciation above, so it sits tight under it. */}
       {listenText && (
-        <div className="mt-6">
+        <div className="mt-3">
           <ListenButton text={listenText} language={word.targetLanguage} />
         </div>
       )}
 
-      <p className="mt-6 text-2xl font-medium text-sumi">{word.translation}</p>
+      {/* The meaning, set apart from the word and its sound so it reads as the
+          answer — the biggest thing on the card after the word itself. */}
+      <div className="mt-7 flex w-full flex-col items-center border-t border-sumi/10 pt-6">
+        {word.wordType && (
+          <span className="rounded-full bg-sumi/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-sumi-soft">
+            {wordTypeLabel(word.wordType, t)}
+          </span>
+        )}
 
-      {(word.explanation || word.explanationJa) && (
-        <div className="mt-3 space-y-1 text-sm text-sumi-soft">
-          {word.explanation && <p>{word.explanation}</p>}
-          {word.explanationJa && <p>{word.explanationJa}</p>}
-        </div>
-      )}
+        <p
+          lang={englishIsTarget ? otherLang : "en"}
+          className={`${word.wordType ? "mt-3" : ""} text-3xl font-bold leading-tight tracking-tight text-sumi sm:text-4xl`}
+        >
+          {word.translation}
+        </p>
+
+        {(word.explanation || word.explanationJa) && (
+          <div className="mt-3 space-y-1 text-sm text-sumi-soft">
+            {word.explanation && <p>{word.explanation}</p>}
+            {word.explanationJa && <p>{word.explanationJa}</p>}
+          </div>
+        )}
+      </div>
 
       {mainExample && (
         <>
-          <div className="mt-6 h-px w-10 bg-sumi/10" />
           <div
-            className={`mt-6 w-full rounded-2xl bg-washi-soft px-6 py-5 text-left ${accent.panel}`}
+            className={`mt-7 w-full rounded-2xl bg-washi-soft px-6 py-5 text-left ${accent.panel}`}
           >
             <p
               className={`mb-3 inline-flex items-center gap-1.5 rounded-full text-xs font-medium uppercase tracking-[0.14em] text-sumi-soft dark:px-2.5 dark:py-1 ${accent.label}`}
@@ -247,6 +268,130 @@ export const WordLesson = ({ word, header }: { word: RevealWord; header?: ReactN
     </>
   );
 };
+
+// The words in a grammar pattern that stand for something the learner
+// fills in ("noun", "base verb", "X") rather than words they actually say.
+const PLACEHOLDER_WORDS = new Set([
+  "noun",
+  "verb",
+  "adjective",
+  "adverb",
+  "subject",
+  "object",
+  "number",
+  "classifier",
+  "base",
+  "singular",
+  "plural",
+  "x",
+  "y",
+]);
+
+type PatternSlot = { alternatives: string[]; placeholder: boolean };
+
+// "There is / There are + noun" → two slots, the first with two
+// alternatives. Only for patterns built with " + " — anything else ("X 係
+// Y") stays as plain text. A trailing "...?" (question patterns) comes back
+// as `ending` to show after the last slot.
+function parsePattern(term: string): { slots: PatternSlot[]; ending: string } | null {
+  if (!term.includes(" + ")) return null;
+
+  let body = term.trim();
+  let ending = "";
+  if (body.endsWith("?")) {
+    ending = "?";
+    body = body.slice(0, -1);
+  }
+  body = body.replace(/\.{3}$/, "").trim();
+
+  const slots = body.split(/\s+\+\s+/).map((slot) => {
+    const alternatives = slot.split(/\s*\/\s*/).filter(Boolean);
+    // Placeholder only if nothing's left once its placeholder words are
+    // taken out — "X 想" still has 想 to say, so it's a word slot.
+    const placeholder = alternatives.every((alternative) => {
+      let sawPlaceholder = false;
+      const rest = alternative.toLowerCase().replace(/[a-z]+/g, (word) => {
+        if (!PLACEHOLDER_WORDS.has(word)) return word;
+        sawPlaceholder = true;
+        return "";
+      });
+      return sawPlaceholder && rest.replace(/[\s-]/g, "") === "";
+    });
+    return { alternatives, placeholder };
+  });
+
+  return slots.length > 1 ? { slots, ending } : null;
+}
+
+// A grammar pattern drawn as a chart: each slot a box, alternatives stacked
+// inside it, "+" between. Words the learner says sit in solid green boxes;
+// the parts they fill in ("noun") in dashed ones. The pattern as written is
+// kept for screen readers.
+const PatternChart = ({ term }: { term: string }) => {
+  const pattern = parsePattern(term);
+  if (!pattern) return null;
+
+  return (
+    <>
+      <p className="sr-only">{term}</p>
+      <div
+        aria-hidden
+        className="flex flex-wrap items-center justify-center gap-x-2 gap-y-3 sm:gap-x-3"
+      >
+        {pattern.slots.map((slot, index) => (
+          <div key={index} className="flex items-center gap-x-2 sm:gap-x-3">
+            {index > 0 && <span className="text-3xl font-bold text-sumi-soft">+</span>}
+            <div
+              className={`flex flex-col divide-y rounded-2xl border-2 text-2xl font-bold sm:text-3xl ${
+                slot.placeholder
+                  ? "divide-dashed divide-sumi/15 border-dashed border-sumi/25 italic text-sumi-soft"
+                  : "divide-matcha/25 border-matcha/40 bg-matcha-soft/60 text-sumi"
+              }`}
+            >
+              {slot.alternatives.map((alternative) => (
+                <span key={alternative} className="px-4 py-1.5 sm:px-5">
+                  {alternative}
+                </span>
+              ))}
+            </div>
+            {index === pattern.slots.length - 1 && pattern.ending && (
+              <span className="text-3xl font-bold text-sumi">{pattern.ending}</span>
+            )}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+};
+
+// Part-of-speech labels in the learner's UI language. Written out one by
+// one (not built from the type) so the i18n extractor can find each key.
+function wordTypeLabel(type: WordType, t: ReturnType<typeof useTranslations>): string {
+  switch (type) {
+    case "noun":
+      return t("word_type.noun", "Noun");
+    case "verb":
+      return t("word_type.verb", "Verb");
+    case "adjective":
+      return t("word_type.adjective", "Adjective");
+    case "adverb":
+      return t("word_type.adverb", "Adverb");
+    case "pronoun":
+      return t("word_type.pronoun", "Pronoun");
+    case "preposition":
+      return t("word_type.preposition", "Preposition");
+    case "conjunction":
+      return t("word_type.conjunction", "Conjunction");
+    case "interjection":
+      return t("word_type.interjection", "Interjection");
+    case "phrase":
+      return t("word_type.phrase", "Phrase");
+    case "numeral":
+      return t("word_type.numeral", "Numeral");
+    case "particle":
+      return t("word_type.particle", "Particle");
+  }
+}
 
 const Highlighted = ({
   segments,

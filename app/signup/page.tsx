@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AuthCard } from "@/components/auth/auth-card";
+import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { SignupForm } from "@/components/auth/signup-form";
 import { getTranslator } from "@/lib/i18n/server";
 
@@ -20,6 +21,7 @@ export default async function SignupPage() {
         href: "/login",
       }}
     >
+      <OAuthButtons />
       <SignupForm />
     </AuthCard>
   );

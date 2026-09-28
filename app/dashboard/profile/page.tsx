@@ -68,7 +68,7 @@ export default async function ProfilePage() {
       </div>
 
       <div className="max-w-lg rounded-2xl border border-card-border bg-washi-soft p-8">
-        <ProfileForm fullName={profile.full_name ?? ""} donguriConfigText={donguriConfigText} />
+        <ProfileForm donguriConfigText={donguriConfigText} />
       </div>
     </div>
   );

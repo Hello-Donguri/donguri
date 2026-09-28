@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getCourseHome, getCourseTitle, getLearnQueueForCourse } from "@/lib/dal";
 import { LearnSession } from "@/components/vocab/learn-session";
 import { FreshSession } from "@/components/vocab/fresh-session";
+import { EnterShortcut } from "@/components/vocab/enter-shortcut";
 import { Breadcrumbs, type BreadcrumbItem } from "@/components/ui/breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { getTranslator } from "@/lib/i18n/server";
@@ -50,6 +51,7 @@ export default async function LearnPage({ params }: PageProps) {
               "Activate more decks on the course page, or head over to Test yourself to keep these fresh.",
             )}
           </p>
+          <EnterShortcut href={`/dashboard/courses/${slug}/test`} />
           <Button href={`/dashboard/courses/${slug}/test`} className="mt-2">
             {t("learn_session.test_yourself", "Test yourself")}
           </Button>

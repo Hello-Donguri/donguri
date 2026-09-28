@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   submitAnswer,
   submitFormAnswer,
@@ -14,7 +15,10 @@ import {
   ProgressDots,
   ClozeCard,
   FormChoiceOptions,
+  useAnswerFocus,
+  useEnterToContinue,
   MultipleChoiceOptions,
+  ToneRetryNote,
   type ChoiceFeedback,
 } from "@/components/vocab/session-ui";
 import { WordImage } from "@/components/ui/word-image";
@@ -49,17 +53,46 @@ type LevelUpInfo = {
 // can't work: a cloze whose answer isn't Latin script is `form-choice`, and
 // a non-Latin grammar point with no cloze content is `multiple-choice` (see
 // buildTypedQuestion in lib/dal.ts).
-export const ReviewSession = ({
-  quiz,
+// Nothing due when the learner arrives: straight back to the course (its
+// review card says when the next word is due) rather than an empty screen.
+function BackToCourse({ courseSlug }: { courseSlug: string }) {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace(`/dashboard/courses/${courseSlug}`);
+  }, [router, courseSlug]);
+  return null;
+}
+
+// Always rendered by the review page, even with nothing due, so a
+// finished session's results stay on screen when the page re-renders
+// underneath them with an empty queue (see refreshDashboardHeader). Which
+// way it goes is decided once, on arrival — that later empty queue must
+// not turn a finished session into a redirect.
+export const ReviewSession = (props: ReviewSessionProps) => {
+  const [nothingDue] = useState(props.quiz.length === 0);
+  return nothingDue ? (
+    <BackToCourse courseSlug={props.courseSlug} />
+  ) : (
+    <ReviewSessionQuestions {...props} />
+  );
+};
+
+const ReviewSessionQuestions = ({
+  quiz: initialQuiz,
   courseSlug,
   initialXp,
   initialDonguriConfig,
 }: ReviewSessionProps) => {
+  // Fixed for the whole session — see the same note in TestSession.
+  const [quiz] = useState(initialQuiz);
   const t = useTranslations();
+  const router = useRouter();
   const [quizIndex, setQuizIndex] = useState(0);
   const [pending, setPending] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [typedAnswer, setTypedAnswer] = useState("");
+  // The right Jyutping, while the learner retypes it after a tone slip.
+  const [toneRetry, setToneRetry] = useState<string | null>(null);
   const [score, setScore] = useState({ correct: 0, incorrect: 0 });
   const [finished, setFinished] = useState(false);
   const [xp, setXp] = useState(initialXp);
@@ -102,9 +135,21 @@ export const ReviewSession = ({
         question.kind === "type-form"
           ? await submitFormAnswer(question.wordId, question.formId, typedAnswer, true)
           : question.kind === "type-answer"
-            ? await submitTypedAnswer(question.wordId, question.direction, typedAnswer, true)
+            ? await submitTypedAnswer(
+                question.wordId,
+                question.direction,
+                typedAnswer,
+                true,
+                toneRetry !== null,
+              )
             : null;
       if (!result) return;
+
+      if ("toneMiss" in result && result.toneMiss) {
+        setToneRetry(result.correctAnswer);
+        setTypedAnswer("");
+        return;
+      }
 
       setFeedback({
         selected: typedAnswer,
@@ -112,7 +157,9 @@ export const ReviewSession = ({
         correctAnswer: result.correctAnswer,
         alternatives: result.alternatives,
         fullAnswer: result.fullAnswer,
+        toneFixed: toneRetry !== null && result.correct,
       });
+      setToneRetry(null);
       recordResult(result.correct);
       setXp(result.xp);
     } finally {
@@ -172,6 +219,17 @@ export const ReviewSession = ({
       });
     }
   };
+
+  useEnterToContinue(Boolean(feedback) && !finished, advance);
+  const answerInputRef = useAnswerFocus(
+    `${quizIndex}${toneRetry ? "-tone-retry" : ""}`,
+    !feedback && !finished,
+  );
+  // On the results screen, Enter is "Back to course" — held off while the
+  // level-up modal is up, which has its own button.
+  useEnterToContinue(finished && !levelUpInfo, () =>
+    router.push(`/dashboard/courses/${courseSlug}`),
+  );
 
   if (finished) {
     const totalAnswers = score.correct + score.incorrect;
@@ -280,6 +338,7 @@ export const ReviewSession = ({
         <ClozeCard
           sentence={question.clozeSentence}
           translation={question.clozeSentenceJa}
+          highlight={question.clozeHighlightJa}
           romanization={question.clozeRomanization}
           path={question.path}
           feedback={feedback}
@@ -334,54 +393,59 @@ export const ReviewSession = ({
           onChoose={(option) => handleChoice(option.text)}
         />
       ) : (
-        <form
-          className="mt-5 flex w-full flex-col gap-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            handleSubmit();
-          }}
-        >
-          {question.kind === "type-answer" &&
-          question.answerRomanized &&
-          question.targetLanguage === "yue" ? (
-            <JyutpingInput
-              value={typedAnswer}
-              onChange={setTypedAnswer}
-              disabled={pending || Boolean(feedback)}
-              placeholder={t("test_session.type_jyutping_placeholder", "Type the Jyutping")}
-              className="h-14 w-full rounded-2xl border border-sumi/15 bg-washi px-5 text-lg text-sumi outline-none transition focus:border-ai/50 disabled:opacity-60"
-            />
-          ) : (
-            <input
-              type="text"
-              value={typedAnswer}
-              onChange={(event) => setTypedAnswer(event.target.value)}
-              disabled={pending || Boolean(feedback)}
-              autoFocus
-              autoComplete="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              placeholder={
-                question.kind === "type-answer" && question.answerRomanized
-                  ? t("test_session.type_romanized_placeholder", "Type the romanization")
-                  : t("test_session.type_answer_placeholder", "Type your answer")
-              }
-              className="h-14 w-full rounded-2xl border border-sumi/15 bg-washi px-5 text-lg text-sumi outline-none transition focus:border-ai/50 disabled:opacity-60"
-            />
-          )}
+        <>
+          {toneRetry && !feedback && <ToneRetryNote correctAnswer={toneRetry} />}
+          <form
+            className="mt-5 flex w-full flex-col gap-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              handleSubmit();
+            }}
+          >
+            {question.kind === "type-answer" &&
+            question.answerRomanized &&
+            question.targetLanguage === "yue" ? (
+              <JyutpingInput
+                inputRef={answerInputRef}
+                autoFocus={false}
+                value={typedAnswer}
+                onChange={setTypedAnswer}
+                disabled={pending || Boolean(feedback)}
+                placeholder={t("test_session.type_jyutping_placeholder", "Type the Jyutping")}
+                className="h-14 w-full rounded-2xl border border-sumi/15 bg-washi px-5 text-lg text-sumi outline-none transition focus:border-ai/50 disabled:opacity-60"
+              />
+            ) : (
+              <input
+                type="text"
+                value={typedAnswer}
+                onChange={(event) => setTypedAnswer(event.target.value)}
+                disabled={pending || Boolean(feedback)}
+                ref={answerInputRef}
+                autoComplete="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                placeholder={
+                  question.kind === "type-answer" && question.answerRomanized
+                    ? t("test_session.type_romanized_placeholder", "Type the romanization")
+                    : t("test_session.type_answer_placeholder", "Type your answer")
+                }
+                className="h-14 w-full rounded-2xl border border-sumi/15 bg-washi px-5 text-lg text-sumi outline-none transition focus:border-ai/50 disabled:opacity-60"
+              />
+            )}
 
-          {!feedback && (
-            <Button
-              type="submit"
-              disabled={pending || typedAnswer.trim() === ""}
-              size="lg"
-              fullWidth
-              className="shadow-sm hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0"
-            >
-              {t("test_session.check", "Check")}
-            </Button>
-          )}
-        </form>
+            {!feedback && (
+              <Button
+                type="submit"
+                disabled={pending || typedAnswer.trim() === ""}
+                size="lg"
+                fullWidth
+                className="shadow-sm hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0"
+              >
+                {t("test_session.check", "Check")}
+              </Button>
+            )}
+          </form>
+        </>
       )}
 
       {feedback && (
@@ -420,6 +484,12 @@ export const ReviewSession = ({
               <strong>{feedback.alternatives.join(" / ")}</strong>
             </p>
           )}
+
+          {feedback.toneFixed && (
+            <p className="mt-1 text-sm">
+              {t("test_session.tone_fixed", "Tones fixed — +0.5 XP this time.")}
+            </p>
+          )}
         </div>
       )}
 
@@ -434,6 +504,12 @@ export const ReviewSession = ({
             ? t("review_session.next_word", "Next word")
             : t("test_session.see_my_results", "See my results")}
         </Button>
+      )}
+
+      {feedback && (
+        <p className="mt-2 hidden text-center text-xs text-sumi-soft/80 sm:block">
+          {t("learn_session.enter_hint", "or press Enter")}
+        </p>
       )}
 
       {feedback && (

@@ -14,8 +14,8 @@ type LearnCompleteProps = {
   words: RevealWord[];
   skippedIds: string[];
   courseSlug: string;
-  // Whether `startLearnSession` has committed the batch yet — the quiz
-  // reads its progress rows, so the button waits on it.
+  // Whether every "Got it" has finished saving (see `learnWord`) — the
+  // quiz reads those progress rows, so the button waits on it.
   started: boolean;
   refreshing: boolean;
   onLearnMore: () => void;

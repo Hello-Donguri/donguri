@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { addFriendByEmail, removeFriend } from "@/lib/actions/friends";
+import { addFriend, removeFriend } from "@/lib/actions/friends";
 import { LeaderboardList } from "@/components/leaderboard/leaderboard-row";
 import { Button } from "@/components/ui/button";
 import { useTranslations } from "@/components/i18n/locale-provider";
@@ -28,7 +28,7 @@ export function LeaderboardTabs({
   const [direction, setDirection] = useState(0);
 
   const [friends, setFriends] = useState(initialFriends);
-  const [email, setEmail] = useState("");
+  const [friendQuery, setFriendQuery] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,19 +48,19 @@ export function LeaderboardTabs({
 
   async function handleAddFriend(event: React.FormEvent) {
     event.preventDefault();
-    if (pending || email.trim() === "") return;
+    if (pending || friendQuery.trim() === "") return;
 
     setPending(true);
     setError(null);
 
     try {
-      const result = await addFriendByEmail(email);
+      const result = await addFriend(friendQuery);
 
       if (result.error) {
         setError(result.error);
       } else if (result.friends) {
         setFriends(result.friends);
-        setEmail("");
+        setFriendQuery("");
       }
     } finally {
       setPending(false);
@@ -127,10 +127,10 @@ export function LeaderboardTabs({
             >
               <form onSubmit={handleAddFriend} className="flex gap-2">
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder={t("leaderboard.friend_email_placeholder", "Friend's email")}
+                  type="text"
+                  value={friendQuery}
+                  onChange={(event) => setFriendQuery(event.target.value)}
+                  placeholder={t("leaderboard.friend_placeholder", "Username or email")}
                   className="h-10 min-w-0 flex-1 rounded-full border border-sumi/15 bg-washi px-4 text-sm text-sumi outline-none transition focus:border-ai/50"
                 />
                 <Button type="submit" disabled={pending} className="h-10 shrink-0 px-5 text-sm">
@@ -143,7 +143,7 @@ export function LeaderboardTabs({
               <LeaderboardList
                 entries={friends}
                 selfTotalXp={selfTotalXp}
-                emptyMessage={t("leaderboard.no_friends_yet", "Add a friend by email to compare XP.")}
+                emptyMessage={t("leaderboard.no_friends_yet", "Add a friend by username or email to compare XP.")}
                 onRemove={handleRemove}
               />
             </motion.div>

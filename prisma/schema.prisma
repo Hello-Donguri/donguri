@@ -17,7 +17,10 @@ model Profile {
   fullName               String?                 @map("full_name")
   firstName              String?                 @map("first_name")
   lastName               String?                 @map("last_name")
-  role                   String                  @default("user")
+  // Public handle for the leaderboards — set once, never editable (see
+  // section 39 of supabase/schema.sql). Null until the user picks one.
+  username               String?                 @unique
+  role                  String                  @default("user")
   createdAt              DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime                @default(now()) @map("updated_at") @db.Timestamptz(6)
   // Total experience points — incremented only by the vocab quiz actions in
@@ -277,9 +280,9 @@ model UserWordProgress {
   lastSeenAt     DateTime? @map("last_seen_at") @db.Timestamptz(6)
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
-  // When this word is next due in the review queue — null until the word's
-  // very first quiz question is answered (see `lastSeenAt`), and null again
-  // once it reaches stage 7 (mastered, no more reviews).
+  // When this word is next due in the review queue — set 4 hours out the
+  // moment it's learnt (whether or not its post-learn quiz is ever taken),
+  // and null once it reaches stage 7 (mastered, no more reviews).
   nextReviewAt   DateTime? @map("next_review_at") @db.Timestamptz(6)
   profile        Profile   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   word           Word      @relation(fields: [wordId], references: [id], onDelete: Cascade, onUpdate: NoAction)

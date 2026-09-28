@@ -1,17 +1,17 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  AnimatePresence,
-  motion,
-  useReducedMotion,
-  type Variants,
-} from "framer-motion";
-import { skipWord, startLearnSession } from "@/lib/actions/vocab";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { learnWord, skipWord } from "@/lib/actions/vocab";
 import type { RevealWord } from "@/lib/definitions";
 import { ArrowRight } from "lucide-react";
-import { ProgressSegments } from "@/components/vocab/session-ui";
+import {
+  ProgressSegments,
+  reducedSessionCardVariants,
+  sessionCardVariants,
+  useEnterToContinue,
+} from "@/components/vocab/session-ui";
 import { WordLesson, lessonAccent } from "@/components/vocab/word-lesson";
 import { Button } from "@/components/ui/button";
 import { LearnComplete } from "@/components/vocab/learn-complete";
@@ -33,32 +33,6 @@ type LearnSessionProps = {
   courseSlug: string;
 };
 
-// Each card pops out to the left and the next springs in from the right —
-// a quick shrink-and-slide out, then a slight overshoot on the way in.
-const cardVariants: Variants = {
-  enter: { opacity: 0, x: 96, scale: 0.9, rotate: 1.5 },
-  center: {
-    opacity: 1,
-    x: 0,
-    scale: 1,
-    rotate: 0,
-    transition: { type: "spring", stiffness: 380, damping: 24, mass: 0.8 },
-  },
-  exit: {
-    opacity: 0,
-    x: -96,
-    scale: 0.9,
-    rotate: -1.5,
-    transition: { duration: 0.18, ease: [0.4, 0, 1, 1] },
-  },
-};
-
-const reducedCardVariants: Variants = {
-  enter: { opacity: 0 },
-  center: { opacity: 1, transition: { duration: 0.2 } },
-  exit: { opacity: 0, transition: { duration: 0.15 } },
-};
-
 export const LearnSession = ({ words, courseSlug }: LearnSessionProps) => {
   const t = useTranslations();
   const reduceMotion = useReducedMotion();
@@ -69,36 +43,39 @@ export const LearnSession = ({ words, courseSlug }: LearnSessionProps) => {
   const [skippedIds, setSkippedIds] = useState<string[]>([]);
   const [refreshing, startRefresh] = useTransition();
   const [started, setStarted] = useState(false);
+  // Each "Got it" saves in the background so the next card comes up
+  // straight away; the quiz waits for all of them (see `finish`).
+  const saves = useRef<Promise<unknown>[]>([]);
 
   // The learn page only *picks* this batch (it's read-only so it can be
-  // prefetched) — mounting is what commits it: progress rows, first review
-  // due, streak. The quiz reads those rows, so "Start quiz" waits on this.
-  useEffect(() => {
-    let cancelled = false;
-
-    startLearnSession(
-      courseSlug,
-      words.map((word) => word.id),
-    )
-      .catch((error) => console.error("Failed to start learn session:", error))
-      .finally(() => {
-        if (!cancelled) {
-          setStarted(true);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [courseSlug, words]);
+  // prefetched, and refreshing it learns nothing) — a word counts as
+  // learnt only once the learner clicks "Got it" on it: progress row,
+  // first review due, streak.
+  const finish = () => {
+    setDone(true);
+    Promise.allSettled(saves.current).then(() => setStarted(true));
+  };
 
   const advance = () => {
     if (index + 1 < words.length) {
       setIndex((current) => current + 1);
     } else {
-      setDone(true);
+      finish();
     }
   };
+
+  const handleGotIt = () => {
+    saves.current.push(
+      learnWord(courseSlug, words[index].id).catch((error) =>
+        console.error("Failed to save learnt word:", error),
+      ),
+    );
+    advance();
+  };
+
+  // Enter is "Got it" on each card (the finished screen has its own — see
+  // LearnComplete).
+  useEnterToContinue(!done && !pending, handleGotIt);
 
   const handleSkip = async (wordId: string) => {
     setPending(true);
@@ -158,7 +135,7 @@ export const LearnSession = ({ words, courseSlug }: LearnSessionProps) => {
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={word.id}
-          variants={reduceMotion ? reducedCardVariants : cardVariants}
+          variants={reduceMotion ? reducedSessionCardVariants : sessionCardVariants}
           initial="enter"
           animate="center"
           exit="exit"
@@ -168,6 +145,17 @@ export const LearnSession = ({ words, courseSlug }: LearnSessionProps) => {
             word={word}
             header={
               <>
+                {/* Same pill as the quiz header (see TestSession), so a
+                    grammar point never passes for a vocab word. */}
+                <span
+                  className={`mb-3 rounded-full px-3.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${
+                    isGrammar ? "bg-matcha-soft text-matcha-dark" : "bg-ai-soft text-ai-dark"
+                  }`}
+                >
+                  {isGrammar
+                    ? t("course_home.grammar", "Grammar")
+                    : t("course_home.vocabulary", "Vocabulary")}
+                </span>
                 <p className="text-xs font-medium uppercase tracking-[0.18em] text-sumi-soft">
                   {progressLabel}
                 </p>
@@ -183,7 +171,7 @@ export const LearnSession = ({ words, courseSlug }: LearnSessionProps) => {
       <div className="mx-auto mt-8 flex w-full max-w-md flex-col items-center gap-2">
         <Button
           disabled={pending}
-          onClick={advance}
+          onClick={handleGotIt}
           size="lg"
           fullWidth
           className="h-14 text-lg shadow-sm hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0"

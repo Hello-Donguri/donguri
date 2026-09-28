@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 import { AuthCard } from "@/components/auth/auth-card";
 import { LoginForm } from "@/components/auth/login-form";
+import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { getTranslator } from "@/lib/i18n/server";
 
 export const metadata: Metadata = {
   title: "Log in — Donguri",
 };
 
-export default async function LoginPage() {
+export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const { t } = await getTranslator();
+  const { error } = await searchParams;
 
   return (
     <AuthCard
@@ -20,6 +22,7 @@ export default async function LoginPage() {
         href: "/signup",
       }}
     >
+      <OAuthButtons error={error === "oauth"} />
       <LoginForm />
     </AuthCard>
   );

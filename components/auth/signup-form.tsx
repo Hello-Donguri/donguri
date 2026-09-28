@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { signup } from "@/lib/actions/auth";
 import { TextField } from "@/components/ui/text-field";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { UsernameField } from "@/components/auth/username-field";
 import { useTranslations } from "@/components/i18n/locale-provider";
 
 export function SignupForm() {
@@ -30,6 +31,7 @@ export function SignupForm() {
         placeholder="Tanaka"
         errors={state?.errors?.lastName}
       />
+      <UsernameField errors={state?.errors?.username} />
       <TextField
         label={t("auth.email_label", "Email")}
         name="email"

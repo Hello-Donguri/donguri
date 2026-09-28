@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cacheLife } from "next/cache";
 import { getEnrolledCourses, requireProfile } from "@/lib/dal";
 import { Button } from "@/components/ui/button";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
@@ -9,11 +10,23 @@ export const metadata: Metadata = {
   title: "Dashboard — Donguri",
 };
 
-export default async function DashboardPage() {
+// Private cache scope, like loadCourseHome on the course page: the session
+// read and streak maths check `Date.now()`, which Cache Components only
+// allows inside a cache scope during a (runtime) prerender.
+async function loadDashboard() {
+  "use cache: private";
+  cacheLife({ stale: 30, revalidate: 60, expire: 300 });
+
   const [profile, courses] = await Promise.all([
     requireProfile(),
     getEnrolledCourses(),
   ]);
+
+  return { profile, courses };
+}
+
+export default async function DashboardPage() {
+  const { profile, courses } = await loadDashboard();
   const { t } = await getTranslator();
 
   return (

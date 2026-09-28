@@ -25,7 +25,63 @@ export type ChallengeOpener = {
   text: string;
   romanization: string | null;
   translation: string;
+  // Word-by-word meanings for hovering over Charles's message — null when
+  // there aren't any (the fixed openers, or the model leaving them out).
+  glosses: WordGloss[] | null;
 };
+
+// One word (or short set phrase) of Charles's message with its meaning in
+// the learner's language, and its Jyutping for Cantonese.
+export type WordGloss = {
+  text: string;
+  romanization: string | null;
+  meaning: string;
+};
+
+const MAX_GLOSSES = 60;
+
+// Reads the model's "words" list, keeping only well-formed entries. Null
+// when there's nothing usable, so the chat just shows the plain message.
+export function parseGlosses(value: unknown, withRomanization: boolean): WordGloss[] | null {
+  if (!Array.isArray(value)) return null;
+
+  const glosses = value.flatMap((entry): WordGloss[] => {
+    if (!entry || typeof entry !== "object") return [];
+    const { text, meaning, romanization } = entry as Record<string, unknown>;
+    if (typeof text !== "string" || typeof meaning !== "string") return [];
+    if (!text.trim() || !meaning.trim()) return [];
+    return [
+      {
+        text: text.trim(),
+        meaning: meaning.trim(),
+        romanization:
+          withRomanization && typeof romanization === "string" && romanization.trim()
+            ? romanization.trim()
+            : null,
+      },
+    ];
+  });
+
+  return glosses.length > 0 ? glosses.slice(0, MAX_GLOSSES) : null;
+}
+
+// The "words" field both of Charles's prompts ask for (an example entry,
+// for the JSON shape) and how to fill it in (a line after the shape).
+export function glossesPromptField(targetLanguage: string): string {
+  return targetLanguage === "yue"
+    ? `"words": [{ "text": "你", "romanization": "nei5", "meaning": "you" }]`
+    : `"words": [{ "text": "weekend", "meaning": "週末" }]`;
+}
+
+// How English feedback quotes Cantonese, so a beginner can both say and
+// understand every quoted bit — shared by the chat and the daily review.
+export const CANTONESE_QUOTE_RULE = `Whenever you quote Cantonese — a single word or a whole phrase — write the characters, then in brackets its Jyutping with tone numbers and a short English meaning in quotes, e.g. 飲 (jam2, "drink") or 我鍾意飲茶 (ngo5 zung1 ji3 jam2 caa4, "I like drinking tea"). Never quote Cantonese without its English meaning.`;
+
+export function glossesPromptRule(targetLanguage: string): string {
+  return targetLanguage === "yue"
+    ? `"words" lists every word of your message, in order, split into natural words (a word can be more than one character, e.g. 鍾意, 今日): "text" exactly as it appears in the message, "romanization" its Jyutping with tone numbers, "meaning" a short English meaning of that word as used here. Leave out punctuation.`
+    : `"words" lists every word of your message, in order: "text" exactly as it appears in the message, "meaning" a short Japanese meaning of that word as used here. Keep a set phrase together if its words don't make sense apart. Leave out punctuation.`;
+}
 
 export type ChallengeTarget = {
   // The course's target language ("en", "yue") — what Charles chats in.
@@ -180,7 +236,7 @@ const OPENERS: FixedOpener[] = [
 
 // The Cantonese course's fixed openers: colloquial written Cantonese a
 // beginner can read, with Jyutping and English.
-const CANTONESE_OPENERS: ChallengeOpener[] = [
+const CANTONESE_OPENERS: Omit<ChallengeOpener, "glosses">[] = [
   { text: "你好！你今日點呀？", romanization: "nei5 hou2! nei5 gam1 jat6 dim2 aa3?", translation: "Hi! How are you today?" },
   { text: "你好！你食咗飯未呀？", romanization: "nei5 hou2! nei5 sik6 zo2 faan6 mei6 aa3?", translation: "Hi! Have you eaten yet?" },
   { text: "你好！你鍾意食乜嘢？", romanization: "nei5 hou2! nei5 zung1 ji3 sik6 mat1 je5?", translation: "Hi! What do you like to eat?" },
@@ -193,11 +249,12 @@ const CANTONESE_OPENERS: ChallengeOpener[] = [
 
 function fixedOpeners(targetLanguage: string): ChallengeOpener[] {
   return targetLanguage === "yue"
-    ? CANTONESE_OPENERS
+    ? CANTONESE_OPENERS.map((opener) => ({ ...opener, glosses: null }))
     : OPENERS.map(({ english, japanese }) => ({
         text: english,
         romanization: null,
         translation: japanese,
+        glosses: null,
       }));
 }
 

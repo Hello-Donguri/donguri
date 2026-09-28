@@ -3,7 +3,8 @@ import { cacheLife } from "next/cache";
 import { Logo } from "@/components/logo";
 import { HeaderActions } from "@/components/dashboard/header-actions";
 import { DevModeProvider } from "@/components/dashboard/dev-mode-context";
-import { getGlobalStreak, requireProfile } from "@/lib/dal";
+import { ReviewDueNotifier } from "@/components/vocab/review-due-notifier";
+import { getCourseStreaks, requireProfile } from "@/lib/dal";
 import { parseDonguriConfig, type AccessoryId } from "@/lib/levels";
 
 export default function DashboardLayout({
@@ -26,6 +27,7 @@ export default function DashboardLayout({
           </div>
         </header>
         <main className="mx-auto max-w-360 px-4 py-6 sm:px-6 sm:py-10">{children}</main>
+        <ReviewDueNotifier />
       </div>
     </DevModeProvider>
   );
@@ -40,7 +42,7 @@ async function loadHeader() {
   "use cache: private";
   cacheLife({ stale: 30, revalidate: 60, expire: 300 });
 
-  const [profile, { currentStreak }] = await Promise.all([requireProfile(), getGlobalStreak()]);
+  const [profile, streaks] = await Promise.all([requireProfile(), getCourseStreaks()]);
   const equippedAccessory = (parseDonguriConfig(profile.donguriConfig)
     .equippedAccessory ?? null) as AccessoryId | null;
 
@@ -51,19 +53,19 @@ async function loadHeader() {
       role: profile.role,
     },
     equippedAccessory,
-    currentStreak,
+    streaks,
     xp: profile.xp,
   };
 }
 
 async function DashboardHeaderActions() {
-  const { profile, equippedAccessory, currentStreak, xp } = await loadHeader();
+  const { profile, equippedAccessory, streaks, xp } = await loadHeader();
 
   return (
     <HeaderActions
       profile={profile}
       equippedAccessory={equippedAccessory}
-      currentStreak={currentStreak}
+      streaks={streaks}
       xp={xp}
     />
   );

@@ -4,6 +4,7 @@ import { requireProfile } from "@/lib/dal";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
 import { Button } from "@/components/ui/button";
+import { NameForm } from "@/components/settings/name-form";
 import { getTranslator } from "@/lib/i18n/server";
 
 export const metadata: Metadata = {
@@ -42,9 +43,24 @@ export default async function SettingsPage() {
       <div className="max-w-lg rounded-2xl border border-card-border bg-washi-soft p-6">
         <h2 className="font-semibold text-sumi">{t("settings_page.account_title", "Account")}</h2>
         <div className="mt-4 flex items-center justify-between gap-4 border-t border-card-border pt-4">
+          <span className="text-sm text-sumi-soft">{t("settings_page.username_label", "Username")}</span>
+          <span className="text-sm font-medium text-sumi">@{profile.username}</span>
+        </div>
+        <div className="mt-4 flex items-center justify-between gap-4 border-t border-card-border pt-4">
           <span className="text-sm text-sumi-soft">{t("settings_page.email_label", "Email")}</span>
           <span className="text-sm font-medium text-sumi">{profile.email}</span>
         </div>
+      </div>
+
+      <div className="max-w-lg rounded-2xl border border-card-border bg-washi-soft p-6">
+        <h2 className="font-semibold text-sumi">{t("settings_page.name_title", "Your name")}</h2>
+        <p className="mt-1 mb-4 text-sm text-sumi-soft">
+          {t(
+            "settings_page.name_description",
+            "Only used to greet you — the leaderboards show your username.",
+          )}
+        </p>
+        <NameForm firstName={profile.first_name ?? ""} lastName={profile.last_name ?? ""} />
       </div>
 
       <div className="max-w-lg rounded-2xl border border-card-border bg-washi-soft p-6">

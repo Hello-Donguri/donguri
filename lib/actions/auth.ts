@@ -2,24 +2,35 @@
 
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import {
   LoginFormSchema,
   SignupFormSchema,
+  OnboardingFormSchema,
   ForgotPasswordFormSchema,
   ResetPasswordFormSchema,
   type LoginFormState,
   type SignupFormState,
+  type OnboardingFormState,
   type ForgotPasswordFormState,
   type ResetPasswordFormState,
 } from "@/lib/definitions";
+import { requireUser } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
 
 const getOrigin = async () => {
   const configuredUrl = process.env.NEXT_PUBLIC_SITE_URL;
 
   if (configuredUrl) {
-    return configuredUrl.replace(/\/$/, "");
+    // Supabase silently ignores a redirect URL without a scheme and falls
+    // back to the project's Site URL — so tolerate "localhost:3000".
+    const withScheme = /^https?:\/\//.test(configuredUrl)
+      ? configuredUrl
+      : `${configuredUrl.includes("localhost") ? "http" : "https"}://${configuredUrl}`;
+
+    return withScheme.replace(/\/$/, "");
   }
 
   const headersList = await headers();
@@ -68,6 +79,7 @@ export async function signup(
   const validatedFields = SignupFormSchema.safeParse({
     firstName: formData.get("firstName"),
     lastName: formData.get("lastName"),
+    username: formData.get("username"),
     email: formData.get("email"),
     password: formData.get("password"),
   });
@@ -78,7 +90,13 @@ export async function signup(
     };
   }
 
-  const { firstName, lastName, email, password } = validatedFields.data;
+  const { firstName, lastName, username, email, password } = validatedFields.data;
+
+  // Checked before creating the auth user, so a taken handle doesn't leave
+  // behind an account the user then has to finish on /onboarding.
+  if (await isUsernameTaken(username)) {
+    return { errors: { username: [USERNAME_TAKEN] } };
+  }
   const fullName = `${firstName} ${lastName}`.trim();
   const origin = await getOrigin();
   const supabase = await createClient();
@@ -128,6 +146,7 @@ export async function signup(
         fullName,
         firstName,
         lastName,
+        username,
       },
       create: {
         id: data.user.id,
@@ -135,10 +154,17 @@ export async function signup(
         fullName,
         firstName,
         lastName,
+        username,
         role: "user",
       },
     });
   } catch (error) {
+    // Someone claimed the handle between the check above and here. The
+    // account itself exists, so /onboarding will ask for another one.
+    if (isUniqueViolation(error)) {
+      return { message: "Your account was created, but that username was just taken — you'll pick another after logging in." };
+    }
+
     console.error("Failed to create Prisma profile:", error);
 
     return {
@@ -154,6 +180,114 @@ export async function signup(
   return {
     message: "Check your inbox to confirm your email before logging in.",
   };
+}
+
+// Google is a built-in Supabase provider; LINE isn't, so it's registered in
+// the Supabase dashboard as a custom OIDC provider (issuer
+// https://access.line.me) with the identifier "line" — hence the prefix.
+const OAUTH_PROVIDERS = {
+  google: "google",
+  line: "custom:line",
+} as const;
+
+export type OAuthProvider = keyof typeof OAUTH_PROVIDERS;
+
+export async function signInWithOAuth(provider: OAuthProvider) {
+  const origin = await getOrigin();
+  const supabase = await createClient();
+
+  // Runs server-side, so the PKCE code verifier lands in a cookie that
+  // app/auth/callback/route.ts reads back when exchanging the code.
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: OAUTH_PROVIDERS[provider],
+    options: {
+      redirectTo: `${origin}/auth/callback?next=/dashboard`,
+    },
+  });
+
+  if (error || !data.url) {
+    console.error(`Supabase ${provider} sign-in failed:`, error);
+    redirect("/login?error=oauth");
+  }
+
+  redirect(data.url);
+}
+
+const USERNAME_TAKEN = "That username is taken.";
+
+async function isUsernameTaken(username: string, exceptUserId?: string) {
+  const existing = await prisma.profile.findUnique({
+    where: { username },
+    select: { id: true },
+  });
+
+  return existing !== null && existing.id !== exceptUserId;
+}
+
+function isUniqueViolation(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
+}
+
+// Finishes a profile that's missing its username or name — see
+// requireProfile in lib/dal.ts, which sends users here. Upserts rather than
+// updates, since the auto-create trigger may not have run (see the
+// `!profile` case there).
+export async function completeOnboarding(
+  _state: OnboardingFormState,
+  formData: FormData,
+): Promise<OnboardingFormState> {
+  const user = await requireUser();
+  const existing = await prisma.profile.findUnique({
+    where: { id: user.id },
+    select: { username: true },
+  });
+
+  const validatedFields = OnboardingFormSchema.safeParse({
+    firstName: formData.get("firstName"),
+    lastName: formData.get("lastName"),
+    // A username, once set, is fixed — whatever was submitted is ignored.
+    username: existing?.username ?? formData.get("username"),
+  });
+
+  if (!validatedFields.success) {
+    return { errors: validatedFields.error.flatten().fieldErrors };
+  }
+
+  const { firstName, lastName, username } = validatedFields.data;
+  const fullName = `${firstName} ${lastName}`;
+
+  if (!existing?.username && (await isUsernameTaken(username, user.id))) {
+    return { errors: { username: [USERNAME_TAKEN] } };
+  }
+
+  try {
+    await prisma.profile.upsert({
+      where: { id: user.id },
+      update: { firstName, lastName, fullName, username },
+      create: {
+        id: user.id,
+        email: user.email ?? "",
+        firstName,
+        lastName,
+        fullName,
+        username,
+        role: "user",
+      },
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return { errors: { username: [USERNAME_TAKEN] } };
+    }
+
+    console.error("Failed to complete onboarding:", error);
+    return { message: "Something went wrong saving your details." };
+  }
+
+  revalidatePath("/dashboard", "layout");
+  redirect("/dashboard");
 }
 
 export async function logout() {

@@ -17,7 +17,7 @@ import type {
   DailyActivityCount,
   DailyChallengeStatus,
   EnrolledCourseSummary,
-  GlobalStreak,
+  CourseStreakInfo,
   WeeklyStats,
   LeaderboardEntry,
   LanguageDeckSummary,
@@ -32,6 +32,7 @@ import type {
   WordCategoryOption,
   WordType,
 } from "@/lib/definitions";
+import { WORD_TYPES } from "@/lib/definitions";
 import {
   addDays,
   applyDailyActivity,
@@ -47,6 +48,7 @@ import { deckCoverImagePath, wordImagePath } from "@/lib/images";
 import {
   findClozeMatchesByForm,
   findTermClozeMatches,
+  findTranslationSpan,
   pickRandomClozeMatch,
   romanizeFromExamples,
   type ClozeMatch,
@@ -125,6 +127,7 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
       donguriConfig: true,
       firstName: true,
       lastName: true,
+      username: true,
       subscription: {
         select: {
           status: true,
@@ -150,6 +153,7 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
     donguriConfig: profile.donguriConfig,
     first_name: profile.firstName,
     last_name: profile.lastName,
+    username: profile.username,
     subscription: profile.subscription,
     hasAccess: hasActiveAccess(profile.role, profile.subscription),
   };
@@ -165,8 +169,20 @@ export const requireProfile = cache(async (): Promise<Profile> => {
     redirect("/onboarding");
   }
 
+  // OAuth sign-ups, and accounts from before usernames existed, haven't
+  // been asked for these yet — see app/onboarding.
+  if (!isProfileComplete(profile)) {
+    redirect("/onboarding");
+  }
+
   return profile;
 });
+
+export function isProfileComplete(
+  profile: Pick<Profile, "username" | "first_name" | "last_name">,
+): boolean {
+  return Boolean(profile.username && profile.first_name && profile.last_name);
+}
 
 // For everything behind the paywall: the signed-in profile, or a redirect
 // to the billing page to start the free trial / resubscribe. Called from
@@ -229,6 +245,10 @@ export const getEnrolledCourses = cache(
       },
     });
 
+    // Shown streaks are recalculated from activity (see getCourseStreak),
+    // not the enrollment's stored counter, which never lapses on its own.
+    const streaks = await getCourseStreaks();
+
     return enrollments.map((enrollment) => {
       const { course } = enrollment;
       const totalWords = course.languageDecks.reduce(
@@ -256,7 +276,7 @@ export const getEnrolledCourses = cache(
         description: course.description,
         targetLanguage: course.targetLanguage,
         sourceLanguage: course.sourceLanguage,
-        currentStreak: enrollment.currentStreak,
+        currentStreak: streaks[course.slug] ?? 0,
         longestStreak: enrollment.longestStreak,
         totalWords,
         knownWords,
@@ -637,7 +657,9 @@ type LanguageDeckWordRow = {
   translation: string;
   romanization: string | null;
   path: string;
-  progress: { status: string }[];
+  // `introducedAt` only where this user's progress is selected (see
+  // LANGUAGE_DECK_PROGRESS_SELECT) — it dates the deck's completion.
+  progress: { status: string; introducedAt?: Date }[];
 };
 
 function toLanguageDeckSummary(languageDeck: {
@@ -661,6 +683,16 @@ function toLanguageDeckSummary(languageDeck: {
     path: word.path,
   }));
   const vocabCount = words.filter((word) => word.path === "vocab").length;
+  const learntWords = languageDeck.words.filter((word) => word.progress.length > 0).length;
+  // When the last word was learnt, if every word has been — drives the
+  // just-finished celebration (see DeckCompleteCelebration).
+  const introducedTimes = languageDeck.words.flatMap((word) =>
+    word.progress.flatMap((p) => (p.introducedAt ? [p.introducedAt.getTime()] : [])),
+  );
+  const completedAt =
+    words.length > 0 && learntWords === words.length && introducedTimes.length > 0
+      ? new Date(Math.max(...introducedTimes)).toISOString()
+      : null;
 
   return {
     id: languageDeck.id,
@@ -675,8 +707,8 @@ function toLanguageDeckSummary(languageDeck: {
     grammarCount: words.length - vocabCount,
     position: languageDeck.position,
     totalWords: words.length,
-    learntWords: languageDeck.words.filter((word) => word.progress.length > 0)
-      .length,
+    learntWords,
+    completedAt,
     knownWords: words.filter((word) => word.known).length,
     words,
   };
@@ -690,6 +722,9 @@ const LANGUAGE_DECK_WORDS_SELECT = {
   path: true,
   progress: { select: { status: true } },
 } as const;
+
+// This user's own progress on each word, for the per-user deck queries.
+const LANGUAGE_DECK_PROGRESS_SELECT = { status: true, introducedAt: true } as const;
 
 // A "deck" is a LanguageDeck, which can hold a mixture of vocab words and
 // grammar points (see the note on `Word.path` in prisma/schema.prisma).
@@ -709,7 +744,7 @@ export const getCourseDecks = cache(async (courseSlug: string) => {
           orderBy: { position: "asc" },
           select: {
             ...LANGUAGE_DECK_WORDS_SELECT,
-            progress: { where: { userId: user.id }, select: { status: true } },
+            progress: { where: { userId: user.id }, select: LANGUAGE_DECK_PROGRESS_SELECT },
           },
         },
       },
@@ -805,7 +840,7 @@ export const getDeckDetail = cache(
           orderBy: { position: "asc" },
           select: {
             ...LANGUAGE_DECK_WORDS_SELECT,
-            progress: { where: { userId: user.id }, select: { status: true } },
+            progress: { where: { userId: user.id }, select: LANGUAGE_DECK_PROGRESS_SELECT },
           },
         },
       },
@@ -1006,29 +1041,24 @@ export const getWeeklyStats = cache(
   },
 );
 
-// Account-wide streak, spanning every course the user is enrolled in —
-// deliberately not scoped to (or derived from) any single course's activity
-// chart, so switching which course gets practiced on a given day never
-// looks like a broken streak. See `computeStreakFromActiveDays` in
-// lib/srs.ts for the "what counts as an active day" rule. XP/level are
-// deliberately not duplicated here — they're read straight from
-// `Profile.xp` wherever they're shown, same as the header badge.
-export const getGlobalStreak = cache(async (): Promise<GlobalStreak> => {
-  const user = await requireUser();
-
+// The UTC days a user did anything in one course — learnt or answered a
+// word, reviewed, or finished a daily challenge. What a course's streak is
+// counted from (see `computeStreakFromActiveDays` in lib/srs.ts).
+async function courseActiveDays(userId: string, courseId: string): Promise<Set<string>> {
+  const inCourse = { languageDeck: { courseId } };
   const [progress, reviews, attempts] = await Promise.all([
     prisma.userWordProgress.findMany({
-      where: { userId: user.id },
+      where: { userId, word: inCourse },
       select: { introducedAt: true, lastSeenAt: true },
     }),
     // `lastSeenAt` only keeps each word's latest review, so earlier review
     // days come from the review log instead.
     prisma.reviewEvent.findMany({
-      where: { userId: user.id },
+      where: { userId, word: inCourse },
       select: { createdAt: true },
     }),
     prisma.dailyChallengeAttempt.findMany({
-      where: { userId: user.id },
+      where: { userId, courseId },
       select: { challengeDate: true },
     }),
   ]);
@@ -1044,8 +1074,36 @@ export const getGlobalStreak = cache(async (): Promise<GlobalStreak> => {
   for (const { challengeDate } of attempts) {
     activeDays.add(toUTCDateString(challengeDate));
   }
+  return activeDays;
+}
 
-  return computeStreakFromActiveDays(activeDays);
+// Streaks are per course: each course's own run of active days, so
+// resetting one course's progress resets its streak without touching
+// another's, and practising one course doesn't keep another's alive.
+export const getCourseStreak = cache(async (courseSlug: string): Promise<CourseStreakInfo> => {
+  const { user, course } = await requireEnrolledCourse(courseSlug);
+  return computeStreakFromActiveDays(await courseActiveDays(user.id, course.id));
+});
+
+// Every enrolled course's current streak, by slug — for places that aren't
+// inside one course: the header (which picks the course in the URL, or the
+// best one elsewhere) and the dashboard's course list.
+export const getCourseStreaks = cache(async (): Promise<Record<string, number>> => {
+  const user = await requireUser();
+  const enrollments = await prisma.courseEnrollment.findMany({
+    where: { userId: user.id, course: { active: true } },
+    select: { course: { select: { id: true, slug: true } } },
+  });
+
+  const entries = await Promise.all(
+    enrollments.map(async ({ course }) => {
+      const { currentStreak } = computeStreakFromActiveDays(
+        await courseActiveDays(user.id, course.id),
+      );
+      return [course.slug, currentStreak] as const;
+    }),
+  );
+  return Object.fromEntries(entries);
 });
 
 // How many of today's (UTC) 3 daily-challenge attempts this user has used up
@@ -1160,6 +1218,7 @@ export const getDailyChallenge = cache(
 
 type LeaderboardProfile = {
   id: string;
+  username: string | null;
   fullName: string | null;
   email: string;
   xp: number;
@@ -1168,6 +1227,7 @@ type LeaderboardProfile = {
 
 const LEADERBOARD_PROFILE_SELECT = {
   id: true,
+  username: true,
   fullName: true,
   email: true,
   xp: true,
@@ -1181,7 +1241,8 @@ function toLeaderboardEntry(
 ): LeaderboardEntry {
   return {
     id: profile.id,
-    name: profile.fullName ?? profile.email.split("@")[0],
+    // Only users who never finished onboarding lack a username.
+    name: profile.username ?? profile.fullName ?? profile.email.split("@")[0],
     xp: profile.xp,
     weeklyXp,
     equippedAccessory:
@@ -1302,8 +1363,8 @@ export const getLeaderboards = cache(
 // vocab words and grammar points (each `RevealWord` carries its own `path`
 // so the UI can label which is which). Read-only, so the page can be
 // prefetched without introducing words the user never opens: LearnSession
-// commits the batch it was handed via the `startLearnSession` action (see
-// `introduceLearnBatch` below) once it actually mounts.
+// marks each word learnt only as the learner clicks "Got it" on it, via the
+// `learnWord` action (see `introduceLearnWords` below).
 export const getLearnQueueForCourse = cache(
   async (courseSlug: string): Promise<RevealWord[]> => {
     const { user, course } = await requireEnrolledCourse(courseSlug);
@@ -1347,6 +1408,9 @@ function toRevealWord(
     term: word.term,
     translation: word.translation,
     romanization: word.romanization,
+    wordType: (WORD_TYPES as readonly string[]).includes(word.wordType ?? "")
+      ? (word.wordType as WordType)
+      : null,
     exampleSentence: word.exampleSentence,
     explanation: word.explanation,
     explanationJa: word.explanationJa,
@@ -1385,12 +1449,15 @@ export async function getLessonWord(
   return word ? toRevealWord(word, course) : null;
 }
 
-// Commits a batch handed out by `getLearnQueueForCourse`: creates the
-// words' `UserWordProgress` rows (stage 1, first review due 4 hours out) and
-// bumps the streak. The ids come from the client, so they're re-checked
+// Marks words from a batch handed out by `getLearnQueueForCourse` as
+// learnt: creates their `UserWordProgress` rows (stage 1, first review due
+// 4 hours out) and bumps the streak. Called one word at a time, as the
+// learner clicks "Got it" on each (see `learnWord` in lib/actions/vocab.ts)
+// — never for the whole batch up front, so a word only counts once it's
+// actually been read. The ids come from the client, so they're re-checked
 // against the same pool the queue draws from — active words in this user's
 // active decks that they haven't met yet — and anything else is ignored.
-export async function introduceLearnBatch(courseSlug: string, wordIds: string[]) {
+export async function introduceLearnWords(courseSlug: string, wordIds: string[]) {
   const { user, course } = await requireEnrolledCourse(courseSlug);
   const languageDeckIds = await getActiveDeckIds(course.id, user.id);
 
@@ -1436,12 +1503,11 @@ export async function introduceLearnBatch(courseSlug: string, wordIds: string[])
 // deactivating a deck after learning some of its words shouldn't hide their
 // pending quiz. For vocab, each word gets exactly two questions (one
 // multiple-choice, one typed — see `buildTypedQuestion`), so a fresh
-// 3-word learn batch always produces 6 questions. For grammar, every fresh
-// point's example sentences each become their own fill-in-the-blank
-// question (see `buildAllClozeQuestions`) — never multiple choice, since
-// what's being tested is production of the structure itself, not
-// recognition among options — so a fresh 3-point learn batch (3 examples
-// each) produces 9 questions. Both kinds are shuffled together into one
+// 3-word learn batch always produces 6 questions. Grammar matches that: two
+// questions per point (see `buildGrammarQuizQuestions`) — fill-in-the-blanks
+// from its examples where it has them — so a 3-point batch is 6 too,
+// however many example sentences each point has. Both kinds are shuffled
+// together into one
 // quiz; each question carries its own `path` (see the QuizQuestion variants
 // in lib/definitions.ts) so the UI can label which is which. Either way,
 // answering these never advances the word's stage (see `recordAnswer`'s
@@ -1457,6 +1523,10 @@ export async function introduceLearnBatch(courseSlug: string, wordIds: string[])
 // (a batch's rows share one `introducedAt`, since `getLearnQueueForCourse`
 // creates them in a single `createMany`). Skipped words are always
 // excluded: they go straight to Mastered and are never quizzed.
+// How far back from the most recently learnt word the quiz looks for the
+// rest of its batch, when it isn't told which words to cover.
+const LEARN_BATCH_WINDOW_MS = 30 * 60 * 1000;
+
 export const getTestQueueForCourse = cache(
   async (courseSlug: string, wordIds?: string[]): Promise<QuizQuestion[]> => {
     const { user, course } = await requireEnrolledCourse(courseSlug);
@@ -1471,10 +1541,13 @@ export const getTestQueueForCourse = cache(
       },
     } as const;
 
-    let batchFilter: { wordId: { in: string[] } } | { introducedAt: Date };
+    let batchFilter: { wordId: { in: string[] } } | { introducedAt: { gte: Date } };
     if (wordIds && wordIds.length > 0) {
       batchFilter = { wordId: { in: wordIds } };
     } else {
+      // Words are committed one "Got it" at a time (see
+      // `introduceLearnWords`), so a batch shares no single timestamp —
+      // it's the fresh words learnt shortly before the latest one.
       const latest = await prisma.userWordProgress.findFirst({
         where: freshWhere,
         orderBy: { introducedAt: "desc" },
@@ -1483,7 +1556,9 @@ export const getTestQueueForCourse = cache(
       if (!latest) {
         return [];
       }
-      batchFilter = { introducedAt: latest.introducedAt };
+      batchFilter = {
+        introducedAt: { gte: new Date(latest.introducedAt.getTime() - LEARN_BATCH_WINDOW_MS) },
+      };
     }
 
     const freshProgress = await prisma.userWordProgress.findMany({
@@ -1512,7 +1587,7 @@ export const getTestQueueForCourse = cache(
     const grammarPool =
       grammarWords.length > 0 ? await loadGrammarPool(course) : null;
     const grammarQuestions = grammarWords.flatMap((word) =>
-      buildAllClozeQuestions(word, course, grammarPool),
+      buildGrammarQuizQuestions(word, course, grammarPool),
     );
 
     let vocabQuestions: QuizQuestion[] = [];
@@ -1547,6 +1622,25 @@ export const getTestQueueForCourse = cache(
   },
 );
 
+// A user's words that are in a course's review queue at all — shared by
+// the review session, the course-home summary and the "words ready to
+// review" notifier, so they always agree. Every learnt, not-yet-mastered
+// word: its first review is due 4 hours after it's learnt whether or not
+// its post-learn quiz was ever taken (see `introduceLearnWords`) — a word
+// whose quiz was skipped mustn't drop out of the schedule for good.
+// Answering it in review marks it seen, which also takes it out of the
+// pending quiz (see `getTestQueueForCourse`).
+function reviewableWhere(userId: string, courseId: string) {
+  return {
+    userId,
+    stage: { lt: MAX_STAGE },
+    word: {
+      languageDeck: { courseId, active: true },
+      active: true,
+    },
+  } as const;
+}
+
 // One review queue per *course* — combining every deck's vocab and grammar
 // together, not scoped to currently-active decks (an already-learned word
 // stays reviewable even if its deck is later deactivated). Course-home-page
@@ -1558,16 +1652,7 @@ export const getReviewQueueSummary = cache(
   async (courseSlug: string): Promise<ReviewQueueSummary> => {
     const { user, course } = await requireEnrolledCourse(courseSlug);
     const now = new Date();
-
-    const reviewable = {
-      userId: user.id,
-      stage: { lt: MAX_STAGE },
-      lastSeenAt: { not: null },
-      word: {
-        languageDeck: { courseId: course.id, active: true },
-        active: true,
-      },
-    } as const;
+    const reviewable = reviewableWhere(user.id, course.id);
 
     const [dueCount, next] = await Promise.all([
       prisma.userWordProgress.count({
@@ -1583,6 +1668,51 @@ export const getReviewQueueSummary = cache(
     return { dueCount, nextDueAt: next?.nextReviewAt ?? null };
   },
 );
+
+export type ReviewDueStatus = {
+  slug: string;
+  title: string;
+  dueCount: number;
+  // The next time a word *becomes* due (strictly in the future), so the
+  // notifier knows when to check again; null when nothing's scheduled.
+  nextUpcomingAt: Date | null;
+};
+
+// Every enrolled course's review count, for the "words ready to review"
+// toast (see ReviewDueNotifier). Polled from the client in the background,
+// so it quietly returns nothing — never redirects — for a signed-out user
+// or one without access.
+export async function getReviewDueStatus(): Promise<ReviewDueStatus[]> {
+  const profile = await getProfile();
+  if (!profile?.hasAccess) return [];
+
+  const now = new Date();
+  const enrollments = await prisma.courseEnrollment.findMany({
+    where: { userId: profile.id, course: { active: true } },
+    orderBy: { course: { position: "asc" } },
+    select: { course: { select: { id: true, slug: true, title: true } } },
+  });
+
+  return Promise.all(
+    enrollments.map(async ({ course }) => {
+      const reviewable = reviewableWhere(profile.id, course.id);
+      const [dueCount, upcoming] = await Promise.all([
+        prisma.userWordProgress.count({ where: { ...reviewable, nextReviewAt: { lte: now } } }),
+        prisma.userWordProgress.findFirst({
+          where: { ...reviewable, nextReviewAt: { gt: now } },
+          orderBy: { nextReviewAt: "asc" },
+          select: { nextReviewAt: true },
+        }),
+      ]);
+      return {
+        slug: course.slug,
+        title: course.title,
+        dueCount,
+        nextUpcomingAt: upcoming?.nextReviewAt ?? null,
+      };
+    }),
+  );
+}
 
 // Admin-only "dev mode" debug view for the course home page — every word
 // tracked anywhere in this course's review queue (learning or mastered,
@@ -1638,14 +1768,8 @@ export const getReviewQueue = cache(
 
     const dueProgress = await prisma.userWordProgress.findMany({
       where: {
-        userId: user.id,
-        stage: { lt: MAX_STAGE },
-        lastSeenAt: { not: null },
+        ...reviewableWhere(user.id, course.id),
         nextReviewAt: { lte: new Date() },
-        word: {
-          languageDeck: { courseId: course.id, active: true },
-          active: true,
-        },
       },
       include: {
         word: {
@@ -1744,18 +1868,12 @@ function buildMultipleChoiceQuestion(
     Math.random() < 0.5 ? "term-to-translation" : "translation-to-term";
   const showingTerm = direction === "translation-to-term";
 
+  // No pictures on the options: the prompt shows the word's picture, so
+  // matching it to an option's picture would give the answer away.
   const toOption = (candidate: QuestionWord): QuizOption =>
     showingTerm
-      ? {
-          text: candidate.term,
-          romanization: candidate.romanization,
-          image: wordImagePath(candidate),
-        }
-      : {
-          text: candidate.translation,
-          romanization: null,
-          image: wordImagePath(candidate),
-        };
+      ? { text: candidate.term, romanization: candidate.romanization }
+      : { text: candidate.translation, romanization: null };
 
   const rest = pool.filter((candidate) => candidate.id !== word.id);
   const sameCategory = shuffle(
@@ -1892,6 +2010,7 @@ function buildClozeQuestion(
     formId: match.formId,
     clozeSentence: match.sentence,
     clozeSentenceJa: match.translation,
+    clozeHighlightJa: findTranslationSpan(word.translation, match.translation),
     clozeRomanization: match.romanization,
     targetLanguage: course.targetLanguage,
   };
@@ -2008,14 +2127,16 @@ function buildTypedQuestion(
   };
 }
 
-// Every (form, example) cloze match becomes its own question — used only
-// for a freshly-learned grammar point's post-learn quiz (see
-// `getTestQueue`), where the point is meant to be drilled across all of its
-// example sentences at once, not just one at random the way
-// `buildTypedQuestion` picks for ordinary review. Falls back to a single
-// `buildTypedQuestion` question for the rare word with no matchable
-// forms/examples at all, so a quiz question is always produced.
-function buildAllClozeQuestions(
+const GRAMMAR_QUIZ_QUESTIONS = 2;
+
+// A freshly-learned grammar point's post-learn quiz questions — two, like
+// a vocab word's, however many examples it has (see `getTestQueue`).
+// Fill-in-the-blanks first, spread across its forms before repeating one
+// ("There is", then "There are") and never reusing a sentence. With only
+// one to make, the second is multiple choice on what the pattern means,
+// against the course's other grammar points; with none, it's whatever
+// `buildTypedQuestion` falls back to.
+function buildGrammarQuizQuestions(
   word: QuestionWord,
   course: { targetLanguage: string; sourceLanguage: string },
   grammarPool: GrammarPool | null,
@@ -2025,13 +2146,34 @@ function buildAllClozeQuestions(
     word.examples ?? [],
     course.targetLanguage,
   );
-  const matches = [...clozeByForm.values()].flat();
 
-  if (matches.length === 0) {
+  // Round-robin across forms: one match from each, then a second from
+  // each, and so on — skipping any sentence already used.
+  const perForm = [...clozeByForm.values()].map((matches) => shuffle(matches));
+  const picked: ClozeMatch[] = [];
+  const usedSentences = new Set<string>();
+  for (let round = 0; picked.length < GRAMMAR_QUIZ_QUESTIONS; round++) {
+    const candidates = shuffle(perForm).flatMap((matches) => matches[round] ?? []);
+    if (candidates.length === 0) break;
+    for (const match of candidates) {
+      if (picked.length === GRAMMAR_QUIZ_QUESTIONS) break;
+      if (usedSentences.has(match.translation)) continue;
+      usedSentences.add(match.translation);
+      picked.push(match);
+    }
+  }
+
+  if (picked.length === 0) {
     return [buildTypedQuestion(word, course, grammarPool)];
   }
 
-  return matches.map((match) => buildClozeQuestion(word, match, course, grammarPool));
+  const questions = picked.map((match) => buildClozeQuestion(word, match, course, grammarPool));
+  const hasOtherGrammar = grammarPool?.words.some((candidate) => candidate.id !== word.id);
+  if (questions.length < GRAMMAR_QUIZ_QUESTIONS && grammarPool && hasOtherGrammar) {
+    questions.push(buildMultipleChoiceQuestion(word, grammarPool.words, course));
+  }
+
+  return questions;
 }
 
 function shuffle<T>(items: T[]): T[] {

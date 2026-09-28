@@ -5,7 +5,7 @@ import {
   bumpStreak,
   ensureDeckActivations,
   getLessonWord,
-  introduceLearnBatch,
+  introduceLearnWords,
   requireSubscriber,
 } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
@@ -77,6 +77,28 @@ function alternativeReadings(stored: string, leniency: AnswerLeniency): string[]
   return readings.length > 1 ? readings : [];
 }
 
+// Jyutping with its tone digits taken out ("nei5 hou2" → "nei hou"), for
+// telling a tone slip apart from a wrong word.
+function withoutTones(jyutping: string): string {
+  return jyutping.toLowerCase().replace(/[1-6]/g, "").replace(/\s+/g, " ").trim();
+}
+
+// Whether a wrong romanized answer has every syllable right and only the
+// tones wrong (or missing) — see TONE_RETRY_XP.
+function isToneMiss(typed: string, stored: string, leniency: AnswerLeniency): boolean {
+  const guess = withoutTones(typed);
+  return (
+    guess !== "" &&
+    answerReadings(stored, leniency).some((reading) => withoutTones(reading) === guess)
+  );
+}
+
+// A Cantonese romanized answer with only its tones wrong isn't marked
+// wrong straight away: the learner is shown the right tones and types it
+// again. Getting it on that second go counts as correct, for half the
+// usual XP.
+const TONE_RETRY_XP = 0.5;
+
 // +1 XP per correct quiz answer (both multiple-choice and fill-in-the-form
 // questions) — see `completeQuiz` below for the +5 perfect-quiz bonus on top
 // of this. Returns the profile's new total so the caller can hand it
@@ -132,6 +154,7 @@ async function recordAnswer(
   wordId: string,
   correct: boolean,
   advancesStage: boolean,
+  xpForCorrect = 1,
 ): Promise<{ xp: number }> {
   const progress = await prisma.userWordProgress.findUniqueOrThrow({
     where: { userId_wordId: { userId, wordId } },
@@ -172,7 +195,7 @@ async function recordAnswer(
     ]);
   }
 
-  const xp = await awardXp(userId, correct ? 1 : 0);
+  const xp = await awardXp(userId, correct ? xpForCorrect : 0);
 
   return { xp };
 }
@@ -213,13 +236,19 @@ export async function submitAnswer(
 // alternates. Shared by the quiz's typed half (`advancesStage: false`) and
 // the review queue's fallback typed question for words with no cloze
 // content (`advancesStage: true`).
+// A Jyutping answer with only its tones wrong comes back as `toneMiss`
+// with nothing recorded yet; the learner retypes it and the client sends
+// that with `toneRetry`, which is recorded as usual but only earns
+// TONE_RETRY_XP if right.
 export async function submitTypedAnswer(
   wordId: string,
   direction: QuizDirection,
   typedAnswer: string,
   advancesStage: boolean,
+  toneRetry = false,
 ): Promise<{
   correct: boolean;
+  toneMiss: boolean;
   correctAnswer: string;
   xp: number;
   alternatives: string[];
@@ -235,6 +264,7 @@ export async function submitTypedAnswer(
       romanization: true,
       path: true,
       alternateAnswers: { select: { value: true } },
+      languageDeck: { select: { course: { select: { targetLanguage: true } } } },
     },
   });
 
@@ -260,10 +290,38 @@ export async function submitTypedAnswer(
   // ("they / them") are shown whole, since they're one answer.
   const correctAnswer = storedAnswer.split(",")[0].trim();
 
-  const { xp } = await recordAnswer(user.id, wordId, correct, advancesStage);
+  if (
+    !correct &&
+    !toneRetry &&
+    useRomanizedAnswer &&
+    word.languageDeck.course.targetLanguage === "yue" &&
+    isToneMiss(typedAnswer, storedAnswer, leniency)
+  ) {
+    const profile = await prisma.profile.findUniqueOrThrow({
+      where: { id: user.id },
+      select: { xp: true },
+    });
+    return {
+      correct: false,
+      toneMiss: true,
+      correctAnswer,
+      xp: profile.xp,
+      alternatives: [],
+      fullAnswer: null,
+    };
+  }
+
+  const { xp } = await recordAnswer(
+    user.id,
+    wordId,
+    correct,
+    advancesStage,
+    toneRetry ? TONE_RETRY_XP : 1,
+  );
 
   return {
     correct,
+    toneMiss: false,
     correctAnswer,
     xp,
     alternatives: alternativeReadings(storedAnswer, leniency),
@@ -474,16 +532,14 @@ export async function refreshDashboardHeader(): Promise<void> {
   revalidatePath("/dashboard", "layout");
 }
 
-// Called once by LearnSession when it mounts, to commit the batch the
-// (read-only, prefetchable) learn page handed it — see
-// `introduceLearnBatch` in lib/dal.ts. Same reasoning as `submitAnswer`
-// above for no revalidatePath: it would re-render the learn page and swap
-// the batch out from under the user.
-export async function startLearnSession(
-  courseSlug: string,
-  wordIds: string[],
-): Promise<void> {
-  await introduceLearnBatch(courseSlug, wordIds);
+// Called by LearnSession each time the learner clicks "Got it", to mark
+// that one word as learnt — see `introduceLearnWords` in lib/dal.ts. Only
+// then: the learn page itself is read-only, so opening or refreshing it
+// learns nothing. Same reasoning as `submitAnswer` above for no
+// revalidatePath: it would re-render the learn page and swap the batch out
+// from under the user.
+export async function learnWord(courseSlug: string, wordId: string): Promise<void> {
+  await introduceLearnWords(courseSlug, [wordId]);
 }
 
 export async function skipWord(wordId: string): Promise<void> {
@@ -621,12 +677,16 @@ export async function resetCourseProgress(courseId: string): Promise<void> {
   const config = parseDonguriConfig(profile.donguriConfig);
 
   // XP history goes too, so "XP this week" can't exceed the reset total,
-  // and this course's review history with its progress.
+  // and this course's review history and daily-challenge attempts with its
+  // progress — both feed the activity chart and the streak (see
+  // getDailyActivityCounts / getCourseStreak in lib/dal.ts), so leaving
+  // them kept the chart and the streak going after a reset.
   await Promise.all([
     prisma.xpEvent.deleteMany({ where: { userId: user.id } }),
     prisma.reviewEvent.deleteMany({
       where: { userId: user.id, word: { languageDeck: { courseId } } },
     }),
+    prisma.dailyChallengeAttempt.deleteMany({ where: { userId: user.id, courseId } }),
   ]);
 
   await prisma.profile.update({

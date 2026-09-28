@@ -22,6 +22,7 @@ import type {
   ChallengeItem,
   ChallengeOpener,
   ChallengeTarget,
+  WordGloss,
 } from "@/lib/daily-challenge";
 import {
   DAILY_CHALLENGE_BASE_XP,
@@ -37,6 +38,7 @@ import { cn } from "@/lib/utils";
 import { scoreTone } from "@/components/vocab/challenge-score";
 import { BilingualText } from "@/components/vocab/bilingual-text";
 import { Jyutping, JyutpingInput } from "@/components/vocab/jyutping";
+import { GlossedJyutping, GlossedText } from "@/components/vocab/glossed-text";
 import { RainbowAvatar } from "@/components/donguri/rainbow-avatar";
 import { ScoreBar } from "@/components/vocab/score-bar";
 import type { AccessoryId } from "@/lib/levels";
@@ -50,6 +52,8 @@ type Message = {
   // language translation behind the Translate button.
   romanization?: string | null;
   translation?: string;
+  // Word-by-word meanings, for hovering (see GlossedText).
+  glosses?: WordGloss[] | null;
   reply?: ChatReply;
 };
 
@@ -203,6 +207,7 @@ function DailyChallengeChat({
                 text: opener.text,
                 romanization: opener.romanization,
                 translation: opener.translation,
+                glosses: opener.glosses,
                 sentAt: Date.now(),
               },
             ],
@@ -299,6 +304,7 @@ function DailyChallengeChat({
           text: result.reply.text,
           romanization: result.reply.romanization,
           translation: result.reply.translation,
+          glosses: result.reply.glosses,
           sentAt: Date.now(),
           reply: result.reply,
         },
@@ -505,10 +511,13 @@ function DailyChallengeChat({
                               : "rounded-bl-md bg-washi text-sumi ring-1 ring-card-border/60",
                           )}
                         >
-                          {message.text}
+                          <GlossedText text={message.text} glosses={message.glosses} />
                           {message.romanization && (
                             <span className="mt-1 block text-xs">
-                              <Jyutping text={message.romanization} />
+                              <GlossedJyutping
+                                romanization={message.romanization}
+                                glosses={message.glosses}
+                              />
                             </span>
                           )}
                           {showTranslation && message.translation && (

@@ -49,6 +49,37 @@ function blankOut(sentence: string, value: string): string | null {
   return pattern.test(sentence) ? sentence.replace(pattern, "___") : null;
 }
 
+// Where the word's own translation (速い, or "fast" for the Cantonese
+// course) appears in the cloze's translation sentence, as the exact text to
+// highlight there — or null when it doesn't. Tries the whole translation,
+// then each alternative in a list like "速い、早い" (longest first, notes in
+// brackets dropped). No attempt at inflections or synonyms: an example's
+// translation often words it differently (迅速な for 速い, お待ち for
+// 待つ), and then nothing is highlighted rather than a guess.
+export function findTranslationSpan(
+  wordTranslation: string,
+  sentence: string,
+): string | null {
+  const alternatives = wordTranslation
+    .replace(/[（(][^）)]*[）)]/g, "")
+    .split(/[、,，;；/／・]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const candidates = [...new Set([wordTranslation.trim(), ...alternatives])].sort(
+    (a, b) => b.length - a.length,
+  );
+
+  for (const candidate of candidates) {
+    const pattern = isLatinTypeable(candidate)
+      ? new RegExp(`\\b${escapeRegExp(candidate)}\\b`, "i")
+      : new RegExp(escapeRegExp(candidate));
+    const match = sentence.match(pattern);
+    if (match) return match[0];
+  }
+
+  return null;
+}
+
 const HAN = /\p{Script=Han}/u;
 const SYLLABLE = /[a-z]+[1-6]/gi;
 const countHan = (text: string) => [...text].filter((char) => HAN.test(char)).length;

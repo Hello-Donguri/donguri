@@ -6,9 +6,39 @@ export const LoginFormSchema = z.object({
   password: z.string().min(1, { error: "Password is required." }).trim(),
 });
 
+const FirstNameSchema = z
+  .string()
+  .trim()
+  .min(1, { error: "First name is required." })
+  .max(50, { error: "Keep it under 50 characters." });
+
+const LastNameSchema = z
+  .string()
+  .trim()
+  .min(1, { error: "Last name is required." })
+  .max(50, { error: "Keep it under 50 characters." });
+
+// Lowercased (and a leading "@" dropped) before checking, matching the
+// `profiles_username_format` constraint in supabase/schema.sql — so
+// "@Yuki_T" and "yuki_t" are the same handle.
+export const UsernameSchema = z
+  .string()
+  .trim()
+  .transform((value) => value.replace(/^@/, "").toLowerCase())
+  .pipe(
+    z
+      .string()
+      .min(3, { error: "At least 3 characters." })
+      .max(20, { error: "At most 20 characters." })
+      .regex(/^[a-z0-9_]+$/, {
+        error: "Only letters, numbers and underscores.",
+      }),
+  );
+
 export const SignupFormSchema = z.object({
-  firstName: z.string().min(1, { error: "First name is required." }).trim(),
-  lastName: z.string().min(1, { error: "Last name is required." }).trim(),
+  firstName: FirstNameSchema,
+  lastName: LastNameSchema,
+  username: UsernameSchema,
   email: z.email({ error: "Please enter a valid email." }).trim(),
   password: z
     .string()
@@ -46,10 +76,44 @@ export type SignupFormState =
       errors?: {
         firstName?: string[];
         lastName?: string[];
+        username?: string[];
         email?: string[];
         password?: string[];
       };
       message?: string;
+    }
+  | undefined;
+
+// The /onboarding step: everything sign-up collects beyond the credentials,
+// for users who arrived some other way (OAuth, or before it was asked).
+export const OnboardingFormSchema = z.object({
+  firstName: FirstNameSchema,
+  lastName: LastNameSchema,
+  username: UsernameSchema,
+});
+
+export type OnboardingFormState =
+  | {
+      errors?: {
+        firstName?: string[];
+        lastName?: string[];
+        username?: string[];
+      };
+      message?: string;
+    }
+  | undefined;
+
+// Account settings — the username deliberately isn't here; it's fixed.
+export const UpdateNameFormSchema = z.object({
+  firstName: FirstNameSchema,
+  lastName: LastNameSchema,
+});
+
+export type UpdateNameFormState =
+  | {
+      errors?: { firstName?: string[]; lastName?: string[] };
+      message?: string;
+      success?: boolean;
     }
   | undefined;
 
@@ -104,6 +168,7 @@ export type Profile = {
   donguriConfig: unknown;
   first_name: string | null;
   last_name: string | null;
+  username: string | null;
   // Synced copy of their Stripe subscription (see lib/billing.ts), null if
   // they've never started Checkout.
   subscription: ProfileSubscription | null;
@@ -119,10 +184,10 @@ export type ProfileSubscription = {
   trialUsed: boolean;
 };
 
-// Per-course streaks live on the enrollment (see `CourseStreak` below) and
-// back the per-course dashboard list; the headline streak shown on a
-// course's own activity chart is account-wide instead (`GlobalStreak`), so
-// switching which course you practice on a given day doesn't reset it.
+// The streak numbers stored on the enrollment (see `bumpStreak`) — they
+// drive the streak bonus XP. What's *shown* is recalculated from each
+// course's activity instead (see `getCourseStreak` in lib/dal.ts), which
+// also lapses on its own when a day is missed.
 export type CourseStreak = {
   currentStreak: number;
   longestStreak: number;
@@ -139,12 +204,12 @@ export type WeeklyStats = {
   xpEarned: number;
 };
 
-// Account-wide streak — not scoped to any one course. See the note on
+// One course's streak, counted from that course's own activity — see
 // `computeStreakFromActiveDays` in lib/srs.ts for how it's derived. XP and
 // level are never duplicated here: they're shown straight from
 // `Profile.xp` via the same `XpCounter` the header badge uses, so there's
 // only one place that number can come from.
-export type GlobalStreak = {
+export type CourseStreakInfo = {
   currentStreak: number;
   longestStreak: number;
   // Whether today (UTC) already has recorded activity — false means the
@@ -213,6 +278,9 @@ export type RevealWord = {
   term: string;
   translation: string;
   romanization: string | null;
+  // Part of speech (noun, numeral…) — null for grammar points, or an
+  // unrecognised value.
+  wordType: WordType | null;
   exampleSentence: string | null;
   explanation: string | null;
   explanationJa: string | null;
@@ -227,19 +295,21 @@ export type RevealWord = {
   path: "vocab" | "grammar";
 };
 
+// A multiple-choice option — text only, never a picture (see toOption in
+// buildMultipleChoiceQuestion, lib/dal.ts).
 export type QuizOption = {
   text: string;
   romanization: string | null;
-  image?: string | null;
 };
 
 export type MultipleChoiceQuestion = {
   kind: "multiple-choice";
   wordId: string;
-  // Always "vocab" — grammar points never produce multiple-choice
-  // questions (see buildAllClozeQuestions in lib/dal.ts). Present so Test
-  // (which now pools vocab and grammar together) can label every question
-  // kind uniformly.
+  // "grammar" when a grammar point has too few example sentences to fill
+  // both its quiz questions with fill-in-the-blanks (see
+  // buildGrammarQuizQuestions in lib/dal.ts), or none at all (see
+  // grammarChoiceFallback). Lets Test, which pools vocab and grammar
+  // together, label every question kind uniformly.
   path: "vocab" | "grammar";
   direction: QuizDirection;
   prompt: string;
@@ -271,6 +341,10 @@ type FormClozeQuestion = {
   formId: string | null;
   clozeSentence: string;
   clozeSentenceJa: string;
+  // The part of `clozeSentenceJa` that translates the blank, highlighted
+  // there — null when the word's translation doesn't literally appear in
+  // it (see findTranslationSpan in lib/cloze.ts).
+  clozeHighlightJa: string | null;
   // The target sentence's romanization with the answer blanked too (e.g.
   // "ngo5 ___ uk1 kei2." for Cantonese) — null when there isn't one.
   clozeRomanization: string | null;
@@ -408,6 +482,9 @@ export type LanguageDeckSummary = {
   // Words with any practice history (revealed or quizzed at least once),
   // regardless of mastery — a superset of knownWords.
   learntWords: number;
+  // ISO time the last word was learnt, once every word has been; null while
+  // the deck is incomplete (or with no per-user progress, e.g. public pages).
+  completedAt: string | null;
   knownWords: number;
   words: LanguageDeckWordSummary[];
 };
@@ -956,11 +1033,6 @@ export type DailyChallengeStatus = {
 // here (must parse, or be empty to clear it) and parsed to a JS value by the
 // action before writing to the `Json` column.
 export const UpdateProfileFormSchema = z.object({
-  fullName: z
-    .string()
-    .trim()
-    .min(1, { error: "Name is required." })
-    .max(100, { error: "Keep it under 100 characters." }),
   donguriConfig: z
     .string()
     .trim()
@@ -982,7 +1054,7 @@ export const UpdateProfileFormSchema = z.object({
 
 export type UpdateProfileFormState =
   | {
-      errors?: { fullName?: string[]; donguriConfig?: string[] };
+      errors?: { donguriConfig?: string[] };
       message?: string;
       success?: boolean;
     }

@@ -3,6 +3,9 @@ import OpenAI from "openai";
 import { cacheLife } from "next/cache";
 import {
   challengeLanguage,
+  glossesPromptField,
+  glossesPromptRule,
+  parseGlosses,
   type ChallengeItem,
   type ChallengeOpener,
   type ChallengeTarget,
@@ -40,11 +43,13 @@ function personalise(opener: ChallengeOpener, firstName: string | null): Challen
         text: cjk(opener.text, "，"),
         romanization: opener.romanization.replace(/^([^!,?.]+)!/, `$1, ${firstName}!`),
         translation: english(opener.translation),
+        glosses: opener.glosses,
       }
     : {
         text: english(opener.text),
         romanization: null,
         translation: cjk(opener.translation, "、"),
+        glosses: opener.glosses,
       };
 }
 
@@ -66,11 +71,13 @@ function buildOpenerPrompt(target: ChallengeTarget, firstName: string | null): s
     ? `{
 	"text": "Charles Duck's opening message, in Cantonese characters",
 	"romanization": "The same message in Jyutping with tone numbers — exactly one syllable per Chinese character, keeping the punctuation",
-	"translation": "A natural, casual English translation of the same message"
+	"translation": "A natural, casual English translation of the same message",
+	${glossesPromptField(target.targetLanguage)}
 }`
     : `{
 	"text": "Charles Duck's opening message",
-	"translation": "A natural, casual Japanese translation of the same message"
+	"translation": "A natural, casual Japanese translation of the same message",
+	${glossesPromptField(target.targetLanguage)}
 }`;
 
   return `You write the very first text message that Charles Duck, a friendly ${language.target}-speaking duck, sends to start a casual chat with ${language.learner} who is a beginner learning ${language.target}.
@@ -86,7 +93,8 @@ ${firstName ? `- Greet them by their first name, "${firstName}", in the greeting
 - If the target doesn't point to a clear everyday topic (for example a small function word, or an abstract grammar pattern), don't force it. Instead use the topic of this general opener, reworded in your own way: "${target.fallbackOpener.text}" (${target.fallbackOpener.translation})
 
 Return only a JSON object:
-${fields}`;
+${fields}
+${glossesPromptRule(target.targetLanguage)}`;
 }
 
 // Cached per target (the fallback opener in it is seeded per user, day and
@@ -127,6 +135,10 @@ async function generateOpener(
     text: opener.text.trim(),
     romanization: needsRomanization ? (opener.romanization as string).trim() : null,
     translation: opener.translation.trim(),
+    glosses: parseGlosses(
+      (parsed as { words?: unknown } | null)?.words,
+      needsRomanization,
+    ),
   };
 }
 

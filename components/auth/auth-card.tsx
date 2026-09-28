@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
+import PeeringDonguriAcorn from "@/components/auth/peering-donguri";
 
 type AuthCardProps = {
   title: string;
@@ -21,11 +22,13 @@ export function AuthCard({ title, subtitle, children, footer }: AuthCardProps) {
         <PageTitle>{title}</PageTitle>
         <PageSubtitle className="text-sm">{subtitle}</PageSubtitle>
         <div className="mt-6 relative">
-          <img
+          {/* <img
             src="/images/donguri-peering.webp"
             alt="Coming Soon"
             className="absolute h-52 -right-33"
-          />
+          /> 
+          <*/}
+          <PeeringDonguriAcorn className="absolute h-52 -right-74" />
 
           {children}
         </div>

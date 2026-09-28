@@ -9,7 +9,7 @@ import {
   getDailyActivityCounts,
   getDailyChallengeStatus,
   getEnrolledCourseCount,
-  getGlobalStreak,
+  getCourseStreak,
   getWeeklyStats,
   getLeaderboards,
   getReviewQueueDebug,
@@ -67,7 +67,7 @@ async function loadCourseHome(slug: string) {
     enrolledCourseCount,
   ] = await Promise.all([
     getCourseDecks(slug),
-    getGlobalStreak(),
+    getCourseStreak(slug),
     getDailyActivityCounts(slug),
     getLeaderboards(),
     getReviewQueueSummary(slug),

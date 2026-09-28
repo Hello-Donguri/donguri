@@ -4,28 +4,33 @@ import { requireUser, getFriendsLeaderboard } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import type { LeaderboardEntry } from "@/lib/definitions";
 
-export async function addFriendByEmail(email: string): Promise<{
+// Accepts a username ("yuki_t" or "@yuki_t") or an email address — an "@"
+// anywhere but the start means email.
+export async function addFriend(query: string): Promise<{
   error?: string;
   friends?: LeaderboardEntry[];
 }> {
   const user = await requireUser();
-  const trimmed = email.trim();
+  const trimmed = query.trim();
 
   if (trimmed === "") {
-    return { error: "Enter an email address." };
+    return { error: "Enter a username or email." };
   }
 
+  const isEmail = trimmed.indexOf("@") > 0;
   const friend = await prisma.profile.findFirst({
-    where: { email: { equals: trimmed, mode: "insensitive" } },
+    where: isEmail
+      ? { email: { equals: trimmed, mode: "insensitive" } }
+      : { username: trimmed.replace(/^@/, "").toLowerCase() },
     select: { id: true },
   });
 
   if (!friend) {
-    return { error: "No user found with that email." };
+    return { error: "No user found." };
   }
 
   if (friend.id === user.id) {
-    return { error: "That's your own email." };
+    return { error: "That's you!" };
   }
 
   await prisma.friendship.upsert({

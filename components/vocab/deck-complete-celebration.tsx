@@ -68,10 +68,22 @@ function writeCelebrated(slug: string, ids: string[]) {
   }
 }
 
-// Lives on the course page: once a deck is fully learnt, the next visit
-// celebrates it with a ticker-tape modal — once per deck, one deck at a time
-// if several finished together. A deck that stops being complete (restarted,
-// or new words added) is forgotten, so finishing it again celebrates again.
+// How long after a deck's last word is learnt the course page still
+// celebrates it — long enough to cover the post-learn quiz on the way back,
+// short enough that a deck finished yesterday isn't celebrated on the next
+// day's first visit (or on another device, which has its own storage).
+const CELEBRATION_WINDOW_MS = 60 * 60 * 1000;
+
+function justCompleted(deck: LanguageDeckSummary, now: number) {
+  if (!isComplete(deck) || !deck.completedAt) return false;
+  return now - new Date(deck.completedAt).getTime() < CELEBRATION_WINDOW_MS;
+}
+
+// Lives on the course page: right after a deck is fully learnt, coming back
+// here celebrates it with a ticker-tape modal — once per deck, one deck at a
+// time if several finished together. A deck that stops being complete
+// (restarted, or new words added) is forgotten, so finishing it again
+// celebrates again.
 export function DeckCompleteCelebration({
   slug,
   decks,
@@ -87,8 +99,11 @@ export function DeckCompleteCelebration({
     const celebrated = readCelebrated(slug).filter((id) => completedIds.has(id));
     writeCelebrated(slug, celebrated);
 
+    const now = Date.now();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after mount.
-    setQueue(completed.filter((deck) => !celebrated.includes(deck.id)));
+    setQueue(
+      completed.filter((deck) => !celebrated.includes(deck.id) && justCompleted(deck, now)),
+    );
   }, [slug, decks]);
 
   const current = queue[0];

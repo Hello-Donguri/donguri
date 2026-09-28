@@ -2,6 +2,7 @@ import "server-only";
 import OpenAI from "openai";
 import { cacheLife } from "next/cache";
 import {
+  CANTONESE_QUOTE_RULE,
   JAPANESE_FEEDBACK_RULE,
   challengeLanguage,
   type DailyChallengeResult,
@@ -71,7 +72,7 @@ ${
               ? `Also write "feedbackJa" and "focusJa". ${JAPANESE_FEEDBACK_RULE}
 
 Return only a JSON object: { "feedback": "...", "focus": "...", "feedbackJa": "...", "focusJa": "..." }`
-              : `When you quote Cantonese, write the characters followed by their Jyutping in brackets.
+              : `Write both in ENGLISH, never Cantonese — the learner is an English speaker. ${CANTONESE_QUOTE_RULE}
 
 Return only a JSON object: { "feedback": "...", "focus": "..." }`
           }`,

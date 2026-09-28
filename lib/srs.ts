@@ -108,9 +108,9 @@ export function dailyChallengeXp(scores: DailyChallengeScores): number {
 }
 
 // Every UTC day with any recorded activity — a word introduced, a word
-// reviewed (correct or not), or a daily-challenge attempt — across every
-// course the user is enrolled in. This is the ground truth for the
-// account-wide streak: rather than an imperatively bumped counter that only
+// reviewed (correct or not), or a daily-challenge attempt — in one course
+// (see courseActiveDays in lib/dal.ts). This is the ground truth for that
+// course's streak: rather than an imperatively bumped counter that only
 // some actions remember to touch, the streak is recomputed from these
 // timestamps every time, so it can't drift out of sync with what the user
 // actually did.
