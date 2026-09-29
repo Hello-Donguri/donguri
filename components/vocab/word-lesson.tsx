@@ -16,20 +16,20 @@ import {
 import { WordImage } from "@/components/ui/word-image";
 import { useTranslations } from "@/components/i18n/locale-provider";
 
-// Dark mode keys the card's accents to the word's path — blue for vocab,
-// green for grammar, the same split as the course page — instead of the
-// brand red, which on a dark background read too close to a competitor's
-// look. Light mode keeps the red.
+// The card's accents follow the word's path — blue for vocab, green for
+// grammar, the same split as the course page — instead of the brand red,
+// which read too close to a competitor's look. The highlight does this in
+// both themes; the rest only in dark mode.
 export function lessonAccent(path: RevealWord["path"]) {
   return path === "grammar"
     ? {
-        highlight: "dark:rounded dark:bg-matcha-soft dark:px-1 dark:text-matcha-dark",
+        highlight: "rounded bg-matcha-soft px-1 text-matcha-dark",
         panel: "dark:bg-matcha-soft/50 dark:ring-1 dark:ring-matcha/25",
         label: "dark:bg-matcha-soft dark:text-matcha-dark",
         card: "dark:border-matcha/40",
       }
     : {
-        highlight: "dark:rounded dark:bg-ai-soft dark:px-1 dark:text-ai-dark",
+        highlight: "rounded bg-ai-soft px-1 text-ai-dark",
         panel: "dark:bg-ai-soft/50 dark:ring-1 dark:ring-ai/25",
         label: "dark:bg-ai-soft dark:text-ai-dark",
         card: "dark:border-ai/40",
@@ -402,7 +402,7 @@ const Highlighted = ({
 }) =>
   segments.map((segment, index) =>
     segment.match ? (
-      <strong key={index} className={`font-bold text-shu ${className}`}>
+      <strong key={index} className={`font-bold ${className}`}>
         {segment.text}
       </strong>
     ) : (

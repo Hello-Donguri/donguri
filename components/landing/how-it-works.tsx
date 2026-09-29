@@ -1,71 +1,83 @@
-import { Section, SectionHeading } from "@/components/landing/section";
+import { BookOpen, MessageCircle, PenLine, RotateCcw } from "lucide-react";
+import { Section, SectionHeading, ICON_CHIP, type Accent } from "@/components/landing/section";
+import { cn } from "@/lib/utils";
 import type { TFunction } from "@/lib/i18n/translate";
 
 export function HowItWorks({ t }: { t: TFunction }) {
-  const steps = [
+  const steps: { icon: React.ReactNode; accent: Accent; title: string; body: string }[] = [
     {
-      icon: "🌱",
-      title: t("how_it_works.discover_title", "Discover a new word"),
-      description: t(
-        "how_it_works.discover_description",
-        "See it in context, with an example sentence and a picture.",
+      icon: <BookOpen aria-hidden className="h-5 w-5" />,
+      accent: "ai",
+      title: t("home.how.learn_title", "Learn three new words"),
+      body: t(
+        "home.how.learn_body",
+        "Each one gets a picture, audio, a Japanese meaning and real example sentences.",
       ),
     },
     {
-      icon: "🔊",
-      title: t("how_it_works.listen_title", "Listen and repeat"),
-      description: t(
-        "how_it_works.listen_description",
-        "Hear natural pronunciation from native audio.",
+      icon: <PenLine aria-hidden className="h-5 w-5" />,
+      accent: "sakura",
+      title: t("home.how.quiz_title", "Test yourself straight away"),
+      body: t(
+        "home.how.quiz_body",
+        "A quick quiz checks you can recognise each word, then type it yourself.",
       ),
     },
     {
-      icon: "✅",
-      title: t("how_it_works.choose_title", "Choose the correct answer"),
-      description: t(
-        "how_it_works.choose_description",
-        "A quick quiz checks that it's sinking in.",
+      icon: <RotateCcw aria-hidden className="h-5 w-5" />,
+      accent: "kin",
+      title: t("home.how.review_title", "Review when it's due"),
+      body: t(
+        "home.how.review_body",
+        "Words come back after hours, then days, then weeks, until you know them for good.",
       ),
     },
     {
-      icon: "🔁",
-      title: t("how_it_works.review_title", "Review it later"),
-      description: t(
-        "how_it_works.review_description",
-        "It comes back at just the right time to stick.",
+      icon: <MessageCircle aria-hidden className="h-5 w-5" />,
+      accent: "matcha",
+      title: t("home.how.challenge_title", "Use it in a real chat"),
+      body: t(
+        "home.how.challenge_body",
+        "The daily challenge asks you to use what you've learnt in a friendly chat with Charles Duck.",
       ),
     },
   ];
 
   return (
-    <Section id="how-it-works">
+    <Section id="how-it-works" tone="washi-soft">
       <SectionHeading
-        eyebrow={t("how_it_works.eyebrow", "See how learning works")}
-        heading={t("how_it_works.heading", "What actually happens after you sign up.")}
+        eyebrow={t("home.how.eyebrow", "How it works")}
+        heading={t("home.how.heading", "A short routine you can keep every day.")}
+        subtext={t(
+          "home.how.subtext",
+          "Four steps, a few minutes each. Your dashboard always shows what's next.",
+        )}
       />
 
-      <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <ol className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {steps.map((step, index) => (
-          <div
+          <li
             key={step.title}
-            className="relative flex flex-col gap-3 rounded-2xl border border-card-border bg-washi-soft p-6"
+            className="relative flex flex-col rounded-3xl border border-card-border bg-washi p-6 shadow-sm"
           >
-            <span className="absolute top-4 right-4 text-sm font-semibold text-sumi-soft/50">
-              {index + 1}
-            </span>
-            <span
-              aria-hidden="true"
-              className="flex h-12 w-12 items-center justify-center rounded-full bg-matcha-soft text-2xl"
-            >
-              {step.icon}
-            </span>
-            <div>
-              <p className="font-medium text-sumi">{step.title}</p>
+            <div className="flex items-center justify-between">
+              <span
+                className={cn(
+                  "flex h-11 w-11 items-center justify-center rounded-xl",
+                  ICON_CHIP[step.accent],
+                )}
+              >
+                {step.icon}
+              </span>
+              <span className="font-nunito text-3xl font-extrabold text-sumi/10">
+                {index + 1}
+              </span>
             </div>
-            <p className="text-sm text-sumi-soft">{step.description}</p>
-          </div>
+            <h3 className="mt-5 font-semibold text-sumi">{step.title}</h3>
+            <p className="mt-1.5 text-sm text-sumi-soft text-pretty">{step.body}</p>
+          </li>
         ))}
-      </div>
+      </ol>
     </Section>
   );
 }

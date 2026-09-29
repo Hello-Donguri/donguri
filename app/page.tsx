@@ -11,17 +11,13 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
 import { getTranslator } from "@/lib/i18n/server";
 import { Hero } from "@/components/landing/hero";
-import { Benefits } from "@/components/landing/benefits";
 import { HowItWorks } from "@/components/landing/how-it-works";
+import { Lessons } from "@/components/landing/lessons";
+import { Practice } from "@/components/landing/practice";
+import { ReviewSchedule } from "@/components/landing/review-schedule";
+import { DailyChallenge } from "@/components/landing/daily-challenge";
+import { Progress } from "@/components/landing/progress";
 import { ForJapaneseSpeakers } from "@/components/landing/for-japanese-speakers";
-import { Collections } from "@/components/landing/collections";
-import { Method } from "@/components/landing/method";
-import { PracticalEnglish } from "@/components/landing/practical-english";
-import { ProgressPreview } from "@/components/landing/progress-preview";
-import { BetaInvite } from "@/components/landing/beta-invite";
-import { MeetDonguri } from "@/components/landing/meet-donguri";
-import { Creators } from "@/components/landing/creators";
-import { FreeBanner } from "@/components/landing/free-banner";
 import { Faq } from "@/components/landing/faq";
 import { FinalCta } from "@/components/landing/final-cta";
 
@@ -60,24 +56,33 @@ export default async function Home() {
 
       <main className="flex-1">
         <Hero t={t} />
-        <Benefits t={t} />
         <HowItWorks t={t} />
+        <Lessons t={t} />
+        <Practice t={t} />
+        <ReviewSchedule t={t} />
+        <DailyChallenge t={t} />
+        <Progress t={t} />
         <ForJapaneseSpeakers t={t} />
-        <Collections t={t} />
-        <Method t={t} />
-        <PracticalEnglish t={t} />
-        <ProgressPreview t={t} />
-        <BetaInvite t={t} />
-        <MeetDonguri t={t} />
-        <Creators t={t} />
-        <FreeBanner t={t} />
         <Faq t={t} />
       </main>
 
       <FinalCta t={t} />
 
-      <footer className="border-t border-sumi/10 px-6 py-8 text-center text-sm text-sumi-soft">
-        {t("footer.tagline", "Hello Donguri — English learning designed for Japanese speakers.")}
+      <footer className="border-t border-sumi/10 px-6 py-10">
+        <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 text-sm text-sumi-soft sm:flex-row sm:justify-between">
+          <p>{t("footer.tagline", "Hello Donguri — English learning designed for Japanese speakers.")}</p>
+          <nav className="flex gap-5">
+            <a href="#how-it-works" className="transition hover:text-sumi">
+              {t("home.footer.how", "How it works")}
+            </a>
+            <a href="#pricing" className="transition hover:text-sumi">
+              {t("home.footer.pricing", "Pricing")}
+            </a>
+            <a href="#faq" className="transition hover:text-sumi">
+              {t("home.footer.faq", "FAQ")}
+            </a>
+          </nav>
+        </div>
       </footer>
     </div>
   );

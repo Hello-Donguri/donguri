@@ -1,83 +1,81 @@
+import { Plus } from "lucide-react";
 import { Section, SectionHeading } from "@/components/landing/section";
 import type { TFunction } from "@/lib/i18n/translate";
 
 export function Faq({ t }: { t: TFunction }) {
   const faqs = [
     {
-      q: t("faq.beginners_q", "Is Hello Donguri suitable for complete beginners?"),
+      q: t("home.faq.beginners_q", "I'm a complete beginner. Is this for me?"),
       a: t(
-        "faq.beginners_a",
-        "Yes. Lessons start with the most common, everyday words and build up gradually, so you don't need any prior English knowledge to get started.",
+        "home.faq.beginners_a",
+        "Yes. Decks start with everyday words and simple grammar, and every word comes with a picture, audio and a Japanese meaning, so you never have to guess.",
       ),
     },
     {
-      q: t("faq.japanese_q", "Are the explanations available in Japanese?"),
+      q: t("home.faq.time_q", "How much time does it take each day?"),
       a: t(
-        "faq.japanese_a",
-        "Yes — every word and example comes with a clear Japanese explanation alongside the English.",
+        "home.faq.time_a",
+        "A few minutes is enough. Three new words, a short quiz and whatever reviews are due usually take five to ten minutes. You can always do more.",
       ),
     },
     {
-      q: t("faq.daily_time_q", "How much should I study each day?"),
+      q: t("home.faq.reviews_q", "What happens if I miss a day?"),
       a: t(
-        "faq.daily_time_a",
-        "Just five minutes a day is enough to make steady progress. You can always do more if you're enjoying it.",
+        "home.faq.reviews_a",
+        "Nothing is lost. Due reviews wait for you on your dashboard. Your streak resets, but your words, XP and level stay.",
       ),
     },
     {
-      q: t("faq.mobile_q", "Can I use it on my phone?"),
-      a: t("faq.mobile_a", "Yes, Hello Donguri works in your phone's browser — no app install required."),
-    },
-    {
-      q: t("faq.free_q", "Is it free?"),
-      a: t("faq.free_a", "Yes, Hello Donguri is completely free to use during early access."),
-    },
-    {
-      q: t("faq.payment_q", "Do I need to enter payment details?"),
+      q: t("home.faq.choose_q", "Can I choose what to learn?"),
       a: t(
-        "faq.payment_a",
-        "No. You can create an account and start learning without entering any payment information.",
+        "home.faq.choose_a",
+        "Yes. Browse the decks and add the ones you want to your word list. New words come from the decks you've added, and you can skip words you already know.",
       ),
     },
     {
-      q: t("faq.progress_q", "How is my progress saved?"),
+      q: t("home.faq.trial_q", "How does the free trial work?"),
       a: t(
-        "faq.progress_a",
-        "Your progress is saved to your account as you learn, so it's there whenever you come back — on any device.",
+        "home.faq.trial_a",
+        "Your first 14 days are free. You add a card when you start, but you're only charged from day 15, and only if you haven't cancelled.",
       ),
     },
     {
-      q: t("faq.cancel_q", "Can I cancel at any time?"),
+      q: t("home.faq.cancel_q", "How do I cancel?"),
       a: t(
-        "faq.cancel_a",
-        "There's nothing to cancel — Hello Donguri is free, and you can stop or come back whenever you like.",
+        "home.faq.cancel_a",
+        "From the billing page in your account, at any time. You keep access until the end of the period you've paid for.",
+      ),
+    },
+    {
+      q: t("home.faq.device_q", "Is there an app to download?"),
+      a: t(
+        "home.faq.device_a",
+        "No download needed. Hello Donguri runs in the browser on your phone, tablet or computer, and your progress is saved to your account.",
       ),
     },
   ];
 
   return (
-    <Section>
+    <Section id="faq">
       <SectionHeading
-        eyebrow={t("faq.eyebrow", "Frequently asked questions")}
-        heading={t("faq.heading", "Everything you might be wondering.")}
+        eyebrow={t("home.faq.eyebrow", "Questions")}
+        heading={t("home.faq.heading", "Good to know before you start.")}
       />
 
       <div className="mx-auto mt-10 flex max-w-2xl flex-col gap-3">
         {faqs.map((faq) => (
           <details
             key={faq.q}
-            className="group rounded-2xl border border-card-border bg-washi-soft p-5 open:pb-5"
+            className="group rounded-2xl border border-card-border bg-washi-soft px-5 py-4"
           >
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-medium text-sumi marker:content-none">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-sumi marker:content-none [&::-webkit-details-marker]:hidden">
               {faq.q}
-              <span
-                aria-hidden="true"
-                className="shrink-0 text-sumi-soft transition group-open:rotate-45"
-              >
-                +
-              </span>
+              <Plus
+                aria-hidden
+                className="h-5 w-5 shrink-0 text-sumi-soft transition-transform group-open:rotate-45"
+              />
             </summary>
-            <p className="mt-3 text-sm text-sumi-soft">{faq.a}</p>
+            <p className="mt-3 text-sm leading-relaxed text-sumi-soft">{faq.a}</p>
           </details>
         ))}
       </div>

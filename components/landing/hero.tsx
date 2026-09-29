@@ -1,38 +1,53 @@
+import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LessonPreviewCard } from "@/components/landing/lesson-preview-card";
 import type { TFunction } from "@/lib/i18n/translate";
 
 export function Hero({ t }: { t: TFunction }) {
+  const points = [
+    t("home.hero.point_trial", "14 days free"),
+    t("home.hero.point_cancel", "Cancel anytime"),
+    t("home.hero.point_japanese", "Explained in Japanese"),
+  ];
+
   return (
-    <section className="mx-auto grid max-w-5xl grid-cols-1 items-center gap-10 px-6 py-16 sm:py-20 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] md:gap-14 md:py-24">
+    <section className="mx-auto grid max-w-5xl grid-cols-1 items-center gap-14 px-6 py-16 sm:py-20 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] md:py-24">
       <div className="flex flex-col items-center text-center md:items-start md:text-left">
-        <span className="rounded-full bg-sakura-soft px-4 py-1 text-sm font-medium text-sakura-dark">
-          {t("hero.eyebrow", "Welcome to Hello Donguri")}
+        <span className="rounded-full bg-ai-soft px-4 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-ai-dark">
+          {t("home.hero.eyebrow", "English for Japanese speakers")}
         </span>
 
-        <h1 className="mt-6 max-w-2xl text-3xl font-bold tracking-tight text-sumi sm:text-4xl">
-          {t("hero.headline", "Make English a small part of every day.")}
+        <h1 className="mt-6 max-w-xl font-nunito text-4xl font-extrabold tracking-tight text-sumi text-balance sm:text-5xl">
+          {t("home.hero.headline", "English that sticks, five minutes at a time.")}
         </h1>
 
-        <p className="mt-4 max-w-xl text-lg text-sumi-soft">
+        <p className="mt-5 max-w-lg text-lg text-sumi-soft text-pretty">
           {t(
-            "hero.subtext",
-            "Learn useful English vocabulary through short, friendly lessons designed for Japanese speakers.",
+            "home.hero.subtext",
+            "Learn three words at a time, test yourself straight away, and review each one just before you'd forget it. Then put it to use in a quick chat with Charles Duck.",
           )}
         </p>
 
         <div className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-          <Button href="/signup" size="lg" className="h-14 bg-shu px-8 hover:bg-shu-dark">
-            {t("hero.cta_primary", "Start for free")}
+          <Button href="/signup" size="lg" className="h-14 px-8 text-base">
+            {t("home.hero.cta_primary", "Start your free trial")}
           </Button>
-
-          <Button href="#how-it-works" variant="outline" size="lg" className="h-14 px-8">
-            {t("hero.cta_secondary", "Explore lessons")}
+          <Button href="#how-it-works" variant="outline" size="lg" className="h-14 px-8 text-base">
+            {t("home.hero.cta_secondary", "See how it works")}
           </Button>
         </div>
+
+        <ul className="mt-6 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-sumi-soft md:justify-start">
+          {points.map((point) => (
+            <li key={point} className="inline-flex items-center gap-1.5">
+              <Check aria-hidden className="h-4 w-4 text-matcha" strokeWidth={3} />
+              {point}
+            </li>
+          ))}
+        </ul>
       </div>
 
-      <div className="flex items-center justify-center">
+      <div className="flex items-center justify-center px-3">
         <LessonPreviewCard t={t} />
       </div>
     </section>
