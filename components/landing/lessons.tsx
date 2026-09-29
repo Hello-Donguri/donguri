@@ -60,7 +60,7 @@ export function Lessons({ t }: { t: TFunction }) {
             )}
           />
           <div className="mt-10">
-            <FeatureList items={items} accent="ai" />
+            <FeatureList items={items} accent="acorn" />
           </div>
         </div>
 
@@ -80,7 +80,7 @@ function GrammarCardMock({ t }: { t: TFunction }) {
   ];
 
   return (
-    <div className="rounded-4xl border border-card-border bg-washi p-6 shadow-lg sm:p-8">
+    <div className="rounded-4xl border border-card-border bg-raised p-6 shadow-lg sm:p-8">
       <div className="flex flex-col items-center text-center">
         <span className="rounded-full bg-matcha-soft px-3.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-matcha-dark">
           {t("home.mock.grammar", "Grammar")}

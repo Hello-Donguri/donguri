@@ -1,8 +1,8 @@
 import { prisma } from "@/lib/prisma";
 
 // What a daily-challenge attempt asks the learner to use in their chat with
-// Charles Duck: a vocab word, a grammar point, or one of each in the same
-// message.
+// Charles Duck: a vocab word, a grammar point, or one of each (anywhere in
+// the chat).
 export type ChallengeItem = {
   term: string;
   translation: string;
@@ -294,11 +294,13 @@ const challengeWordSelect = {
 } as const;
 
 // XP (profile-wide, the same XP that sets the Donguri level) at which the
-// challenge steps up: words only to begin with, then grammar patterns, then
-// a word and a grammar pattern together in the same message. Lined up with
-// the level-2 and level-3 thresholds in lib/levels.ts.
+// challenge steps up: one word to begin with, then one grammar pattern,
+// then a word and a grammar pattern together — used anywhere in the chat,
+// in the same message or different ones (see sendDailyChallengeMessage).
+// A single target until 250 XP, since two at once was too much for
+// beginners. Lined up with level thresholds in lib/levels.ts.
 export const CHALLENGE_GRAMMAR_XP = 50;
-export const CHALLENGE_COMBINED_XP = 120;
+export const CHALLENGE_COMBINED_XP = 250;
 
 type ChallengeMode = "vocab" | "grammar" | "both";
 

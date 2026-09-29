@@ -174,7 +174,9 @@ function AdminMenu({ role, className }: { role: UserRole; className?: string }) 
         onClick={() => setOpen((current) => !current)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="inline-flex h-8 items-center gap-1 rounded-full bg-shu/10 px-3 text-xs font-medium text-shu-dark transition hover:bg-shu/15"
+        // Light mode: cream on the sage header, like the other header chips
+        // (the red tint clashed with the sage). Dark mode keeps the red.
+        className="inline-flex h-8 items-center gap-1 rounded-full border border-header-border bg-washi-soft px-3 text-xs font-semibold text-sumi transition hover:bg-raised dark:border-transparent dark:bg-shu/10 dark:font-medium dark:text-shu-dark dark:hover:bg-shu/15"
       >
         {t("dashboard_layout.role_admin", "Admin")}
         <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
@@ -352,7 +354,7 @@ export function HeaderActions({ profile, equippedAccessory, streaks, xp }: Heade
             aria-haspopup="menu"
             aria-expanded={desktopOpen}
             aria-label={t("dashboard_layout.account_menu", "Account menu")}
-            className="block h-10 w-10 shrink-0 overflow-hidden rounded-full border border-card-border shadow-sm transition hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ai"
+            className="block h-10 w-10 shrink-0 rounded-lg transition hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ai"
           >
             <DonguriAvatar equippedAccessory={equippedAccessory} className="h-10 w-10" />
           </button>
@@ -368,9 +370,7 @@ export function HeaderActions({ profile, equippedAccessory, streaks, xp }: Heade
                 className="absolute right-0 top-full z-50 mt-2 w-72 origin-top-right rounded-2xl border border-card-border bg-washi p-2 shadow-xl"
               >
                 <div className="flex items-center gap-3 rounded-xl px-3 py-2.5">
-                  <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full border border-card-border">
-                    <DonguriAvatar equippedAccessory={equippedAccessory} className="h-11 w-11" />
-                  </div>
+                  <DonguriAvatar equippedAccessory={equippedAccessory} className="h-11 w-11 shrink-0" />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-sumi">{displayName}</p>
                     <p className="truncate text-xs text-sumi-soft">{profile.email}</p>
@@ -431,9 +431,7 @@ export function HeaderActions({ profile, equippedAccessory, streaks, xp }: Heade
               className="absolute inset-x-0 top-full z-50 border-b border-card-border bg-washi p-4 shadow-xl md:hidden"
             >
               <div className="flex items-center gap-3 rounded-xl px-3 py-2.5">
-                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full border border-card-border">
-                  <DonguriAvatar equippedAccessory={equippedAccessory} className="h-12 w-12" />
-                </div>
+                <DonguriAvatar equippedAccessory={equippedAccessory} className="h-12 w-12 shrink-0" />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-sumi">{displayName}</p>
                   <p className="truncate text-xs text-sumi-soft">{profile.email}</p>

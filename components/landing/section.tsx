@@ -22,18 +22,50 @@ export function Section({ id, tone = "washi", className, children }: SectionProp
   );
 }
 
-// The eyebrow's colour — the same split the app uses: blue for learning,
+// A section's colour — the same split the app uses: blue for learning,
 // green for grammar and the daily challenge, pink for quizzes, gold for
-// reviews and rewards.
-export type Accent = "ai" | "matcha" | "sakura" | "kin";
+// reviews and rewards — plus acorn (Donguri's warm brown) and sage for
+// quieter accents, so blue is left mainly to buttons and progress.
+export type Accent = "ai" | "matcha" | "sakura" | "kin" | "acorn" | "sage";
 
-// Soft chip of each accent colour — eyebrows and feature-list icons.
+// Soft chip of each accent colour — feature-list and step icons. Acorn and
+// sage fall back to the blue chip in dark mode, which is what they were.
 export const ICON_CHIP: Record<Accent, string> = {
   ai: "bg-ai-soft text-ai-dark",
   matcha: "bg-matcha-soft text-matcha-dark",
   sakura: "bg-sakura-soft text-sakura-dark",
   kin: "bg-kin/20 text-sumi",
+  acorn: "bg-acorn-soft text-acorn dark:bg-ai-soft dark:text-ai-dark",
+  sage: "bg-neutral-soft text-sumi dark:bg-ai-soft dark:text-ai-dark",
 };
+
+// Dark mode keeps the old coloured eyebrow pill; light mode uses the quiet
+// acorn label below. Written out in full so Tailwind finds each class.
+const DARK_EYEBROW: Record<Accent, string> = {
+  ai: "dark:bg-ai-soft dark:text-ai-dark",
+  matcha: "dark:bg-matcha-soft dark:text-matcha-dark",
+  sakura: "dark:bg-sakura-soft dark:text-sakura-dark",
+  kin: "dark:bg-kin/20 dark:text-sumi",
+  acorn: "dark:bg-ai-soft dark:text-ai-dark",
+  sage: "dark:bg-ai-soft dark:text-ai-dark",
+};
+
+// A section's small label above its heading: acorn text after a short
+// acorn rule in light mode, so it adds warmth without competing with the
+// blue call-to-action buttons.
+export function Eyebrow({ accent = "ai", children }: { accent?: Accent; children: ReactNode }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-2.5 text-xs font-bold uppercase tracking-[0.16em] text-acorn dark:rounded-full dark:px-4 dark:py-1 dark:font-semibold",
+        DARK_EYEBROW[accent],
+      )}
+    >
+      <span aria-hidden="true" className="h-0.5 w-6 rounded-full bg-acorn dark:hidden" />
+      {children}
+    </span>
+  );
+}
 
 type SectionHeadingProps = {
   eyebrow?: string;
@@ -54,16 +86,7 @@ export function SectionHeading({
 }: SectionHeadingProps) {
   return (
     <div className={cn("flex flex-col", center && "items-center text-center", className)}>
-      {eyebrow && (
-        <span
-          className={cn(
-            "rounded-full px-4 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
-            ICON_CHIP[accent],
-          )}
-        >
-          {eyebrow}
-        </span>
-      )}
+      {eyebrow && <Eyebrow accent={accent}>{eyebrow}</Eyebrow>}
       <h2 className="mt-4 max-w-2xl font-nunito text-3xl font-extrabold tracking-tight text-sumi text-balance sm:text-4xl">
         {heading}
       </h2>

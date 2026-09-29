@@ -1,5 +1,5 @@
 import { Check, Languages, LogIn, MessageSquareText, Smartphone } from "lucide-react";
-import { Section, SectionHeading, FeatureList } from "@/components/landing/section";
+import { Section, SectionHeading, FeatureList, Eyebrow } from "@/components/landing/section";
 import { Button } from "@/components/ui/button";
 import type { TFunction } from "@/lib/i18n/translate";
 
@@ -56,14 +56,12 @@ export function ForJapaneseSpeakers({ t }: { t: TFunction }) {
             heading={t("home.japanese.heading", "Everything explained in the language you think in.")}
           />
           <div className="mt-10">
-            <FeatureList items={items} accent="ai" />
+            <FeatureList items={items} accent="sage" />
           </div>
         </div>
 
-        <div id="pricing" className="scroll-mt-6 rounded-4xl border border-card-border bg-washi p-7 shadow-lg sm:p-9">
-          <span className="rounded-full bg-kin/20 px-4 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-sumi">
-            {t("home.pricing.eyebrow", "Membership")}
-          </span>
+        <div id="pricing" className="scroll-mt-6 rounded-4xl border border-card-border bg-raised p-7 shadow-lg sm:p-9">
+          <Eyebrow accent="kin">{t("home.pricing.eyebrow", "Membership")}</Eyebrow>
           <h2 className="mt-5 font-nunito text-3xl font-extrabold tracking-tight text-sumi">
             {t("home.pricing.heading", "Try everything free for 14 days.")}
           </h2>

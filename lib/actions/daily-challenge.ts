@@ -70,6 +70,11 @@ export type ChatReply = {
   // Japanese version of `feedback`; null if the model left it out.
   feedbackJa: string | null;
   usedTarget: boolean;
+  // Word + grammar chats only (null otherwise): which targets have been used
+  // so far, for ticking them off one by one, and the message the grammar
+  // was found in — sent back with the next message, since only the model
+  // can judge grammar and the chat is otherwise stateless.
+  targets: { vocab: boolean; grammar: boolean; grammarMessage: string | null } | null;
   summary: ChallengeSummary | null;
 };
 
@@ -136,7 +141,11 @@ function parseSummary(value: unknown): ChallengeSummary | null {
 
 function isChatReply(
   value: unknown,
-): value is Omit<ChatReply, "summary"> & { summary?: unknown; respondedToYou?: boolean } {
+): value is Omit<ChatReply, "summary" | "targets"> & {
+  summary?: unknown;
+  respondedToYou?: boolean;
+  usedGrammar?: boolean;
+} {
   if (!value || typeof value !== "object") return false;
 
   const reply = value as Record<string, unknown>;
@@ -147,6 +156,7 @@ function isChatReply(
     typeof reply.feedback === "string" &&
     typeof reply.usedTarget === "boolean" &&
     (reply.respondedToYou === undefined || typeof reply.respondedToYou === "boolean") &&
+    (reply.usedGrammar === undefined || typeof reply.usedGrammar === "boolean") &&
     SCORE_FIELDS.every((field) => {
       const score = reply[field];
       return typeof score === "number" && score >= 0 && score <= 10;
@@ -249,31 +259,76 @@ function describeItem(item: ChallengeItem): string {
 
 function describeTarget(target: ChallengeTarget): string {
   if (target.vocab && target.grammar) {
-    return `the word ${describeItem(target.vocab)} together with the grammar pattern ${describeItem(target.grammar)}, both in the same message`;
+    return `the word ${describeItem(target.vocab)} and the grammar pattern ${describeItem(target.grammar)} — in the same message or in two different messages, whichever comes naturally`;
   }
   if (target.grammar) return `the grammar pattern ${describeItem(target.grammar)}`;
   return `the word ${describeItem(target.vocab!)}`;
 }
 
+// Where a two-target (word + grammar) chat stands before this turn — worked
+// out by the server each time, since the chat itself is stateless (the
+// client sends the history). Null fields mean "not used yet".
+type TargetState = {
+  // The word is string-matched, so this is whether the latest message has
+  // it, plus the first earlier message that did.
+  vocabInLatest: boolean;
+  vocabEarlier: string | null;
+  // Grammar needs the model's judgement, so the earlier message it was
+  // found in is echoed back by the client and checked against the history
+  // (see sendDailyChallengeMessage).
+  grammarEarlier: string | null;
+};
+
+const ATTEMPT_RULE =
+  "Any attempt counts — even if it's wrong, awkward, unrelated to the conversation, or the target on its own with nothing else. Mistakes lower the scores; they never stop the challenge from ending.";
+
 // What the model is told about whether the latest message used the target.
 // The vocab word is checked here, not by the model, so any message that
-// contains it ends the attempt — even a bare "you" or a broken sentence;
-// low quality shows up in the scores instead. Grammar patterns can't be
-// string-matched, so an attempt at one is left to the model.
-function describeTargetUsage(target: ChallengeTarget, vocabInMessage: boolean): string {
-  const attemptRule =
-    "Any attempt counts — even if it's wrong, awkward, unrelated to the conversation, or the target on its own with nothing else. Mistakes lower the scores; they never stop the challenge from ending.";
+// contains it counts — even a bare "you" or a broken sentence; low quality
+// shows up in the scores instead. Grammar patterns can't be string-matched,
+// so an attempt at one is left to the model.
+function describeTargetUsage(target: ChallengeTarget, state: TargetState): string {
+  if (target.vocab && target.grammar) return describeCombinedUsage(target.grammar, state);
 
-  if (target.vocab && !vocabInMessage) {
+  if (target.vocab && !state.vocabInLatest) {
     return `The user's latest message does NOT contain the target word, so usedTarget must be false.`;
   }
-  if (target.vocab && target.grammar) {
-    return `The user's latest message DOES contain the target word. usedTarget is true if it also attempts the grammar pattern ${describeItem(target.grammar)}. ${attemptRule}`;
-  }
   if (target.vocab) {
-    return `The user's latest message DOES contain the target word, so usedTarget must be true and the chat ends now. ${attemptRule}`;
+    return `The user's latest message DOES contain the target word, so usedTarget must be true and the chat ends now. ${ATTEMPT_RULE}`;
   }
-  return `usedTarget is true if the user's latest message attempts the grammar pattern ${describeItem(target.grammar!)}. ${attemptRule}`;
+  return `usedTarget is true if the user's latest message attempts the grammar pattern ${describeItem(target.grammar!)}. ${ATTEMPT_RULE} Judge the latest message only, not earlier ones.`;
+}
+
+// A word + grammar chat: the two can land in different messages, and the
+// chat ends once both have been used. The model reports grammar in the
+// latest message as usedGrammar; usedTarget is "both are now used".
+function describeCombinedUsage(grammar: ChallengeItem, state: TargetState): string {
+  const vocabDone = state.vocabEarlier !== null || state.vocabInLatest;
+  const word = state.vocabEarlier
+    ? `The user already used the target word in an earlier message ("${state.vocabEarlier}").`
+    : state.vocabInLatest
+      ? "The user's latest message DOES contain the target word."
+      : "The user has NOT used the target word yet.";
+
+  if (state.grammarEarlier) {
+    return `${word} The user already attempted the grammar pattern in an earlier message ("${state.grammarEarlier}"), so usedGrammar must be false. The chat ends once both are used, so usedTarget must be ${vocabDone}.${vocabDone ? "" : " Steer toward the word they still need."}`;
+  }
+
+  return `${word} usedGrammar is true if the user's latest message attempts the grammar pattern ${describeItem(grammar)} — judge the latest message only. ${ATTEMPT_RULE} The chat ends once both the word and the pattern have been used, in any messages: ${
+    vocabDone
+      ? "the word is already done, so usedTarget must equal usedGrammar."
+      : "the word hasn't been used yet, so usedTarget must be false even if usedGrammar is true."
+  } Until then, steer toward whichever of the two they still need.`;
+}
+
+// The earlier messages that used a target and so get scored alongside the
+// latest one if this turn finishes a word + grammar chat. Empty otherwise.
+// An earlier word is left out when the latest message has the word too.
+function earlierScoredMessages(state: TargetState): string[] {
+  const vocab = state.vocabInLatest ? null : state.vocabEarlier;
+  return [...new Set([vocab, state.grammarEarlier])].filter(
+    (text): text is string => text !== null,
+  );
 }
 
 // The parts of the prompt that depend on the course: English for Japanese
@@ -326,14 +381,22 @@ function promptLanguage(target: ChallengeTarget) {
 
 function buildSystemPrompt(
   target: ChallengeTarget,
-  vocabInMessage: boolean,
+  state: TargetState,
   toneMismatch: { wrote: string; correct: string } | null,
 ): string {
   const goal = describeTarget(target);
   const language = promptLanguage(target);
+  const combined = Boolean(target.vocab && target.grammar);
   const toneNote = toneMismatch
     ? `\nThe user wrote the target word in Jyutping as "${toneMismatch.wrote}", but its correct tones are "${toneMismatch.correct}". That still counts as using the word. Make the tone correction your "feedback" tip (e.g. "Nice! Just check the tones: it's ${toneMismatch.correct}, not ${toneMismatch.wrote}."), and if the chat ends now, include it in the summary tips too.`
     : "";
+  // A word + grammar chat finished across two messages is scored on both,
+  // averaged, so splitting them up neither helps nor hurts the result.
+  const earlier = earlierScoredMessages(state);
+  const combinedScoring =
+    earlier.length > 0
+      ? `\nIf usedTarget is true, the chat is scored on every message where the user used a target: their latest message and ${earlier.map((text) => `"${text}"`).join(" and ")}. Give each of the four scores as the average of what each of those messages deserves on its own (judge an earlier message's relevance against what you had said just before it), rounded to a whole number. If usedTarget is false, score the latest message only.`
+      : "";
 
   return `${language.intro} You two are just texting casually — this is NOT a classroom and you are not a teacher. You want the user to practice using ${goal} themselves, but you never announce that or make it feel like a lesson.
 
@@ -360,14 +423,14 @@ ${language.replyFields}
 	"naturalnessScore": 0,
 	"relevanceScore": 0,
 	"complexityScore": 0,
-	"usedTarget": false,
+${combined ? '	"usedGrammar": false,\n' : ""}	"usedTarget": false,
 	"summary": null,
 	"feedback": "One short, encouraging sentence with ONE concrete tip — a single point, never two joined with 'and' — on how the user's latest message could be more natural, correct, or relevant to the conversation — or, if it's already good, richer (e.g. add a reason or a detail) — or a short specific compliment if it's already excellent. If respondedToYou is false, the tip must be about that (e.g. answer my question first, then ask yours). Check the tip against the exact words they wrote first: never tell them to add something they already wrote (if it's in the wrong place, tell them to move it), and never 'correct' something they got right.${language.readingTheirMessage}"${language.feedbackJaField}
 }
 The feedback: ${language.feedbackLanguage}
 ${glossesPromptRule(target.targetLanguage)}
 respondedToYou is true only if the user's latest message actually responds to what you last said. If you asked a question, it must answer it — even briefly or loosely ("Just some toast!", "I'm not sure"). It is false if the user ignores your question, changes the subject, or replies with a question of their own without answering yours. Asking a question back AFTER answering is great ("Pizza! What about you?") and counts as true.
-${describeTargetUsage(target, vocabInMessage)} Judge the latest message only, not earlier ones.${toneNote}
+${describeTargetUsage(target, state)}${toneNote}${combinedScoring}
 grammarScore is an integer from 0 to 10 for the grammatical correctness of the user's latest message, judged on its own, not on relevance. ${language.texting} When usedTarget is true, also judge whether the target is used correctly.
 naturalnessScore is an integer from 0 to 10 for how natural the WORDING of the user's latest message is — would a native speaker text it this way? Judge the wording only; whether it fits the conversation is relevanceScore.
 - 9-10: exactly how a native speaker would text it. 10 only if there is nothing to change.
@@ -388,7 +451,7 @@ complexityScore is an integer from 0 to 10 for how rich and developed the user's
 Don't reward length for its own sake: rambling, repetitive or overlong messages should not score higher than a tight sentence that connects two ideas.
 When usedTarget is true, the chat is over, so "text" should be a short, warm reply that wraps up the chat, and "summary" must be an object reviewing the user's whole performance:
 {
-	"betterVersion": "The most natural way to say what they said in the message where they used the target, still using it: fix any mistakes, word choice and word order, the way a native speaker would text the same thing. Keep their meaning and their content — do NOT add new ideas, details or extra words unless the sentence needs them to be correct. If that message was already natural and correct, repeat it unchanged.${language.betterVersion ? ` Write it ${language.betterVersion}.` : ""}",${language.betterVersionExtraFields}
+	"betterVersion": "The most natural way to say what they said in their latest message, still using the target${combined ? "s it contains" : ""}: fix any mistakes, word choice and word order, the way a native speaker would text the same thing. Keep their meaning and their content — do NOT add new ideas, details or extra words unless the sentence needs them to be correct. If that message was already natural and correct, repeat it unchanged.${language.betterVersion ? ` Write it ${language.betterVersion}.` : ""}",${language.betterVersionExtraFields}
 	"tips": ["Up to 3 short tips, each explaining one real difference between what they wrote and your betterVersion (a wrong word, a wrong tone, words in the wrong order, a missing word), or one other real mistake they made. Before writing each tip, compare it with the exact words they wrote.${language.readingTheirMessage} Never tell them to add something they already wrote — if it's there but in the wrong place, tell them to move it and where to. Never 'correct' something they already got right. They are shown in one list straight after your feedback, so never repeat or reword the feedback's point, and make each tip a different point. Use an empty list if there is nothing left to improve."],
 	"overall": "2-3 short sentences on how the user did across the whole chat — how well they used the target, and how natural and relevant their replies were. A verdict, not advice: don't repeat any correction or suggestion from feedback or tips"${language.summaryExtraFields}
 }
@@ -489,10 +552,15 @@ ${isCantonese ? `Write any rewritten tip in very simple English. ${CANTONESE_QUO
   }
 }
 
+// `grammarMessage` is the previous reply's `targets.grammarMessage` (word +
+// grammar chats only): the earlier message the grammar pattern was found
+// in. It only counts if it really is one of the learner's messages in
+// `history`.
 export async function sendDailyChallengeMessage(
   courseSlug: string,
   history: ChatTurn[],
   message: string,
+  grammarMessage: string | null = null,
 ): Promise<SendDailyChallengeMessageResult> {
   const user = await requireSubscriber();
   const trimmedMessage = message.trim();
@@ -552,7 +620,27 @@ export async function sendDailyChallengeMessage(
 
   const vocabInMessage = target.vocab ? containsVocab(trimmedMessage, target.vocab) : true;
 
+  // A word + grammar chat can use the two in different messages, so where
+  // each already stands comes from the earlier turns (see TargetState).
+  const combined = Boolean(target.vocab && target.grammar);
+  const earlierUserMessages = history
+    .filter((turn) => turn.role === "user")
+    .map((turn) => String(turn.content).trim());
+  const state: TargetState = {
+    vocabInLatest: vocabInMessage,
+    vocabEarlier: combined
+      ? (earlierUserMessages.find((text) => containsVocab(text, target.vocab!)) ?? null)
+      : null,
+    grammarEarlier:
+      combined && grammarMessage && earlierUserMessages.includes(grammarMessage.trim())
+        ? grammarMessage.trim()
+        : null,
+  };
+
   let reply: ChatReply;
+  // Every message the final scores cover — just the latest, unless a word +
+  // grammar chat was finished across two. Stored with the attempt.
+  let scoredMessages = [trimmedMessage];
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const messages = [
@@ -560,7 +648,7 @@ export async function sendDailyChallengeMessage(
         role: "system" as const,
         content: buildSystemPrompt(
           target,
-          vocabInMessage,
+          state,
           target.vocab ? vocabToneMismatch(trimmedMessage, target.vocab) : null,
         ),
       },
@@ -609,12 +697,23 @@ export async function sendDailyChallengeMessage(
     }
 
     // A word-only target is decided here outright, whatever the model said;
-    // a grammar pattern needs the model's judgement (and the word too, when
-    // both are set).
-    const usedTarget =
-      target.vocab && !target.grammar
+    // a grammar pattern needs the model's judgement. A word + grammar chat
+    // ends once both have been used, in any messages: the word by string
+    // match, the grammar by the model (usedGrammar, falling back to
+    // usedTarget if it left that out).
+    const grammarInLatest =
+      combined && !state.grammarEarlier && (parsed.usedGrammar ?? parsed.usedTarget);
+    const vocabDone = state.vocabEarlier !== null || vocabInMessage;
+    const grammarDone = state.grammarEarlier !== null || grammarInLatest;
+    const usedTarget = combined
+      ? vocabDone && grammarDone
+      : target.vocab
         ? vocabInMessage
-        : vocabInMessage && parsed.usedTarget;
+        : parsed.usedTarget;
+
+    if (combined && usedTarget) {
+      scoredMessages = [...earlierScoredMessages(state), trimmedMessage];
+    }
 
     // The model sometimes flags a dodge in respondedToYou but still scores
     // the sentence on its own merits, so the cap is enforced here too.
@@ -640,11 +739,18 @@ export async function sendDailyChallengeMessage(
       relevanceScore,
       complexityScore: Math.round(parsed.complexityScore),
       usedTarget,
+      targets: combined
+        ? {
+            vocab: vocabDone,
+            grammar: grammarDone,
+            grammarMessage: state.grammarEarlier ?? (grammarInLatest ? trimmedMessage : null),
+          }
+        : null,
       summary: usedTarget ? parseSummary(parsed.summary) : null,
     };
 
     if (reply.summary) {
-      reply = await checkTips(openai, target, trimmedMessage, reply);
+      reply = await checkTips(openai, target, scoredMessages.join("\n"), reply);
     }
   } catch (error) {
     console.error("OpenAI daily challenge request failed:", error);
@@ -670,7 +776,7 @@ export async function sendDailyChallengeMessage(
       targetTerms: [target.vocab?.term, target.grammar?.term].filter(
         (term): term is string => term !== undefined,
       ),
-      message: trimmedMessage,
+      message: scoredMessages.join("\n"),
       grammarScore: reply.grammarScore,
       naturalnessScore: reply.naturalnessScore,
       relevanceScore: reply.relevanceScore,

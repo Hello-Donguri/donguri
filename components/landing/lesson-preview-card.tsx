@@ -9,9 +9,9 @@ export function LessonPreviewCard({ t }: { t: TFunction }) {
     <div className="relative w-full max-w-sm">
       <div
         aria-hidden="true"
-        className="absolute -inset-3 -z-10 rotate-3 rounded-[2.25rem] bg-ai-soft/70"
+        className="absolute -inset-3 -z-10 rotate-3 rounded-[2.25rem] bg-acorn-soft dark:bg-ai-soft/70"
       />
-      <div className="rounded-4xl border border-card-border bg-washi p-6 shadow-lg">
+      <div className="rounded-4xl border border-card-border bg-raised p-6 shadow-lg">
         <div className="flex flex-col items-center text-center">
           <span className="rounded-full bg-ai-soft px-3.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-ai-dark">
             {t("home.mock.vocabulary", "Vocabulary")}

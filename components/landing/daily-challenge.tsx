@@ -74,7 +74,7 @@ function ChatMock({ t }: { t: TFunction }) {
   ];
 
   return (
-    <div className="rounded-4xl border border-card-border bg-washi p-5 shadow-lg sm:p-7">
+    <div className="rounded-4xl border border-card-border bg-raised p-5 shadow-lg sm:p-7">
       <div className="flex items-center gap-3 border-b border-sumi/10 pb-4">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white ring-1 ring-card-border">
           <Image src="/images/charles.webp" alt="" width={1254} height={1254} className="h-10 w-10" />

@@ -3,16 +3,26 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  /* Donguri — warm cream/tan palette */
-  --outer: #241a10; /* behind the page frame — body background */
-  --washi: #fdf6ec; /* page background */
-  --washi-soft: #f8ead2; /* card background */
-  --card-border: #e3cda3;
-  --header: #f9e3c6;
-  --header-border: #eccfa3;
+  /* Donguri — sage and cream, from the mascot artwork: the sage backdrop
+     (#a9c2b0) for the header and frame, a pale tint of it for the page,
+     and the mascot's cream for cards. --washi stays light because it's
+     also the text colour on the solid blue/green/pink buttons. */
+  --outer: #a9c2b0; /* behind the page frame — body background */
+  --washi: #e6eee7; /* page background */
+  --washi-soft: #f8f5e6; /* card background */
+  --card-border: #c5d5c9;
+  --header: #a9c2b0;
+  --header-border: #93ad9c;
   --sumi: #160d04; /* main text / ink */
-  --sumi-soft: #6f5c45; /* muted text */
-  --neutral-soft: #e4d8c2; /* neutral icon chip (e.g. the search chip) */
+  --sumi-soft: #2f3e35; /* muted text — deep green-grey, 5.8:1+ even on the sage header */
+  --neutral-soft: #d3dfd6; /* neutral icon chip (e.g. the search chip) */
+  /* A card lifted above the page — product previews, step cards. Warm
+     ivory so it stands forward from both the sage page and cream cards. */
+  --raised: #fffcf4;
+  /* Donguri's acorn cap — a small warm accent for labels and icons,
+     never a main button colour. */
+  --acorn: #7d5733;
+  --acorn-soft: #f3e6d2;
 
   /* Fixed contrast ink — unlike --sumi/--washi, these never invert in
      .dark, since they're used to contrast arbitrary DB-driven colors
@@ -42,9 +52,9 @@
   --pill-icon: #332415; /* the "?" circle */
 
   /* Ghost buttons (Profile, Log out, Dev mode) */
-  --ghost-border: #d7bd94;
-  --ghost-text: #2c1e0f;
-  --ghost-hover: #f2e2c6;
+  --ghost-border: #93ad9c;
+  --ghost-text: #1f2b23;
+  --ghost-hover: #d3dfd6;
 
   /* Tag (e.g. an active deck's name shown as a pill) */
   --tag: #d6e4fb;
@@ -52,7 +62,7 @@
 
   /* Streak chart */
   --chart-line: #1a54c4;
-  --chart-area: #c6bda8;
+  --chart-area: #b5c7ba;
 
   /* Activity chart series — deliberately distinct from --ai/--matcha/--shu
      (see the light-theme category checks in the dataviz skill): the action
@@ -100,6 +110,9 @@
   --color-sumi: var(--sumi);
   --color-sumi-soft: var(--sumi-soft);
   --color-neutral-soft: var(--neutral-soft);
+  --color-raised: var(--raised);
+  --color-acorn: var(--acorn);
+  --color-acorn-soft: var(--acorn-soft);
   --color-ink-on-light: var(--ink-on-light);
   --color-ink-on-dark: var(--ink-on-dark);
   --color-ai: var(--ai);
@@ -150,6 +163,10 @@
   --sumi: #fff7ea;
   --sumi-soft: #d9c9b5;
   --neutral-soft: #3a3020;
+  /* Same as --washi here, so raised cards look exactly as they did. */
+  --raised: #17130f;
+  --acorn: #d9a86c;
+  --acorn-soft: #3a2a1a;
   --ai: #4e9cff;
   --ai-dark: #7cb8ff;
   --ai-soft: #163257;

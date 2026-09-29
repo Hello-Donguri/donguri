@@ -189,6 +189,11 @@ function DailyChallengeChat({
 
   const isComplete = completion !== null;
   const isOpening = messages.length === 0;
+  // A word + grammar chat: which targets are used so far, from Charles's
+  // latest reply (see ChatReply.targets). Null before any reply, and for a
+  // single-target chat.
+  const latestTargets =
+    messages.findLast((message) => message.reply)?.reply?.targets ?? null;
   const isCharlesTyping = isReplying || isOpening;
 
   useEffect(() => {
@@ -276,6 +281,7 @@ function DailyChallengeChat({
         courseSlug,
         history,
         message,
+        latestTargets?.grammarMessage ?? null,
       );
 
       if (!result.ok) {
@@ -456,7 +462,11 @@ function DailyChallengeChat({
               </div>
             </header>
 
-            <TargetBanner target={target} isComplete={isComplete} />
+            <TargetBanner
+              target={target}
+              isComplete={isComplete}
+              used={latestTargets}
+            />
 
             <MotionConfig reducedMotion="user">
               <div
@@ -824,14 +834,18 @@ function DailyChallengeChat({
 function TargetBanner({
   target,
   isComplete,
+  used,
 }: {
   target: ChallengeTarget;
   isComplete: boolean;
+  // Word + grammar chats: which of the two are done so far.
+  used: { vocab: boolean; grammar: boolean } | null;
 }) {
   const t = useTranslations();
-  const items = [target.vocab, target.grammar].filter(
-    (item): item is ChallengeItem => item !== null,
-  );
+  const items = [
+    target.vocab && { item: target.vocab, done: isComplete || Boolean(used?.vocab) },
+    target.grammar && { item: target.grammar, done: isComplete || Boolean(used?.grammar) },
+  ].filter((entry): entry is { item: ChallengeItem; done: boolean } => Boolean(entry));
 
   // Pinned under the header, like a pinned message in a chat app.
   return (
@@ -858,14 +872,17 @@ function TargetBanner({
                 "Target used — challenge complete",
               )
             : items.length > 1
-              ? t("daily_challenge.target_both", "Use both in one reply")
+              ? t(
+                  "daily_challenge.target_both_any",
+                  "Use both — together or in separate replies",
+                )
               : t("daily_challenge.target_one", "Use this in a reply")}
         </p>
         {/* One card per target, the term over its meaning, so a long
             grammar pattern and its explanation wrap inside their own card
             rather than across the whole strip. */}
         <ul className="mt-1.5 flex flex-wrap items-stretch gap-1.5">
-          {items.map((item, index) => (
+          {items.map(({ item, done }, index) => (
             <li key={item.term} className="flex min-w-0 items-center gap-1.5">
               {index > 0 && (
                 <span
@@ -877,10 +894,25 @@ function TargetBanner({
               )}
               <span
                 title={item.explanation ?? undefined}
-                className="flex min-w-0 flex-col rounded-xl bg-washi/80 px-3 py-1.5 shadow-sm ring-1 ring-matcha/15"
+                className={cn(
+                  "flex min-w-0 flex-col rounded-xl px-3 py-1.5 shadow-sm ring-1 transition-colors",
+                  // Ticked off as soon as it's used — only shown mid-chat
+                  // when there are two to get through.
+                  done && items.length > 1 && !isComplete
+                    ? "bg-matcha-soft ring-matcha/50"
+                    : "bg-washi/80 ring-matcha/15",
+                )}
               >
-                <strong className="text-sm font-semibold leading-snug text-sumi">
+                <strong className="flex items-center gap-1 text-sm font-semibold leading-snug text-sumi">
+                  {done && items.length > 1 && (
+                    <CheckIcon className="h-3.5 w-3.5 shrink-0 text-matcha-dark" />
+                  )}
                   {item.term}
+                  {done && items.length > 1 && !isComplete && (
+                    <span className="sr-only">
+                      {t("daily_challenge.target_item_done", "(used)")}
+                    </span>
+                  )}
                 </strong>
                 {item.romanization && target.targetLanguage === "yue" && (
                   <span className="text-xs leading-snug">

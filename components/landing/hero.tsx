@@ -1,6 +1,7 @@
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LessonPreviewCard } from "@/components/landing/lesson-preview-card";
+import { Eyebrow } from "@/components/landing/section";
 import type { TFunction } from "@/lib/i18n/translate";
 
 export function Hero({ t }: { t: TFunction }) {
@@ -13,9 +14,7 @@ export function Hero({ t }: { t: TFunction }) {
   return (
     <section className="mx-auto grid max-w-5xl grid-cols-1 items-center gap-14 px-6 py-16 sm:py-20 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] md:py-24">
       <div className="flex flex-col items-center text-center md:items-start md:text-left">
-        <span className="rounded-full bg-ai-soft px-4 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-ai-dark">
-          {t("home.hero.eyebrow", "English for Japanese speakers")}
-        </span>
+        <Eyebrow>{t("home.hero.eyebrow", "English for Japanese speakers")}</Eyebrow>
 
         <h1 className="mt-6 max-w-xl font-nunito text-4xl font-extrabold tracking-tight text-sumi text-balance sm:text-5xl">
           {t("home.hero.headline", "English that sticks, five minutes at a time.")}

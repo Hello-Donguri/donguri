@@ -72,7 +72,7 @@ export function Practice({ t }: { t: TFunction }) {
 // test-session.tsx.
 function ClozeMock({ t }: { t: TFunction }) {
   return (
-    <div className="rounded-4xl border border-card-border bg-washi p-6 shadow-lg sm:p-8">
+    <div className="rounded-4xl border border-card-border bg-raised p-6 shadow-lg sm:p-8">
       <div className="rounded-3xl border border-card-border bg-washi-soft p-5 text-center">
         <p className="text-xs font-medium uppercase tracking-wide text-sumi-soft">
           {t("home.mock.fill_blank", "Fill in the blank")}

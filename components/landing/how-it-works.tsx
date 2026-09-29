@@ -3,6 +3,13 @@ import { Section, SectionHeading, ICON_CHIP, type Accent } from "@/components/la
 import { cn } from "@/lib/utils";
 import type { TFunction } from "@/lib/i18n/translate";
 
+const STEP_BAR: Partial<Record<Accent, string>> = {
+  ai: "bg-ai",
+  sakura: "bg-sakura",
+  kin: "bg-kin",
+  matcha: "bg-matcha",
+};
+
 export function HowItWorks({ t }: { t: TFunction }) {
   const steps: { icon: React.ReactNode; accent: Accent; title: string; body: string }[] = [
     {
@@ -58,8 +65,14 @@ export function HowItWorks({ t }: { t: TFunction }) {
         {steps.map((step, index) => (
           <li
             key={step.title}
-            className="relative flex flex-col rounded-3xl border border-card-border bg-washi p-6 shadow-sm"
+            className="relative flex flex-col overflow-hidden rounded-3xl border border-header-border bg-raised p-6 shadow-md shadow-sumi/5 dark:border-card-border dark:shadow-sm"
           >
+            {/* Each step's own colour as a thin top bar — enough to tell the
+                four apart without competing with the buttons. */}
+            <span
+              aria-hidden="true"
+              className={cn("absolute inset-x-0 top-0 h-1 dark:hidden", STEP_BAR[step.accent])}
+            />
             <div className="flex items-center justify-between">
               <span
                 className={cn(
@@ -69,7 +82,7 @@ export function HowItWorks({ t }: { t: TFunction }) {
               >
                 {step.icon}
               </span>
-              <span className="font-nunito text-3xl font-extrabold text-sumi/10">
+              <span className="font-nunito text-3xl font-extrabold text-acorn/30 dark:text-sumi/10">
                 {index + 1}
               </span>
             </div>
