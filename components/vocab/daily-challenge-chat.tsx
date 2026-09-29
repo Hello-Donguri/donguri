@@ -1151,8 +1151,9 @@ function FeedbackDetail({ item }: { item: FeedbackItem }) {
       : null;
 
   // The per-reply tip first, then the end-of-attempt ones, minus any the
-  // model repeated.
-  const tips = [{ en: reply.feedback, ja: reply.feedbackJa }];
+  // model repeated. The per-reply tip is empty when the final check
+  // dropped it (see checkTips in lib/actions/daily-challenge.ts).
+  const tips = reply.feedback.trim() ? [{ en: reply.feedback, ja: reply.feedbackJa }] : [];
   summary?.tips.forEach((tip, index) => {
     if (!tips.some(({ en }) => en.trim() === tip.trim())) {
       tips.push({ en: tip, ja: summary.tipsJa[index] ?? null });
@@ -1188,14 +1189,16 @@ function FeedbackDetail({ item }: { item: FeedbackItem }) {
         )}
       </div>
 
-      <ul className="flex flex-col gap-3 rounded-2xl bg-kin/10 p-4">
-        {tips.map((tip) => (
-          <li key={tip.en} className="flex gap-3 text-sm text-sumi">
-            <BulbIcon className="mt-0.5 h-5 w-5 shrink-0 text-kin" />
-            <BilingualText en={tip.en} ja={tip.ja} />
-          </li>
-        ))}
-      </ul>
+      {tips.length > 0 && (
+        <ul className="flex flex-col gap-3 rounded-2xl bg-kin/10 p-4">
+          {tips.map((tip) => (
+            <li key={tip.en} className="flex gap-3 text-sm text-sumi">
+              <BulbIcon className="mt-0.5 h-5 w-5 shrink-0 text-kin" />
+              <BilingualText en={tip.en} ja={tip.ja} />
+            </li>
+          ))}
+        </ul>
+      )}
 
       {summary && (
         <div className="flex gap-3">

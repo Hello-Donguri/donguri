@@ -28,7 +28,10 @@ export function AuthCard({ title, subtitle, children, footer }: AuthCardProps) {
             className="absolute h-52 -right-33"
           /> 
           <*/}
-          <PeeringDonguriAcorn className="absolute h-52 -right-74" />
+          {/* Decorative, and it overlaps the first buttons: w-auto shrinks
+              its box to the drawing (the SVG's own width is 434), and
+              pointer-events-none lets clicks through to what's under it. */}
+          <PeeringDonguriAcorn className="pointer-events-none absolute h-52 w-auto -right-33" />
 
           {children}
         </div>

@@ -295,8 +295,11 @@ function promptLanguage(target: ChallengeTarget) {
       texting:
         "This is casual texting, so ignore punctuation, and never count writing Jyutping instead of characters — or missing tone numbers — as a mistake. A wrong tone number in their Jyutping is a small mistake: take at most 1 point off grammarScore for it, never fail the target over it, and point out the correct tone in your feedback.",
       betterVersion: "in Cantonese characters",
-      summaryExtraFields: `,
-	"betterVersionRomanization": "The betterVersion in Jyutping with tone numbers, one syllable per character"`,
+      betterVersionExtraFields: `
+	"betterVersionRomanization": "The betterVersion in Jyutping with tone numbers, one syllable per character",`,
+      summaryExtraFields: "",
+      readingTheirMessage:
+        " They may have written in Jyutping: read it syllable by syllable as the Cantonese it spells, so e.g. 'hai2 uk1 kei5' IS 喺屋企 — they already used it.",
       feedbackRule:
         `Write "overall" and every tip in ENGLISH, never Cantonese — only "betterVersion" is Cantonese. ${CANTONESE_QUOTE_RULE}`,
     };
@@ -312,6 +315,8 @@ function promptLanguage(target: ChallengeTarget) {
 	"feedbackJa": "The same feedback in Japanese"`,
     texting: "This is casual texting, so ignore capital letters and missing end punctuation.",
     betterVersion: "",
+    betterVersionExtraFields: "",
+    readingTheirMessage: "",
     summaryExtraFields: `,
 	"overallJa": "The same overall review in Japanese",
 	"tipsJa": ["The same tips in Japanese, one for each tip above, in the same order"]`,
@@ -357,7 +362,7 @@ ${language.replyFields}
 	"complexityScore": 0,
 	"usedTarget": false,
 	"summary": null,
-	"feedback": "One short, encouraging sentence with ONE concrete tip — a single point, never two joined with 'and' — on how the user's latest message could be more natural, correct, or relevant to the conversation — or, if it's already good, richer (e.g. add a reason or a detail) — or a short specific compliment if it's already excellent. If respondedToYou is false, the tip must be about that (e.g. answer my question first, then ask yours)."${language.feedbackJaField}
+	"feedback": "One short, encouraging sentence with ONE concrete tip — a single point, never two joined with 'and' — on how the user's latest message could be more natural, correct, or relevant to the conversation — or, if it's already good, richer (e.g. add a reason or a detail) — or a short specific compliment if it's already excellent. If respondedToYou is false, the tip must be about that (e.g. answer my question first, then ask yours). Check the tip against the exact words they wrote first: never tell them to add something they already wrote (if it's in the wrong place, tell them to move it), and never 'correct' something they got right.${language.readingTheirMessage}"${language.feedbackJaField}
 }
 The feedback: ${language.feedbackLanguage}
 ${glossesPromptRule(target.targetLanguage)}
@@ -383,14 +388,105 @@ complexityScore is an integer from 0 to 10 for how rich and developed the user's
 Don't reward length for its own sake: rambling, repetitive or overlong messages should not score higher than a tight sentence that connects two ideas.
 When usedTarget is true, the chat is over, so "text" should be a short, warm reply that wraps up the chat, and "summary" must be an object reviewing the user's whole performance:
 {
-	"overall": "2-3 short sentences on how the user did across the whole chat — how well they used the target, and how natural and relevant their replies were. A verdict, not advice: don't repeat any correction or suggestion from feedback or tips",
-	"tips": ["Up to 3 short, concrete tips on what they could have done better, each about something they actually wrote. They are shown in one list straight after your feedback, so never repeat or reword the feedback's point, and make each tip a different point. Use an empty list if there is nothing left to improve."],
-	"betterVersion": "A better version of the message where they used the target, still using it: fix any mistakes, make it sound natural, make it actually answer what you last said, and add a little detail if it was very short. Keep it short, simple and beginner-friendly — something they could realistically say. If that message was already perfect, repeat it unchanged.${language.betterVersion ? ` Write it ${language.betterVersion}.` : ""}"${language.summaryExtraFields}
+	"betterVersion": "The most natural way to say what they said in the message where they used the target, still using it: fix any mistakes, word choice and word order, the way a native speaker would text the same thing. Keep their meaning and their content — do NOT add new ideas, details or extra words unless the sentence needs them to be correct. If that message was already natural and correct, repeat it unchanged.${language.betterVersion ? ` Write it ${language.betterVersion}.` : ""}",${language.betterVersionExtraFields}
+	"tips": ["Up to 3 short tips, each explaining one real difference between what they wrote and your betterVersion (a wrong word, a wrong tone, words in the wrong order, a missing word), or one other real mistake they made. Before writing each tip, compare it with the exact words they wrote.${language.readingTheirMessage} Never tell them to add something they already wrote — if it's there but in the wrong place, tell them to move it and where to. Never 'correct' something they already got right. They are shown in one list straight after your feedback, so never repeat or reword the feedback's point, and make each tip a different point. Use an empty list if there is nothing left to improve."],
+	"overall": "2-3 short sentences on how the user did across the whole chat — how well they used the target, and how natural and relevant their replies were. A verdict, not advice: don't repeat any correction or suggestion from feedback or tips"${language.summaryExtraFields}
 }
 When usedTarget is false, "summary" must be null. Write the summary in the same very simple, beginner-friendly English as the feedback, with no grammar jargon.
 ${language.feedbackRule}
 Be honest and strict: 10 means flawless and exactly what a native speaker would text in this situation. Give 10 only when there is truly nothing to improve.
 Do not score based on spelling alone, and do not invent a correction when the sentence is already natural.`;
+}
+
+type TipCheck = { verdict: "keep" | "fix" | "drop"; text?: unknown; textJa?: unknown };
+
+// A second look at the final review's tips — the per-message feedback plus
+// the summary's — before the learner sees them. The chat model sometimes
+// gets what they wrote wrong (e.g. "add 喺屋企" when they'd written it in
+// Jyutping, just in the wrong place), so a proofreading pass compares each
+// tip with their exact words and keeps, rewrites or drops it. Any failure
+// leaves the tips as they were.
+async function checkTips(
+  openai: OpenAI,
+  target: ChallengeTarget,
+  message: string,
+  reply: ChatReply,
+): Promise<ChatReply> {
+  const summary = reply.summary;
+  if (!summary) return reply;
+
+  const isCantonese = target.targetLanguage === "yue";
+  const hasJa = !isCantonese;
+  const tips = [reply.feedback, ...summary.tips];
+  const tipsJa = [reply.feedbackJa, ...(summary.tipsJa.length ? summary.tipsJa : summary.tips.map(() => null))];
+  const betterVersion = summary.betterVersionRomanization
+    ? `${summary.betterVersion} (Jyutping: ${summary.betterVersionRomanization})`
+    : summary.betterVersion;
+
+  const prompt = `You are proofreading tips about a language learner's message before the learner sees them. Be careful and strict.
+
+The learner wrote: "${message}"
+${isCantonese ? "They may have written Cantonese in Jyutping, with or without tone numbers: read it syllable by syllable as the Cantonese it spells — e.g. 'hai2 uk1 kei5' is 喺屋企, so they DID write 喺屋企.\n" : ""}A more natural version of it: "${betterVersion}"
+
+The tips, numbered:
+${tips.map((tip, index) => `${index}. ${tip}`).join("\n")}
+
+Check each tip against exactly what the learner wrote, word by word:
+- "drop" a tip that is wrong: it tells them to add something they already wrote, "corrects" something they got right, describes a mistake they didn't make, or makes the same point as an earlier tip.
+- "fix" a tip that points at a real problem but describes it wrongly — e.g. it says to add a word that is already there but in the wrong place: rewrite it to say to move that word, and where to.
+- "keep" every other tip exactly as it is.
+
+Return only a JSON object: {"checks": [{"verdict": "keep" | "fix" | "drop", "text": "the rewritten tip, only when verdict is fix"${hasJa ? ', "textJa": "the rewritten tip in Japanese, only when verdict is fix"' : ""}}]} with exactly one entry per tip, in the same order.
+${isCantonese ? `Write any rewritten tip in very simple English. ${CANTONESE_QUOTE_RULE}` : `Write any rewritten tip in very simple English. ${JAPANESE_FEEDBACK_RULE}`}`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL ?? "gpt-5.6-luna",
+      response_format: { type: "json_object" },
+      messages: [{ role: "system", content: prompt }],
+    });
+    const content = response.choices[0]?.message.content;
+    const checks = content ? (JSON.parse(content) as { checks?: unknown }).checks : null;
+    if (
+      !Array.isArray(checks) ||
+      checks.length !== tips.length ||
+      !checks.every(
+        (check: TipCheck) =>
+          check &&
+          ["keep", "fix", "drop"].includes(check.verdict) &&
+          (check.verdict !== "fix" || optionalString(check.text) !== null),
+      )
+    ) {
+      return reply;
+    }
+
+    const checked = (checks as TipCheck[]).flatMap((check, index) => {
+      if (check.verdict === "drop") return [];
+      if (check.verdict === "keep") return [{ en: tips[index], ja: tipsJa[index] }];
+      return [{ en: optionalString(check.text)!, ja: hasJa ? optionalString(check.textJa) : null }];
+    });
+
+    // The per-message feedback stays first when it survives; the rest are
+    // the summary's tips. Japanese is kept only while every tip has one, so
+    // it's never shown against the wrong tip.
+    const feedbackKept = checks[0].verdict !== "drop";
+    const [feedback, ...rest] = feedbackKept ? checked : [{ en: "", ja: null }, ...checked];
+    const restJa = rest.map((tip) => tip.ja);
+
+    return {
+      ...reply,
+      feedback: feedback.en,
+      feedbackJa: feedback.ja,
+      summary: {
+        ...summary,
+        tips: rest.map((tip) => tip.en),
+        tipsJa: restJa.every((ja): ja is string => ja !== null) ? restJa : [],
+      },
+    };
+  } catch (error) {
+    console.error("Daily challenge tip check failed:", error);
+    return reply;
+  }
 }
 
 export async function sendDailyChallengeMessage(
@@ -546,6 +642,10 @@ export async function sendDailyChallengeMessage(
       usedTarget,
       summary: usedTarget ? parseSummary(parsed.summary) : null,
     };
+
+    if (reply.summary) {
+      reply = await checkTips(openai, target, trimmedMessage, reply);
+    }
   } catch (error) {
     console.error("OpenAI daily challenge request failed:", error);
     return {
