@@ -24,7 +24,9 @@ import {
   useAnswerFocus,
   useEnterToContinue,
   MultipleChoiceOptions,
-  ToneRetryNote,
+  RetryNote,
+  retriedMessage,
+  type PendingRetry,
   type ChoiceFeedback,
 } from "@/components/vocab/session-ui";
 import { WordImage } from "@/components/ui/word-image";
@@ -49,6 +51,9 @@ type TestSessionProps = {
 };
 
 type Feedback = ChoiceFeedback;
+
+// What both typed-answer actions return (submitTypedAnswer, submitFormAnswer).
+type TypedResult = Awaited<ReturnType<typeof submitFormAnswer | typeof submitTypedAnswer>>;
 
 type LevelUpInfo = {
   newLevel: number;
@@ -75,8 +80,8 @@ export const TestSession = ({
   const [pending, setPending] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [typedAnswer, setTypedAnswer] = useState("");
-  // The right Jyutping, while the learner retypes it after a tone slip.
-  const [toneRetry, setToneRetry] = useState<string | null>(null);
+  // A nearly-right answer being typed again (a tone or spelling slip).
+  const [retry, setRetry] = useState<PendingRetry | null>(null);
   const [score, setScore] = useState({ correct: 0, incorrect: 0 });
   const [finished, setFinished] = useState(false);
   const [xp, setXp] = useState(initialXp);
@@ -111,22 +116,37 @@ export const TestSession = ({
     }
   };
 
+  // Shared by the two typed questions: a near miss (`result.retry`) keeps
+  // the question open for a second go at half XP; anything else is the
+  // answer's result.
+  const applyTypedResult = (result: TypedResult) => {
+    if (result.retry) {
+      setRetry({ answer: result.correctAnswer, reason: result.retry });
+      setTypedAnswer("");
+      return;
+    }
+    setFeedback({
+      selected: typedAnswer,
+      correct: result.correct,
+      correctAnswer: result.correctAnswer,
+      alternatives: result.alternatives,
+      fullAnswer: result.fullAnswer,
+      retried: retry && result.correct ? retry.reason : undefined,
+    });
+    setRetry(null);
+    recordResult(result.correct);
+    setXp(result.xp);
+  };
+
   const handleTypeFormSubmit = async () => {
     if (feedback || pending || question.kind !== "type-form" || typedAnswer.trim() === "") return;
 
     setPending(true);
 
     try {
-      const result = await submitFormAnswer(question.wordId, question.formId, typedAnswer, false);
-      setFeedback({
-        selected: typedAnswer,
-        correct: result.correct,
-        correctAnswer: result.correctAnswer,
-        alternatives: result.alternatives,
-        fullAnswer: result.fullAnswer,
-      });
-      recordResult(result.correct);
-      setXp(result.xp);
+      applyTypedResult(
+        await submitFormAnswer(question.wordId, question.formId, typedAnswer, false, retry !== null),
+      );
     } finally {
       setPending(false);
     }
@@ -183,29 +203,15 @@ export const TestSession = ({
     setPending(true);
 
     try {
-      const result = await submitTypedAnswer(
-        question.wordId,
-        question.direction,
-        typedAnswer,
-        false,
-        toneRetry !== null,
+      applyTypedResult(
+        await submitTypedAnswer(
+          question.wordId,
+          question.direction,
+          typedAnswer,
+          false,
+          retry !== null,
+        ),
       );
-      if (result.toneMiss) {
-        setToneRetry(result.correctAnswer);
-        setTypedAnswer("");
-        return;
-      }
-      setFeedback({
-        selected: typedAnswer,
-        correct: result.correct,
-        correctAnswer: result.correctAnswer,
-        alternatives: result.alternatives,
-        fullAnswer: result.fullAnswer,
-        toneFixed: toneRetry !== null && result.correct,
-      });
-      setToneRetry(null);
-      recordResult(result.correct);
-      setXp(result.xp);
     } finally {
       setPending(false);
     }
@@ -244,7 +250,7 @@ export const TestSession = ({
 
   useEnterToContinue(Boolean(feedback) && !finished, advance);
   const answerInputRef = useAnswerFocus(
-    `${quizIndex}${toneRetry ? "-tone-retry" : ""}`,
+    `${quizIndex}${retry ? "-retry" : ""}`,
     !feedback && !finished,
   );
   // On the results screen, Enter is "Back to course" — held off while the
@@ -439,10 +445,13 @@ export const TestSession = ({
           />
         </div>
         {question.kind === "type-form" ? (
-          typedInput(
-            handleTypeFormSubmit,
-            t("test_session.type_answer_placeholder", "Type your answer"),
-          )
+          <>
+            {retry && !feedback && <RetryNote retry={retry} />}
+            {typedInput(
+              handleTypeFormSubmit,
+              t("test_session.type_answer_placeholder", "Type your answer"),
+            )}
+          </>
         ) : (
           <FormChoiceOptions
             options={question.options}
@@ -517,7 +526,7 @@ export const TestSession = ({
         </div>
         {question.kind === "type-answer" ? (
           <>
-            {toneRetry && !feedback && <ToneRetryNote correctAnswer={toneRetry} />}
+            {retry && !feedback && <RetryNote retry={retry} />}
             {typedInput(
               handleTypeAnswerSubmit,
               question.answerRomanized
@@ -600,10 +609,8 @@ export const TestSession = ({
           </p>
         )}
 
-        {feedback.toneFixed && (
-          <p className="mt-1 text-sm">
-            {t("test_session.tone_fixed", "Tones fixed — +0.5 XP this time.")}
-          </p>
+        {feedback.retried && (
+          <p className="mt-1 text-sm">{retriedMessage(feedback.retried, t)}</p>
         )}
       </div>
 
@@ -646,7 +653,7 @@ export const TestSession = ({
           initial="enter"
           animate="center"
           exit="exit"
-          className={`relative rounded-[2rem] border border-card-border bg-washi px-5 pb-5 pt-6 shadow-sm sm:px-10 sm:pb-8 sm:pt-8 ${
+          className={`relative rounded-4xl border-[1.5px] bg-raised px-5 pb-5 pt-6 shadow-sm sm:px-10 sm:pb-8 sm:pt-8 dark:border ${
             lessonAccent(question.path).card
           }`}
         >

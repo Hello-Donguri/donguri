@@ -84,7 +84,7 @@ function withoutTones(jyutping: string): string {
 }
 
 // Whether a wrong romanized answer has every syllable right and only the
-// tones wrong (or missing) — see TONE_RETRY_XP.
+// tones wrong (or missing) — see RETRY_XP.
 function isToneMiss(typed: string, stored: string, leniency: AnswerLeniency): boolean {
   const guess = withoutTones(typed);
   return (
@@ -93,11 +93,89 @@ function isToneMiss(typed: string, stored: string, leniency: AnswerLeniency): bo
   );
 }
 
-// A Cantonese romanized answer with only its tones wrong isn't marked
-// wrong straight away: the learner is shown the right tones and types it
-// again. Getting it on that second go counts as correct, for half the
-// usual XP.
-const TONE_RETRY_XP = 0.5;
+// The fewest single-letter fixes — add, remove, change, or swap two
+// neighbours — that turn one string into the other ("freind" → "friend"
+// is 1). Optimal string alignment distance, which handles missing or extra
+// letters, unlike comparing letter by letter.
+function spellingDistance(a: string, b: string): number {
+  const rows = Array.from({ length: a.length + 1 }, (_, i) =>
+    Array.from({ length: b.length + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)),
+  );
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      rows[i][j] = Math.min(rows[i - 1][j] + 1, rows[i][j - 1] + 1, rows[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        rows[i][j] = Math.min(rows[i][j], rows[i - 2][j - 2] + 1);
+      }
+    }
+  }
+  return rows[a.length][b.length];
+}
+
+// The accepted reading a wrong English answer was nearly spelt as, or null.
+// "Nearly" means the same first letter and 1 slip for a 4-7 letter answer,
+// up to 2 from 8 letters ("recieve", "beautful", "accomodation"). Answers
+// under 4 letters never count — one change there is usually a different
+// word (cat / cut). Checked against each reading with its bracketed note
+// off, since that's the part people type.
+function nearMissReading(typed: string, stored: string, leniency: AnswerLeniency): string | null {
+  const guess = typed.trim().toLowerCase().replace(/\s+/g, " ");
+  if (!guess) return null;
+
+  for (const reading of answerReadings(stored, leniency)) {
+    const target = reading.replace(READING_NOTE, "").trim().toLowerCase().replace(/\s+/g, " ");
+    if (target.length < 4 || guess[0] !== target[0]) continue;
+    const allowed = target.length >= 8 ? 2 : 1;
+    const distance = spellingDistance(guess, target);
+    if (distance > 0 && distance <= allowed) return reading.replace(READING_NOTE, "").trim();
+  }
+  return null;
+}
+
+// A typed answer that's nearly right isn't marked wrong straight away:
+// the learner is shown the right answer and types it again. "tone" is a
+// Cantonese answer with only its tones wrong; "spelling" is an English
+// answer with a small spelling slip (see nearMissReading). Getting it on
+// that second go counts as correct, for half the usual XP.
+export type RetryReason = "tone" | "spelling";
+const RETRY_XP = 0.5;
+
+// Whether a wrong typed answer gets a second go, and why. English answers
+// only in the English course, and never for Japanese being typed back.
+function retryFor(
+  typed: string,
+  stored: string,
+  leniency: AnswerLeniency,
+  targetLanguage: string,
+  romanized: boolean,
+): { reason: RetryReason; answer: string } | null {
+  if (romanized && targetLanguage === "yue" && isToneMiss(typed, stored, leniency)) {
+    return { reason: "tone", answer: stored.split(",")[0].trim() };
+  }
+  if (targetLanguage === "en" && isLatinTypeable(stored)) {
+    const answer = nearMissReading(typed, stored, leniency);
+    if (answer) return { reason: "spelling", answer };
+  }
+  return null;
+}
+
+// The response for an answer being offered a retry — nothing is recorded
+// yet, so the XP is just the learner's current total.
+async function retryResponse(userId: string, retry: { reason: RetryReason; answer: string }) {
+  const profile = await prisma.profile.findUniqueOrThrow({
+    where: { id: userId },
+    select: { xp: true },
+  });
+  return {
+    correct: false,
+    retry: retry.reason,
+    correctAnswer: retry.answer,
+    xp: profile.xp,
+    alternatives: [],
+    fullAnswer: null,
+  };
+}
 
 // +1 XP per correct quiz answer (both multiple-choice and fill-in-the-form
 // questions) — see `completeQuiz` below for the +5 perfect-quiz bonus on top
@@ -236,19 +314,19 @@ export async function submitAnswer(
 // alternates. Shared by the quiz's typed half (`advancesStage: false`) and
 // the review queue's fallback typed question for words with no cloze
 // content (`advancesStage: true`).
-// A Jyutping answer with only its tones wrong comes back as `toneMiss`
-// with nothing recorded yet; the learner retypes it and the client sends
-// that with `toneRetry`, which is recorded as usual but only earns
-// TONE_RETRY_XP if right.
+// A nearly-right answer (a tone slip in Jyutping, a spelling slip in
+// English — see retryFor) comes back with `retry` set and nothing recorded
+// yet; the learner retypes it and the client sends that with `isRetry`,
+// which is recorded as usual but only earns RETRY_XP if right.
 export async function submitTypedAnswer(
   wordId: string,
   direction: QuizDirection,
   typedAnswer: string,
   advancesStage: boolean,
-  toneRetry = false,
+  isRetry = false,
 ): Promise<{
   correct: boolean;
-  toneMiss: boolean;
+  retry: RetryReason | null;
   correctAnswer: string;
   xp: number;
   alternatives: string[];
@@ -290,38 +368,23 @@ export async function submitTypedAnswer(
   // ("they / them") are shown whole, since they're one answer.
   const correctAnswer = storedAnswer.split(",")[0].trim();
 
-  if (
-    !correct &&
-    !toneRetry &&
-    useRomanizedAnswer &&
-    word.languageDeck.course.targetLanguage === "yue" &&
-    isToneMiss(typedAnswer, storedAnswer, leniency)
-  ) {
-    const profile = await prisma.profile.findUniqueOrThrow({
-      where: { id: user.id },
-      select: { xp: true },
-    });
-    return {
-      correct: false,
-      toneMiss: true,
-      correctAnswer,
-      xp: profile.xp,
-      alternatives: [],
-      fullAnswer: null,
-    };
-  }
+  const retry =
+    correct || isRetry
+      ? null
+      : retryFor(
+          typedAnswer,
+          acceptedAnswers,
+          leniency,
+          word.languageDeck.course.targetLanguage,
+          useRomanizedAnswer,
+        );
+  if (retry) return retryResponse(user.id, retry);
 
-  const { xp } = await recordAnswer(
-    user.id,
-    wordId,
-    correct,
-    advancesStage,
-    toneRetry ? TONE_RETRY_XP : 1,
-  );
+  const { xp } = await recordAnswer(user.id, wordId, correct, advancesStage, isRetry ? RETRY_XP : 1);
 
   return {
     correct,
-    toneMiss: false,
+    retry: null,
     correctAnswer,
     xp,
     alternatives: alternativeReadings(storedAnswer, leniency),
@@ -334,32 +397,48 @@ export async function submitTypedAnswer(
 // means the blank was the word's own term (see findTermClozeMatches in
 // lib/cloze.ts), checked against the term plus its alternate answers. Shared by the
 // quiz's cloze-preferred typed half (`advancesStage: false`) and the review
-// queue's cloze question (`advancesStage: true`) — see `submitTypedAnswer`.
+// queue's cloze question (`advancesStage: true`) — see `submitTypedAnswer`,
+// including its spelling retry (`retry` / `isRetry`).
 export async function submitFormAnswer(
   wordId: string,
   formId: string | null,
   typedAnswer: string,
   advancesStage: boolean,
+  isRetry = false,
 ): Promise<{
   correct: boolean;
+  retry: RetryReason | null;
   correctAnswer: string;
   xp: number;
   alternatives?: string[];
   fullAnswer?: string | null;
 }> {
   const user = await requireSubscriber();
+  const courseSelect = { languageDeck: { select: { course: { select: { targetLanguage: true } } } } };
 
   if (formId === null) {
     const word = await prisma.word.findUniqueOrThrow({
       where: { id: wordId },
-      select: { term: true, path: true, alternateAnswers: { select: { value: true } } },
+      select: {
+        term: true,
+        path: true,
+        alternateAnswers: { select: { value: true } },
+        ...courseSelect,
+      },
     });
     const acceptedAnswers = [word.term, ...word.alternateAnswers.map((alt) => alt.value)].join(",");
     const leniency = { vocab: word.path === "vocab" };
     const { correct, fullAnswer } = matchTypedAnswer(typedAnswer, acceptedAnswers, leniency);
-    const { xp } = await recordAnswer(user.id, wordId, correct, advancesStage);
+    const retry =
+      correct || isRetry
+        ? null
+        : retryFor(typedAnswer, acceptedAnswers, leniency, word.languageDeck.course.targetLanguage, false);
+    if (retry) return retryResponse(user.id, retry);
+
+    const { xp } = await recordAnswer(user.id, wordId, correct, advancesStage, isRetry ? RETRY_XP : 1);
     return {
       correct,
+      retry: null,
       correctAnswer: word.term,
       xp,
       alternatives: alternativeReadings(word.term, leniency),
@@ -369,7 +448,7 @@ export async function submitFormAnswer(
 
   const form = await prisma.wordForm.findUniqueOrThrow({
     where: { id: formId },
-    select: { value: true, wordId: true },
+    select: { value: true, wordId: true, word: { select: courseSelect } },
   });
 
   if (form.wordId !== wordId) {
@@ -377,10 +456,16 @@ export async function submitFormAnswer(
   }
 
   const correct = typedAnswer.trim().toLowerCase() === form.value.trim().toLowerCase();
+  // A form is one exact value, so it's checked as a single reading.
+  const retry =
+    correct || isRetry
+      ? null
+      : retryFor(typedAnswer, form.value, { vocab: false }, form.word.languageDeck.course.targetLanguage, false);
+  if (retry) return retryResponse(user.id, retry);
 
-  const { xp } = await recordAnswer(user.id, wordId, correct, advancesStage);
+  const { xp } = await recordAnswer(user.id, wordId, correct, advancesStage, isRetry ? RETRY_XP : 1);
 
-  return { correct, correctAnswer: form.value, xp };
+  return { correct, retry: null, correctAnswer: form.value, xp };
 }
 
 // Checks a selected option against a hand-authored question's correct index.

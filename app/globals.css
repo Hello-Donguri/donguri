@@ -3,21 +3,21 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  /* Donguri — sage and cream, from the mascot artwork: the sage backdrop
-     (#a9c2b0) for the header and frame, a pale tint of it for the page,
-     and the mascot's cream for cards. --washi stays light because it's
-     also the text colour on the solid blue/green/pink buttons. */
-  --outer: #a9c2b0; /* behind the page frame — body background */
-  --washi: #e6eee7; /* page background */
-  --washi-soft: #f8f5e6; /* card background */
-  --card-border: #c5d5c9;
-  --header: #a9c2b0;
-  --header-border: #93ad9c;
+  /* Donguri — cream with sage-green accents: cream page and cards, with
+     the sage green (the matcha tokens below) for borders, grammar blocks,
+     example panels and highlights. --washi stays light because it's also
+     the text colour on the solid blue/green/pink buttons. */
+  --outer: #f7f0e4; /* behind the page frame — body background */
+  --washi: #faf4e9; /* page background */
+  --washi-soft: #f3ebdb; /* card background */
+  --card-border: #c9d3c5; /* soft sage line */
+  --header: #fcf7ee;
+  --header-border: #c9d3c5;
   --sumi: #160d04; /* main text / ink */
-  --sumi-soft: #2f3e35; /* muted text — deep green-grey, 5.8:1+ even on the sage header */
-  --neutral-soft: #d3dfd6; /* neutral icon chip (e.g. the search chip) */
+  --sumi-soft: #2f3e35; /* muted text — deep green-grey, ~10:1 on cream */
+  --neutral-soft: #e4e6d9; /* neutral icon chip (e.g. the search chip) */
   /* A card lifted above the page — product previews, step cards. Warm
-     ivory so it stands forward from both the sage page and cream cards. */
+     ivory so it stands forward from the cream page and cards. */
   --raised: #fffcf4;
   /* Donguri's acorn cap — a small warm accent for labels and icons,
      never a main button colour. */
@@ -37,9 +37,11 @@
   --sakura: #e23f8a; /* review action */
   --sakura-dark: #e13d74;
   --sakura-soft: #fbdcec; /* pink icon chip */
-  --matcha: #1ea346; /* grammar action */
-  --matcha-dark: #237a34;
-  --matcha-soft: #c9f2da; /* green icon chip */
+  /* Sage green — grammar, and the light theme's accent colour. Sampled
+     from the light-mode mock-up: #3b6444 borders, #cfdfd0 fills. */
+  --matcha: #3b6444; /* grammar action, accent borders */
+  --matcha-dark: #2c5234; /* green text — 6.4:1 on --matcha-soft */
+  --matcha-soft: #cfdfd0; /* green chip / panel fill */
   --shu: #d13d20; /* brand / logo */
   --shu-dark: #b23217;
   --kin: #ffb800; /* vivid gold */
@@ -52,9 +54,9 @@
   --pill-icon: #332415; /* the "?" circle */
 
   /* Ghost buttons (Profile, Log out, Dev mode) */
-  --ghost-border: #93ad9c;
+  --ghost-border: #b8c6b8;
   --ghost-text: #1f2b23;
-  --ghost-hover: #d3dfd6;
+  --ghost-hover: #ece7d8;
 
   /* Tag (e.g. an active deck's name shown as a pill) */
   --tag: #d6e4fb;
@@ -62,7 +64,7 @@
 
   /* Streak chart */
   --chart-line: #1a54c4;
-  --chart-area: #b5c7ba;
+  --chart-area: #c9ceba;
 
   /* Activity chart series — deliberately distinct from --ai/--matcha/--shu
      (see the light-theme category checks in the dataviz skill): the action

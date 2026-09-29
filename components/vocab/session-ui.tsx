@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useEffectEvent, useRef } from "react";
 import { Check, Volume2, X } from "lucide-react";
-import type { Variants } from "framer-motion";
+import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { useSpeech } from "@/lib/speech";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { Jyutping } from "@/components/vocab/jyutping";
 import type { MultipleChoiceQuestion, QuizOption } from "@/lib/definitions";
+import type { RetryReason } from "@/lib/actions/vocab";
 
 export const SpeakButton = ({
   text,
@@ -130,34 +131,63 @@ export type ChoiceFeedback = {
   // The full reading when a correct typed answer left off its bracketed
   // note ("you" for "you (plural)").
   fullAnswer?: string | null;
-  // Right on the second go after a tone slip (see ToneRetryNote) — correct,
-  // but for half XP.
-  toneFixed?: boolean;
+  // Right on the second go after a near miss (see RetryNote) — correct, but
+  // for half XP.
+  retried?: RetryReason;
 };
 
-// Shown when a Jyutping answer had every syllable right but a tone wrong:
-// the right tones, and a prompt to type it again (see submitTypedAnswer's
-// `toneMiss` in lib/actions/vocab.ts).
-export const ToneRetryNote = ({ correctAnswer }: { correctAnswer: string }) => {
+// A nearly-right answer waiting to be typed again (see submitTypedAnswer's
+// `retry` in lib/actions/vocab.ts): the right answer and why.
+export type PendingRetry = { answer: string; reason: RetryReason };
+
+// Pops in when a typed answer was nearly right — a Jyutping answer with a
+// tone wrong, or an English answer with a small spelling slip: the correct
+// answer, and a prompt to type it in for half XP.
+export const RetryNote = ({ retry }: { retry: PendingRetry }) => {
   const t = useTranslations();
+  const reduceMotion = useReducedMotion();
 
   return (
-    <div
+    <motion.div
+      key={`${retry.reason}-${retry.answer}`}
+      role="status"
       aria-live="polite"
-      className="mt-5 w-full rounded-2xl bg-kin/20 px-5 py-4 text-center text-sumi ring-2 ring-kin/40"
+      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.85, y: 8 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={reduceMotion ? { duration: 0.15 } : { type: "spring", stiffness: 420, damping: 18 }}
+      className="mt-5 w-full rounded-2xl bg-kin/20 px-5 py-4 text-center text-sumi shadow-sm ring-2 ring-kin/40"
     >
-      <p className="font-semibold">
-        {t("test_session.tone_miss", "So close — just the tones! It's")}{" "}
-        <strong className="text-lg">
-          <Jyutping text={correctAnswer} chart />
-        </strong>
+      <p className="font-nunito text-xl font-extrabold">
+        {t("test_session.nearly", "Nearly!")}
       </p>
+      {retry.reason === "tone" ? (
+        <p className="mt-1 font-semibold">
+          {t("test_session.tone_miss", "So close — just the tones! It's")}{" "}
+          <strong className="text-lg">
+            <Jyutping text={retry.answer} chart />
+          </strong>
+        </p>
+      ) : (
+        <p className="mt-1 font-semibold">
+          {t("test_session.spelling_miss", "The correct spelling is")}{" "}
+          <strong className="text-lg">{retry.answer}</strong>
+        </p>
+      )}
       <p className="mt-1 text-sm text-sumi-soft">
-        {t("test_session.tone_retry", "Type it again with the right tones for half XP.")}
+        {retry.reason === "tone"
+          ? t("test_session.tone_retry", "Type it again with the right tones for half XP.")
+          : t("test_session.spelling_retry", "Type it in correctly for half XP.")}
       </p>
-    </div>
+    </motion.div>
   );
 };
+
+// The line under a correct answer that took a second go.
+export function retriedMessage(reason: RetryReason, t: ReturnType<typeof useTranslations>) {
+  return reason === "tone"
+    ? t("test_session.tone_fixed", "Tones fixed — +0.5 XP this time.")
+    : t("test_session.spelling_fixed", "Spelling fixed — +0.5 XP this time.");
+}
 
 function choiceStyle(feedback: ChoiceFeedback | null, option: string): string {
   if (!feedback) {

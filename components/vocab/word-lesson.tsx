@@ -16,23 +16,32 @@ import {
 import { WordImage } from "@/components/ui/word-image";
 import { useTranslations } from "@/components/i18n/locale-provider";
 
-// The card's accents follow the word's path — blue for vocab, green for
-// grammar, the same split as the course page — instead of the brand red,
-// which read too close to a competitor's look. The highlight does this in
-// both themes; the rest only in dark mode.
+// The card's accents. Light mode uses the theme's sage green for every
+// card — green border, sage example panel, green highlights — on cream.
+// Dark mode follows the word's path: blue for vocab, green for grammar,
+// the same split as the course page. Neither uses the brand red, which
+// read too close to a competitor's look. `card` carries the border colour
+// in full, so callers shouldn't add their own.
 export function lessonAccent(path: RevealWord["path"]) {
+  const light = {
+    highlight: "rounded bg-matcha/20 px-1 text-matcha-dark",
+    panel: "bg-matcha-soft/80 ring-1 ring-matcha/60",
+    label: "bg-matcha/20 text-matcha-dark",
+    card: "border-matcha/80",
+  };
+
   return path === "grammar"
     ? {
-        highlight: "rounded bg-matcha-soft px-1 text-matcha-dark",
-        panel: "dark:bg-matcha-soft/50 dark:ring-1 dark:ring-matcha/25",
-        label: "dark:bg-matcha-soft dark:text-matcha-dark",
-        card: "dark:border-matcha/40",
+        highlight: `${light.highlight} dark:bg-matcha-soft`,
+        panel: `${light.panel} dark:bg-matcha-soft/50 dark:ring-matcha/25`,
+        label: `${light.label} dark:bg-matcha-soft`,
+        card: `${light.card} dark:border-matcha/40`,
       }
     : {
-        highlight: "rounded bg-ai-soft px-1 text-ai-dark",
-        panel: "dark:bg-ai-soft/50 dark:ring-1 dark:ring-ai/25",
-        label: "dark:bg-ai-soft dark:text-ai-dark",
-        card: "dark:border-ai/40",
+        highlight: `${light.highlight} dark:bg-ai-soft dark:text-ai-dark`,
+        panel: `${light.panel} dark:bg-ai-soft/50 dark:ring-ai/25`,
+        label: `${light.label} dark:bg-ai-soft dark:text-ai-dark`,
+        card: `${light.card} dark:border-ai/40`,
       };
 }
 
@@ -193,10 +202,10 @@ export const WordLesson = ({ word, header }: { word: RevealWord; header?: ReactN
       {mainExample && (
         <>
           <div
-            className={`mt-7 w-full rounded-2xl bg-washi-soft px-6 py-5 text-left ${accent.panel}`}
+            className={`mt-7 w-full rounded-2xl px-6 py-5 text-left ${accent.panel}`}
           >
             <p
-              className={`mb-3 inline-flex items-center gap-1.5 rounded-full text-xs font-medium uppercase tracking-[0.14em] text-sumi-soft dark:px-2.5 dark:py-1 ${accent.label}`}
+              className={`mb-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium uppercase tracking-[0.14em] ${accent.label}`}
             >
               <MessageSquareQuote aria-hidden className="h-3.5 w-3.5" />
               {t("learn_session.example", "Example")}
@@ -344,8 +353,8 @@ const PatternChart = ({ term }: { term: string }) => {
             <div
               className={`flex flex-col divide-y rounded-2xl border-2 text-2xl font-bold sm:text-3xl ${
                 slot.placeholder
-                  ? "divide-dashed divide-sumi/15 border-dashed border-sumi/25 italic text-sumi-soft"
-                  : "divide-matcha/25 border-matcha/40 bg-matcha-soft/60 text-sumi"
+                  ? "divide-dashed divide-sumi/15 border-dashed border-sumi/25 bg-washi/60 italic text-sumi-soft dark:bg-transparent"
+                  : "divide-matcha/40 border-matcha/80 bg-matcha-soft text-sumi dark:divide-matcha/25 dark:border-matcha/40 dark:bg-matcha-soft/60"
               }`}
             >
               {slot.alternatives.map((alternative) => (
@@ -471,8 +480,8 @@ export const LessonButton = ({ courseSlug, wordId }: { courseSlug: string; wordI
           event.preventDefault();
           close();
         }}
-        className={`m-auto max-h-[90vh] w-[calc(100%_-_2rem)] max-w-3xl overflow-y-auto rounded-[2rem] border border-card-border bg-washi p-0 shadow-2xl backdrop:bg-sumi/40 backdrop:backdrop-blur-[2px] ${
-          lesson ? lessonAccent(lesson.path).card : ""
+        className={`m-auto max-h-[90vh] w-[calc(100%_-_2rem)] max-w-3xl overflow-y-auto rounded-4xl border bg-raised p-0 shadow-2xl backdrop:bg-sumi/40 backdrop:backdrop-blur-[2px] ${
+          lesson ? lessonAccent(lesson.path).card : "border-card-border"
         }`}
       >
         <div className="relative p-4 sm:p-6">

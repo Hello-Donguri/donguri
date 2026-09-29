@@ -188,6 +188,19 @@ function DailyChallengeChat({
   const inputRef = useRef<HTMLInputElement>(null);
   const feedbackRef = useRef<HTMLElement>(null);
   const completionRef = useRef<HTMLDivElement>(null);
+  const quackRef = useRef<HTMLAudioElement | null>(null);
+
+  // Charles quacks as each reply lands. Only for replies, not his opener:
+  // browsers block sound until the learner has interacted with the page,
+  // and by a reply they've typed and sent. Made on first use, rewound so
+  // quick replies each get their own quack, and a blocked play is ignored.
+  function quack() {
+    quackRef.current ??= new Audio("/audio/quack.mp3");
+    const audio = quackRef.current;
+    audio.volume = 0.6;
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+  }
 
   const isComplete = completion !== null;
   const isOpening = messages.length === 0;
@@ -304,6 +317,7 @@ function DailyChallengeChat({
         return;
       }
 
+      quack();
       setMessages((currentMessages) => [
         ...currentMessages,
         {

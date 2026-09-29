@@ -18,7 +18,9 @@ import {
   useAnswerFocus,
   useEnterToContinue,
   MultipleChoiceOptions,
-  ToneRetryNote,
+  RetryNote,
+  retriedMessage,
+  type PendingRetry,
   type ChoiceFeedback,
 } from "@/components/vocab/session-ui";
 import { WordImage } from "@/components/ui/word-image";
@@ -91,8 +93,8 @@ const ReviewSessionQuestions = ({
   const [pending, setPending] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [typedAnswer, setTypedAnswer] = useState("");
-  // The right Jyutping, while the learner retypes it after a tone slip.
-  const [toneRetry, setToneRetry] = useState<string | null>(null);
+  // A nearly-right answer being typed again (a tone or spelling slip).
+  const [retry, setRetry] = useState<PendingRetry | null>(null);
   const [score, setScore] = useState({ correct: 0, incorrect: 0 });
   const [finished, setFinished] = useState(false);
   const [xp, setXp] = useState(initialXp);
@@ -133,20 +135,27 @@ const ReviewSessionQuestions = ({
     try {
       const result =
         question.kind === "type-form"
-          ? await submitFormAnswer(question.wordId, question.formId, typedAnswer, true)
+          ? await submitFormAnswer(
+              question.wordId,
+              question.formId,
+              typedAnswer,
+              true,
+              retry !== null,
+            )
           : question.kind === "type-answer"
             ? await submitTypedAnswer(
                 question.wordId,
                 question.direction,
                 typedAnswer,
                 true,
-                toneRetry !== null,
+                retry !== null,
               )
             : null;
       if (!result) return;
 
-      if ("toneMiss" in result && result.toneMiss) {
-        setToneRetry(result.correctAnswer);
+      // Nearly right: show the answer and let them type it again.
+      if (result.retry) {
+        setRetry({ answer: result.correctAnswer, reason: result.retry });
         setTypedAnswer("");
         return;
       }
@@ -157,9 +166,9 @@ const ReviewSessionQuestions = ({
         correctAnswer: result.correctAnswer,
         alternatives: result.alternatives,
         fullAnswer: result.fullAnswer,
-        toneFixed: toneRetry !== null && result.correct,
+        retried: retry && result.correct ? retry.reason : undefined,
       });
-      setToneRetry(null);
+      setRetry(null);
       recordResult(result.correct);
       setXp(result.xp);
     } finally {
@@ -222,7 +231,7 @@ const ReviewSessionQuestions = ({
 
   useEnterToContinue(Boolean(feedback) && !finished, advance);
   const answerInputRef = useAnswerFocus(
-    `${quizIndex}${toneRetry ? "-tone-retry" : ""}`,
+    `${quizIndex}${retry ? "-retry" : ""}`,
     !feedback && !finished,
   );
   // On the results screen, Enter is "Back to course" — held off while the
@@ -394,7 +403,7 @@ const ReviewSessionQuestions = ({
         />
       ) : (
         <>
-          {toneRetry && !feedback && <ToneRetryNote correctAnswer={toneRetry} />}
+          {retry && !feedback && <RetryNote retry={retry} />}
           <form
             className="mt-5 flex w-full flex-col gap-3"
             onSubmit={(event) => {
@@ -485,10 +494,8 @@ const ReviewSessionQuestions = ({
             </p>
           )}
 
-          {feedback.toneFixed && (
-            <p className="mt-1 text-sm">
-              {t("test_session.tone_fixed", "Tones fixed — +0.5 XP this time.")}
-            </p>
+          {feedback.retried && (
+            <p className="mt-1 text-sm">{retriedMessage(feedback.retried, t)}</p>
           )}
         </div>
       )}

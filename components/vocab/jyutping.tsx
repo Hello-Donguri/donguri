@@ -1,7 +1,14 @@
 "use client";
 
-import { useId, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import { useTranslations } from "@/components/i18n/locale-provider";
+import { cn } from "@/lib/utils";
 
 // Cantonese tones as Chao pitch contours (5 = highest, 1 = lowest): where
 // each tone starts and ends. Drives both the per-word contour chart and
@@ -54,7 +61,8 @@ function parseJyutping(text: string): Segment[] {
   const segments: Segment[] = [];
   let last = 0;
   for (const match of text.matchAll(SYLLABLE)) {
-    if (match.index > last) segments.push({ text: text.slice(last, match.index), tone: null });
+    if (match.index > last)
+      segments.push({ text: text.slice(last, match.index), tone: null });
     segments.push({ text: match[0], tone: Number(match[2]) as Tone });
     last = match.index + match[0].length;
   }
@@ -63,7 +71,9 @@ function parseJyutping(text: string): Segment[] {
 }
 
 export function jyutpingTones(text: string): Tone[] {
-  return parseJyutping(text).flatMap((segment) => (segment.tone ? [segment.tone] : []));
+  return parseJyutping(text).flatMap((segment) =>
+    segment.tone ? [segment.tone] : [],
+  );
 }
 
 export type SyllableRange = { first: number; length: number };
@@ -83,9 +93,13 @@ export const Jyutping = ({
   highlight?: SyllableRange[];
 }) => {
   const segments = parseJyutping(text);
-  const tones = segments.flatMap((segment) => (segment.tone ? [segment.tone] : []));
+  const tones = segments.flatMap((segment) =>
+    segment.tone ? [segment.tone] : [],
+  );
   const isHighlighted = (position: number) =>
-    highlight.some(({ first, length }) => position >= first && position < first + length);
+    highlight.some(
+      ({ first, length }) => position >= first && position < first + length,
+    );
 
   let syllable = 0;
   const coloured = (
@@ -119,12 +133,36 @@ export const Jyutping = ({
   );
 };
 
+// Typed Jyutping with each toned syllable in its tone's colour, and
+// nothing else changed — no weight or spacing, unlike Jyutping above — so
+// it stays exactly as wide as the plain text in the input under it (see
+// JyutpingInput). Syllables still missing a tone stay the normal colour.
+const ToneColouredText = ({ text }: { text: string }) => (
+  <>
+    {parseJyutping(text).map((segment, index) =>
+      segment.tone ? (
+        <span key={index} className={TONE_TEXT[segment.tone]}>
+          {segment.text}
+        </span>
+      ) : (
+        segment.text
+      ),
+    )}
+  </>
+);
+
 const LEVEL_Y = (level: number) => 16 - (level - 1) * 3.5;
 
 // A small pitch chart: one contour per syllable, left to right, each in
 // its tone's colour, over faint guides for the top, middle and bottom of
 // the voice. `keoi5 dei6` draws a low rise, then a low level line.
-export const ToneContour = ({ tones, size = "sm" }: { tones: Tone[]; size?: "sm" | "md" }) => {
+export const ToneContour = ({
+  tones,
+  size = "sm",
+}: {
+  tones: Tone[];
+  size?: "sm" | "md";
+}) => {
   const t = useTranslations();
   const slot = 14;
   const gap = 5;
@@ -134,7 +172,9 @@ export const ToneContour = ({ tones, size = "sm" }: { tones: Tone[]; size?: "sm"
   return (
     <svg
       role="img"
-      aria-label={t("jyutping.tones_label", "Tones: {{tones}}", { tones: tones.join(", ") })}
+      aria-label={t("jyutping.tones_label", "Tones: {{tones}}", {
+        tones: tones.join(", "),
+      })}
       viewBox={`0 0 ${width} 20`}
       width={width * scale}
       height={20 * scale}
@@ -227,10 +267,23 @@ export const JyutpingInput = ({
     onInputElement?.(element);
   };
   const listId = useId();
-  const [picker, setPicker] = useState<{ syllable: string; addSpace: boolean } | null>(null);
+  const [picker, setPicker] = useState<{
+    syllable: string;
+    addSpace: boolean;
+  } | null>(null);
   const [active, setActive] = useState(0);
 
   const caret = () => inputRef.current?.selectionStart ?? value.length;
+
+  // The coloured copy (see the overlay below) scrolls with the input once
+  // the text is wider than the box.
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const syncOverlayScroll = () => {
+    if (overlayRef.current && inputRef.current) {
+      overlayRef.current.scrollLeft = inputRef.current.scrollLeft;
+    }
+  };
+  useLayoutEffect(syncOverlayScroll);
 
   const openPicker = (addSpace: boolean) => {
     const syllable = tonelessSyllable(value.slice(0, caret()));
@@ -248,7 +301,10 @@ export const JyutpingInput = ({
     setPicker(null);
     requestAnimationFrame(() => {
       inputRef.current?.focus();
-      inputRef.current?.setSelectionRange(at + insert.length, at + insert.length);
+      inputRef.current?.setSelectionRange(
+        at + insert.length,
+        at + insert.length,
+      );
     });
   };
 
@@ -287,7 +343,11 @@ export const JyutpingInput = ({
       setPlainSpaceNext(false);
     } else if (event.key === " " && openPicker(true)) {
       event.preventDefault();
-    } else if (event.key === "Enter" && caret() === value.length && openPicker(false)) {
+    } else if (
+      event.key === "Enter" &&
+      caret() === value.length &&
+      openPicker(false)
+    ) {
       // The last syllable still needs a tone: pick it before submitting.
       event.preventDefault();
     }
@@ -305,37 +365,66 @@ export const JyutpingInput = ({
 
   return (
     <div className="relative w-full">
-      <input
-        ref={setRefs}
-        id={id}
-        name={name}
-        maxLength={maxLength}
-        type="text"
-        role="combobox"
-        aria-expanded={Boolean(picker)}
-        aria-controls={listId}
-        aria-activedescendant={activeId}
-        aria-autocomplete="none"
-        value={value}
-        onChange={(event) => {
-          setPicker(null);
-          setPlainSpaceNext(false);
-          onChange(event.target.value);
-        }}
-        onKeyDown={onKeyDown}
-        onBlur={() => setPicker(null)}
-        disabled={disabled}
-        autoFocus={autoFocus}
-        autoComplete="off"
-        autoCapitalize="off"
-        spellCheck={false}
-        placeholder={placeholder}
-        className={className}
-      />
+      <div className="relative">
+        <input
+          ref={setRefs}
+          id={id}
+          name={name}
+          maxLength={maxLength}
+          type="text"
+          role="combobox"
+          aria-expanded={Boolean(picker)}
+          aria-controls={listId}
+          aria-activedescendant={activeId}
+          aria-autocomplete="none"
+          value={value}
+          onChange={(event) => {
+            setPicker(null);
+            setPlainSpaceNext(false);
+            onChange(event.target.value);
+          }}
+          onKeyDown={onKeyDown}
+          onBlur={() => setPicker(null)}
+          onScroll={syncOverlayScroll}
+          onSelect={syncOverlayScroll}
+          disabled={disabled}
+          autoFocus={autoFocus}
+          autoComplete="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          placeholder={placeholder}
+          // The typed text itself is invisible — the tone-coloured copy on
+          // top shows it — but the caret, selection and placeholder aren't.
+          className={cn(
+            className,
+            "text-transparent! caret-sumi selection:bg-ai/25 selection:text-transparent placeholder:text-sumi-soft/70",
+          )}
+        />
+
+        {/* Each syllable in its tone's colour as it's typed ("nei5" turns
+          tone 5's colour once the digit's added). Drawn over the input with
+          the same box, padding and font, so it lines up letter for letter;
+          it ignores the pointer, so clicks and selection go to the input. */}
+        <div
+          ref={overlayRef}
+          aria-hidden="true"
+          className={cn(
+            className,
+            "pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre border-transparent! bg-transparent! shadow-none! ring-0! text-sumi",
+            // Fades with the input when it's disabled.
+            disabled && "opacity-60",
+          )}
+        >
+          <ToneColouredText text={value} />
+        </div>
+      </div>
 
       {showHint && (
         <p className="mt-1.5 text-center text-xs text-sumi-soft">
-          {t("jyutping.hint", "Press space after each syllable to pick its tone, or type the number.")}
+          {t(
+            "jyutping.hint",
+            "Press space after each syllable to pick its tone, or type the number.",
+          )}
         </p>
       )}
 
@@ -346,9 +435,15 @@ export const JyutpingInput = ({
           }`}
         >
           <p className="mb-2 text-center text-xs text-sumi-soft">
-            {t("jyutping.pick_tone", "Which tone is “{{syllable}}”?", { syllable: picker.syllable })}
+            {t("jyutping.pick_tone", "Which tone is “{{syllable}}”?", {
+              syllable: picker.syllable,
+            })}
           </p>
-          <ul id={listId} role="listbox" className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+          <ul
+            id={listId}
+            role="listbox"
+            className="grid grid-cols-3 gap-2 sm:grid-cols-6"
+          >
             {TONES.map(({ tone }, index) => (
               <li
                 key={tone}

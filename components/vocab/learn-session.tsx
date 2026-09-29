@@ -139,7 +139,7 @@ export const LearnSession = ({ words, courseSlug }: LearnSessionProps) => {
           initial="enter"
           animate="center"
           exit="exit"
-          className={`rounded-[2rem] border border-card-border bg-washi p-4 shadow-sm sm:p-6 ${lessonAccent(word.path).card}`}
+          className={`rounded-4xl border-[1.5px] bg-raised p-4 shadow-sm sm:p-6 dark:border ${lessonAccent(word.path).card}`}
         >
           <WordLesson
             word={word}
