@@ -28,9 +28,11 @@ import {
   DAILY_CHALLENGE_BASE_XP,
   DAILY_CHALLENGE_MAX_TOTAL,
   DAILY_CHALLENGE_PERFECT_BONUS_XP,
-  DAILY_CHALLENGE_XP_THRESHOLD,
+  DAILY_CHALLENGE_XP_START,
+  DAILY_CHALLENGE_XP_STEP,
   dailyChallengeTotal,
-  dailyChallengeXp,
+  dailyChallengeXpBands,
+  type DailyChallengeXpBand,
 } from "@/lib/srs";
 import { Button } from "@/components/ui/button";
 import { useLocale, useTranslations } from "@/components/i18n/locale-provider";
@@ -786,12 +788,13 @@ function DailyChallengeChat({
             <div className="border-t border-card-border pt-4">
               <p className="text-sm text-sumi-soft">
                 {t(
-                  "daily_challenge.xp_rule_intro",
-                  "Your four scores are added up to a total out of {{max}}. Finishing always earns {{base}} XP, every point above {{threshold}} adds 1 more, and a perfect {{max}}/{{max}} adds a +{{bonus}} bonus.",
+                  "daily_challenge.xp_rule_intro_bands",
+                  "Your four scores are added up to a total out of {{max}}. Finishing always earns {{base}} XP. From {{start}} you earn more, going up 1 XP for every {{step}} points, and a perfect {{max}}/{{max}} adds a +{{bonus}} bonus. If your last message doesn't answer Charles, you only get the {{base}} XP.",
                   {
                     max: DAILY_CHALLENGE_MAX_TOTAL,
                     base: DAILY_CHALLENGE_BASE_XP,
-                    threshold: DAILY_CHALLENGE_XP_THRESHOLD,
+                    start: DAILY_CHALLENGE_XP_START,
+                    step: DAILY_CHALLENGE_XP_STEP,
                     bonus: DAILY_CHALLENGE_PERFECT_BONUS_XP,
                   },
                 )}
@@ -800,8 +803,8 @@ function DailyChallengeChat({
             </div>
             <p className="border-t border-card-border pt-3 text-xs text-sumi-soft">
               {t(
-                "daily_challenge.xp_rule_note",
-                "Only the message that uses the target is scored. You get {{max}} attempts a day.",
+                "daily_challenge.xp_rule_note_multi",
+                "Only the messages that use a target are scored. If you use two targets in different messages, their scores are averaged. You get {{max}} attempts a day.",
                 { max: maxAttemptsPerDay },
               )}
             </p>
@@ -931,11 +934,21 @@ function TargetBanner({
   );
 }
 
+// Which totals earn which XP, lowest first (see dailyChallengeXpBands).
+const XP_BANDS = dailyChallengeXpBands();
+
+// "<28", "28–29", "40★" — a band's totals, short enough for a ladder rung.
+function bandLabel(band: DailyChallengeXpBand): string {
+  if (band.min === 0) return `<${band.max + 1}`;
+  if (band.max === DAILY_CHALLENGE_MAX_TOTAL && band.min === band.max) return `${band.min}★`;
+  return band.min === band.max ? `${band.min}` : `${band.min}–${band.max}`;
+}
+
 // Why the attempt earned what it did, readable at a glance: each score as
 // a 10-segment bar with the lost points marked, adding up to the total, then
-// that total's place on the XP ladder (every total from the threshold up to
-// a perfect score, worked out with dailyChallengeXp so it can't drift from
-// the real rule). xpEarned is the server's real award.
+// that total's place on the XP ladder (one rung per XP band, worked out with
+// dailyChallengeXp so it can't drift from the real rule). xpEarned is the
+// server's real award.
 function XpBreakdown({
   reply,
   xpEarned,
@@ -945,11 +958,7 @@ function XpBreakdown({
 }) {
   const t = useTranslations();
   const total = dailyChallengeTotal(reply);
-  const ladder = Array.from(
-    { length: DAILY_CHALLENGE_MAX_TOTAL - DAILY_CHALLENGE_XP_THRESHOLD + 1 },
-    (_, i) => DAILY_CHALLENGE_XP_THRESHOLD + i,
-  );
-  const rung = Math.max(total, DAILY_CHALLENGE_XP_THRESHOLD);
+  const rungIndex = XP_BANDS.findIndex((band) => total >= band.min && total <= band.max);
 
   return (
     <div className="flex flex-col gap-5">
@@ -989,45 +998,41 @@ function XpBreakdown({
         <ol
           className="grid gap-1"
           style={{
-            gridTemplateColumns: `repeat(${ladder.length}, minmax(0, 1fr))`,
+            gridTemplateColumns: `repeat(${XP_BANDS.length}, minmax(0, 1fr))`,
           }}
         >
-          {ladder.map((step) => {
-            const xp =
-              step === rung
-                ? xpEarned
-                : dailyChallengeXp({
-                    grammarScore: step,
-                    naturalnessScore: 0,
-                    relevanceScore: 0,
-                    complexityScore: 0,
-                  });
-            const isYou = step === rung;
+          {XP_BANDS.map((band, index) => {
+            const isYou = index === rungIndex;
             return (
               <li
-                key={step}
+                key={band.min}
                 aria-current={isYou ? "step" : undefined}
                 className={cn(
                   "flex flex-col items-center rounded-xl py-1.5 text-center tabular-nums transition",
                   isYou
                     ? "bg-matcha text-washi shadow-sm ring-2 ring-matcha/30"
-                    : step < rung
+                    : index < rungIndex
                       ? "bg-matcha-soft/70 text-matcha-dark"
                       : "bg-washi/60 text-sumi-soft",
                 )}
               >
-                <span className="text-[11px] opacity-80">
-                  {step === DAILY_CHALLENGE_XP_THRESHOLD
-                    ? `≤${step}`
-                    : step === DAILY_CHALLENGE_MAX_TOTAL
-                      ? `${step}★`
-                      : step}
-                </span>
-                <span className="text-sm font-bold">+{xp}</span>
+                <span className="text-[11px] opacity-80">{bandLabel(band)}</span>
+                {/* Your own rung shows what you actually earned — the base
+                    XP for a final message that didn't answer Charles. */}
+                <span className="text-sm font-bold">+{isYou ? xpEarned : band.xp}</span>
               </li>
             );
           })}
         </ol>
+        {!reply.respondedToYou && (
+          <p className="text-xs text-sumi-soft">
+            {t(
+              "daily_challenge.xp_not_answered",
+              "Your last message didn't answer Charles's question, so this one earns the base {{base}} XP.",
+              { base: DAILY_CHALLENGE_BASE_XP },
+            )}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -1058,7 +1063,7 @@ function CompletionBanner({
   const total = dailyChallengeTotal(finalItem.reply);
   const isPerfect = total === DAILY_CHALLENGE_MAX_TOTAL;
   const isGreat = total >= DAILY_CHALLENGE_MAX_TOTAL - 2;
-  const isAboveThreshold = total > DAILY_CHALLENGE_XP_THRESHOLD;
+  const isAboveThreshold = total >= DAILY_CHALLENGE_XP_START;
 
   return (
     <section
@@ -1329,15 +1334,11 @@ function ScoreTile({
   );
 }
 
-// One row per total from a perfect score down to the threshold, then a
-// catch-all row, all computed with dailyChallengeXp so it can't drift from
-// the real rule.
+// One row per XP band, from a perfect score down to the catch-all "under
+// 28" row (see dailyChallengeXpBands), so it can't drift from the real rule.
 function XpTable() {
   const t = useTranslations();
-  const totals = Array.from(
-    { length: DAILY_CHALLENGE_MAX_TOTAL - DAILY_CHALLENGE_XP_THRESHOLD + 1 },
-    (_, i) => DAILY_CHALLENGE_MAX_TOTAL - i,
-  );
+  const bands = [...XP_BANDS].reverse();
 
   return (
     <table className="mt-3 w-full text-sm">
@@ -1350,37 +1351,34 @@ function XpTable() {
         </tr>
       </thead>
       <tbody>
-        {totals.map((total) => {
-          const isThreshold = total === DAILY_CHALLENGE_XP_THRESHOLD;
-          const xp = dailyChallengeXp({
-            grammarScore: total,
-            naturalnessScore: 0,
-            relevanceScore: 0,
-            complexityScore: 0,
-          });
+        {bands.map((band) => {
+          const isBase = band.min === 0;
+          const isPerfect = band.min === DAILY_CHALLENGE_MAX_TOTAL;
           return (
-            <tr key={total} className="border-t border-card-border/60">
+            <tr key={band.min} className="border-t border-card-border/60">
               <td className="py-1.5 tabular-nums text-sumi">
-                {isThreshold
-                  ? t("daily_challenge.xp_table_or_less", "{{total}} or less", {
-                      total,
+                {isBase
+                  ? t("daily_challenge.xp_table_under", "Under {{total}}", {
+                      total: band.max + 1,
                     })
-                  : `${total}/${DAILY_CHALLENGE_MAX_TOTAL}`}
+                  : band.min === band.max
+                    ? `${band.min}/${DAILY_CHALLENGE_MAX_TOTAL}`
+                    : `${band.min}–${band.max}/${DAILY_CHALLENGE_MAX_TOTAL}`}
               </td>
               <td className="py-1.5 text-right">
                 <span
                   className={cn(
                     "inline-block min-w-14 rounded-full px-2 py-0.5 text-center text-xs font-semibold tabular-nums",
-                    total === DAILY_CHALLENGE_MAX_TOTAL
+                    isPerfect
                       ? "bg-kin text-ink-on-light"
-                      : isThreshold
+                      : isBase
                         ? "bg-washi-soft text-sumi-soft"
                         : "bg-matcha-soft text-matcha-dark",
                   )}
                 >
-                  +{xp} XP
+                  +{band.xp} XP
                 </span>
-                {total === DAILY_CHALLENGE_MAX_TOTAL && (
+                {isPerfect && (
                   <span className="ml-1.5 text-xs text-sumi-soft">
                     {t(
                       "daily_challenge.xp_table_bonus",

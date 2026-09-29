@@ -66,14 +66,17 @@ export function streakBonusXp(currentStreak: number): number {
 }
 
 // XP for one daily-challenge chat attempt, from the four 0-10 scores of the
-// message where the learner used the challenge target (see
+// message(s) where the learner used the challenge target (see
 // sendDailyChallengeMessage in lib/actions/daily-challenge.ts), added up
-// into a total out of 40. Finishing always earns the base 1 XP; every point
-// above DAILY_CHALLENGE_XP_THRESHOLD adds 1 more, up to 6 for the score
-// itself, and a perfect 40 adds a bonus on top:
-//   total ≤ 34 → 1 XP, 35 → 2, 36 → 3, 37 → 4, 38 → 5, 39 → 6, 40 → 6 + 1 = 7
+// into a total out of 40. Finishing always earns the base 1 XP; from
+// DAILY_CHALLENGE_XP_START it's 2 XP, then 1 more for every
+// DAILY_CHALLENGE_XP_STEP points, up to 6 for the score itself, and a
+// perfect 40 adds a bonus on top:
+//   total < 28 → 1 XP, 28-29 → 2, 30-31 → 3, 32-33 → 4, 34-35 → 5,
+//   36-39 → 6, 40 → 6 + 1 = 7
 export const DAILY_CHALLENGE_MAX_TOTAL = 40;
-export const DAILY_CHALLENGE_XP_THRESHOLD = 34;
+export const DAILY_CHALLENGE_XP_START = 28;
+export const DAILY_CHALLENGE_XP_STEP = 2;
 export const DAILY_CHALLENGE_BASE_XP = 1;
 export const DAILY_CHALLENGE_MAX_SCORE_XP = 6;
 export const DAILY_CHALLENGE_PERFECT_BONUS_XP = 1;
@@ -97,14 +100,45 @@ export function dailyChallengeTotal({
   return grammarScore + naturalnessScore + relevanceScore + complexityScore;
 }
 
-export function dailyChallengeXp(scores: DailyChallengeScores): number {
+// `respondedToYou: false` — the final message didn't answer what Charles
+// asked, i.e. the target was dropped in to finish — earns the base XP only,
+// however well it scores otherwise.
+export function dailyChallengeXp(scores: DailyChallengeScores, respondedToYou = true): number {
+  if (!respondedToYou) return DAILY_CHALLENGE_BASE_XP;
+
   const total = dailyChallengeTotal(scores);
-  const scoreXp = Math.min(
-    DAILY_CHALLENGE_BASE_XP + Math.max(0, total - DAILY_CHALLENGE_XP_THRESHOLD),
-    DAILY_CHALLENGE_MAX_SCORE_XP,
-  );
+  const scoreXp =
+    total < DAILY_CHALLENGE_XP_START
+      ? DAILY_CHALLENGE_BASE_XP
+      : Math.min(
+          DAILY_CHALLENGE_BASE_XP +
+            1 +
+            Math.floor((total - DAILY_CHALLENGE_XP_START) / DAILY_CHALLENGE_XP_STEP),
+          DAILY_CHALLENGE_MAX_SCORE_XP,
+        );
   const bonus = total === DAILY_CHALLENGE_MAX_TOTAL ? DAILY_CHALLENGE_PERFECT_BONUS_XP : 0;
   return scoreXp + bonus;
+}
+
+// The totals that earn each XP amount, lowest first — e.g. 0-27 → 1, 28-29
+// → 2, … 40 → 7. Worked out from dailyChallengeXp itself, so the UI's XP
+// table and ladder can't drift from the real rule.
+export type DailyChallengeXpBand = { min: number; max: number; xp: number };
+
+export function dailyChallengeXpBands(): DailyChallengeXpBand[] {
+  const bands: DailyChallengeXpBand[] = [];
+  for (let total = 0; total <= DAILY_CHALLENGE_MAX_TOTAL; total++) {
+    const xp = dailyChallengeXp({
+      grammarScore: total,
+      naturalnessScore: 0,
+      relevanceScore: 0,
+      complexityScore: 0,
+    });
+    const last = bands.at(-1);
+    if (last && last.xp === xp) last.max = total;
+    else bands.push({ min: total, max: total, xp });
+  }
+  return bands;
 }
 
 // Every UTC day with any recorded activity — a word introduced, a word

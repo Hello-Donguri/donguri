@@ -70,6 +70,9 @@ export type ChatReply = {
   // Japanese version of `feedback`; null if the model left it out.
   feedbackJa: string | null;
   usedTarget: boolean;
+  // False when the latest message didn't answer what Charles asked. A final
+  // message like that earns only the base XP (see dailyChallengeXp).
+  respondedToYou: boolean;
   // Word + grammar chats only (null otherwise): which targets have been used
   // so far, for ticking them off one by one, and the message the grammar
   // was found in — sent back with the next message, since only the model
@@ -100,10 +103,10 @@ const SCORE_FIELDS = [
   "complexityScore",
 ] as const;
 // Relevance ceiling for a message that doesn't respond to what Charles just
-// said (e.g. dodging his question with one of its own). Low enough that a
-// dodge can't total more than 34/40, so it only ever earns the base XP
-// (see dailyChallengeXp), however fluent it sounds — the model tends to
-// score the sentence on its own otherwise.
+// said (e.g. dodging his question with one of its own) — the model tends to
+// score the sentence on its own merits otherwise. A dodge that finishes the
+// challenge also earns only the base XP (respondedToYou in dailyChallengeXp),
+// since the XP bands start low enough that the cap alone wouldn't stop it.
 const NON_RESPONSE_RELEVANCE_CAP = 4;
 
 function optionalString(value: unknown): string | null {
@@ -141,7 +144,7 @@ function parseSummary(value: unknown): ChallengeSummary | null {
 
 function isChatReply(
   value: unknown,
-): value is Omit<ChatReply, "summary" | "targets"> & {
+): value is Omit<ChatReply, "summary" | "targets" | "respondedToYou"> & {
   summary?: unknown;
   respondedToYou?: boolean;
   usedGrammar?: boolean;
@@ -739,6 +742,7 @@ export async function sendDailyChallengeMessage(
       relevanceScore,
       complexityScore: Math.round(parsed.complexityScore),
       usedTarget,
+      respondedToYou: parsed.respondedToYou !== false,
       targets: combined
         ? {
             vocab: vocabDone,
@@ -765,7 +769,7 @@ export async function sendDailyChallengeMessage(
     return { ok: true, reply, completion: null };
   }
 
-  const xpEarned = dailyChallengeXp(reply);
+  const xpEarned = dailyChallengeXp(reply, reply.respondedToYou);
 
   await prisma.dailyChallengeAttempt.create({
     data: {
