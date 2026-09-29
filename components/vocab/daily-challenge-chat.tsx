@@ -45,6 +45,9 @@ import { RainbowAvatar } from "@/components/donguri/rainbow-avatar";
 import { ScoreBar } from "@/components/vocab/score-bar";
 import type { AccessoryId } from "@/lib/levels";
 
+// How long Charles's quack plays before his reply appears.
+const QUACK_LEAD_MS = 500;
+
 type Message = {
   id: number;
   role: "ai" | "user";
@@ -190,14 +193,23 @@ function DailyChallengeChat({
   const completionRef = useRef<HTMLDivElement>(null);
   const quackRef = useRef<HTMLAudioElement | null>(null);
 
-  // Charles quacks as each reply lands. Only for replies, not his opener:
-  // browsers block sound until the learner has interacted with the page,
-  // and by a reply they've typed and sent. Made on first use, rewound so
-  // quick replies each get their own quack, and a blocked play is ignored.
-  function quack() {
-    quackRef.current ??= new Audio("/audio/quack.mp3");
-    const audio = quackRef.current;
+  // Loaded as the chat opens, so the first quack doesn't wait on the file.
+  useEffect(() => {
+    const audio = new Audio("/audio/quack.mp3");
+    audio.preload = "auto";
     audio.volume = 0.6;
+    audio.load();
+    quackRef.current = audio;
+  }, []);
+
+  // Charles quacks just before each reply appears (see QUACK_LEAD_MS).
+  // Only for replies, not his opener: browsers block sound until the
+  // learner has interacted with the page, and by a reply they've typed and
+  // sent. Rewound so quick replies each get their own quack; a blocked play
+  // is ignored.
+  function quack() {
+    const audio = quackRef.current;
+    if (!audio) return;
     audio.currentTime = 0;
     audio.play().catch(() => {});
   }
@@ -317,7 +329,10 @@ function DailyChallengeChat({
         return;
       }
 
+      // Quack first, then show the reply a moment later. Still inside the
+      // transition, so Charles's typing dots stay up until it lands.
       quack();
+      await new Promise((resolve) => setTimeout(resolve, QUACK_LEAD_MS));
       setMessages((currentMessages) => [
         ...currentMessages,
         {
