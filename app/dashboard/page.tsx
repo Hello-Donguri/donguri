@@ -31,7 +31,7 @@ async function loadDashboard() {
 
 export default async function DashboardPage() {
   const { profile, courses, badges } = await loadDashboard();
-  const { t } = await getTranslator();
+  const { t, locale } = await getTranslator();
 
   return (
     <div className="flex flex-col gap-8">
@@ -107,7 +107,7 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      <BadgeShelf earned={badges.earned} locked={badges.locked} t={t} />
+      <BadgeShelf earned={badges.earned} locked={badges.locked} t={t} locale={locale} />
 
       {profile.role === "admin" && (
         <section className="rounded-2xl border border-shu/20 bg-shu/5 p-6">

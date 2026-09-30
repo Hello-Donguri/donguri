@@ -206,6 +206,7 @@
   "badges.best_week": "最高の1週間：{{progress}} / {{target}}",
   "badges.earned": "獲得したバッジ",
   "badges.earned_of": "{{total}}個中 {{earned}}個 獲得",
+  "badges.earned_on": "{{date}} 獲得",
   "badges.goal_challenges_done": "デイリーチャレンジを{{count}}回クリアする",
   "badges.goal_in_a_day": "1日で{{goal}}",
   "badges.goal_in_a_week": "1週間で{{goal}}",

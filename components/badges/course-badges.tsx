@@ -4,8 +4,8 @@ import { useRef } from "react";
 import { Award, ChevronRight, X } from "lucide-react";
 import { BadgeTile } from "@/components/badges/badge-tile";
 import { BadgeTooltip } from "@/components/badges/badge-tooltip";
-import { useTranslations } from "@/components/i18n/locale-provider";
-import type { BadgeView } from "@/lib/badges";
+import { useLocale, useTranslations } from "@/components/i18n/locale-provider";
+import type { EarnedBadge, LockedBadge } from "@/lib/badges";
 
 // How many earned badges fit in the greeting's row before "See all".
 const MAX_IN_ROW = 5;
@@ -18,10 +18,11 @@ export function CourseBadges({
   earned,
   locked,
 }: {
-  earned: BadgeView[];
-  locked: (BadgeView & { progress: number })[];
+  earned: EarnedBadge[];
+  locked: LockedBadge[];
 }) {
   const t = useTranslations();
+  const locale = useLocale();
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   if (earned.length === 0 && locked.length === 0) return null;
@@ -107,7 +108,7 @@ export function CourseBadges({
               <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {earned.map((badge) => (
                   <li key={badge.id}>
-                    <BadgeTile badge={badge} t={t} />
+                    <BadgeTile badge={badge} awardedAt={badge.awardedAt} t={t} locale={locale} />
                   </li>
                 ))}
               </ul>
@@ -121,7 +122,7 @@ export function CourseBadges({
               <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {locked.map((badge) => (
                   <li key={badge.id}>
-                    <BadgeTile badge={badge} progress={badge.progress} t={t} />
+                    <BadgeTile badge={badge} progress={badge.progress} t={t} locale={locale} />
                   </li>
                 ))}
               </ul>

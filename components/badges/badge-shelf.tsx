@@ -1,17 +1,19 @@
 import { BadgeTile } from "@/components/badges/badge-tile";
-import type { BadgeView } from "@/lib/badges";
+import type { EarnedBadge, LockedBadge } from "@/lib/badges";
 import type { TFunction } from "@/lib/i18n/translate";
+import type { Locale } from "@/lib/i18n/config";
 
 type BadgeShelfProps = {
-  earned: BadgeView[];
-  locked: (BadgeView & { progress: number })[];
+  earned: EarnedBadge[];
+  locked: LockedBadge[];
   t: TFunction;
+  locale: Locale;
 };
 
 // The dashboard's badges, across every course: earned ones in full colour,
 // newest first, then the ones still to earn, greyed out with how close the
 // learner is. Nothing at all until an admin has made a badge.
-export function BadgeShelf({ earned, locked, t }: BadgeShelfProps) {
+export function BadgeShelf({ earned, locked, t, locale }: BadgeShelfProps) {
   if (earned.length === 0 && locked.length === 0) return null;
 
   return (
@@ -31,12 +33,12 @@ export function BadgeShelf({ earned, locked, t }: BadgeShelfProps) {
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {earned.map((badge) => (
           <li key={badge.id}>
-            <BadgeTile badge={badge} t={t} />
+            <BadgeTile badge={badge} awardedAt={badge.awardedAt} t={t} locale={locale} />
           </li>
         ))}
         {locked.map((badge) => (
           <li key={badge.id}>
-            <BadgeTile badge={badge} progress={badge.progress} t={t} />
+            <BadgeTile badge={badge} progress={badge.progress} t={t} locale={locale} />
           </li>
         ))}
       </ul>

@@ -202,7 +202,7 @@ export default async function UserProfilePage({ params }: PageProps) {
                   index % 2 === 0 ? "hover:-rotate-2" : "hover:rotate-2"
                 }`}
               >
-                <BadgeTile badge={badge} t={t} />
+                <BadgeTile badge={badge} awardedAt={badge.awardedAt} t={t} locale={locale} />
               </li>
             ))}
           </ul>

@@ -269,6 +269,58 @@ const OPENERS: FixedOpener[] = [
     english: "Hi! What's your favorite way to relax?",
     japanese: "やあ！一番好きなリラックス方法は何？",
   },
+  {
+    english: "Hey! Do you have any brothers or sisters?",
+    japanese: "ねえ！兄弟や姉妹はいる？",
+  },
+  {
+    english: "Hi! What's your favorite season?",
+    japanese: "やあ！一番好きな季節は何？",
+  },
+  {
+    english: "Hey! How do you usually get to work or school?",
+    japanese: "ねえ！仕事や学校にはいつもどうやって行ってる？",
+  },
+  {
+    english: "Hi! What do you want to eat for dinner tonight?",
+    japanese: "やあ！今夜の夕ごはんは何が食べたい？",
+  },
+  {
+    english: "Hey! Do you play any video games?",
+    japanese: "ねえ！何かゲームはしてる？",
+  },
+  {
+    english: "Hi! Have you read any good books lately?",
+    japanese: "やあ！最近何かいい本を読んだ？",
+  },
+  {
+    english: "Hey! Is there a good restaurant near your home?",
+    japanese: "ねえ！家の近くにおいしいレストランはある？",
+  },
+  {
+    english: "Hi! Are you busy today?",
+    japanese: "やあ！今日は忙しい？",
+  },
+  {
+    english: "Hey! When is your birthday?",
+    japanese: "ねえ！誕生日はいつ？",
+  },
+  {
+    english: "Hi! Do you like shopping?",
+    japanese: "やあ！買い物は好き？",
+  },
+  {
+    english: "Hey! What did you do yesterday evening?",
+    japanese: "ねえ！昨日の夜は何してた？",
+  },
+  {
+    english: "Hi! Do you like going to the beach?",
+    japanese: "やあ！海に行くのは好き？",
+  },
+  {
+    english: "Hey! What's your favorite snack?",
+    japanese: "ねえ！好きなおやつは何？",
+  },
 ];
 
 // The Cantonese course's fixed openers: colloquial written Cantonese a
@@ -282,6 +334,30 @@ const CANTONESE_OPENERS: Omit<ChallengeOpener, "glosses">[] = [
   { text: "你好！你鍾意飲咖啡定茶呀？", romanization: "nei5 hou2! nei5 zung1 ji3 jam2 gaa3 fe1 ding6 caa4 aa3?", translation: "Hi! Do you like coffee or tea?" },
   { text: "你好！你週末想做乜嘢呀？", romanization: "nei5 hou2! nei5 zau1 mut6 soeng2 zou6 mat1 je5 aa3?", translation: "Hi! What do you want to do this weekend?" },
   { text: "你好！你鍾意咩運動呀？", romanization: "nei5 hou2! nei5 zung1 ji3 me1 wan6 dung6 aa3?", translation: "Hi! What sports do you like?" },
+  { text: "早晨！你今朝食咗乜嘢早餐呀？", romanization: "zou2 san4! nei5 gam1 ziu1 sik6 zo2 mat1 je5 zou2 caan1 aa3?", translation: "Good morning! What did you have for breakfast?" },
+  { text: "你好！你尋晚瞓得好唔好呀？", romanization: "nei5 hou2! nei5 cam4 maan5 fan3 dak1 hou2 m4 hou2 aa3?", translation: "Hi! Did you sleep well last night?" },
+  { text: "你好！你而家做緊乜嘢呀？", romanization: "nei5 hou2! nei5 ji4 gaa1 zou6 gan2 mat1 je5 aa3?", translation: "Hi! What are you doing right now?" },
+  { text: "你好！你上個週末做咗乜嘢呀？", romanization: "nei5 hou2! nei5 soeng6 go3 zau1 mut6 zou6 zo2 mat1 je5 aa3?", translation: "Hi! What did you do last weekend?" },
+  { text: "你好！你鍾意聽咩音樂呀？", romanization: "nei5 hou2! nei5 zung1 ji3 teng1 me1 jam1 ngok6 aa3?", translation: "Hi! What kind of music do you like?" },
+  { text: "你好！你最近有冇睇戲呀？", romanization: "nei5 hou2! nei5 zeoi3 gan6 jau5 mou5 tai2 hei3 aa3?", translation: "Hi! Have you seen any movies lately?" },
+  { text: "你好！你下次旅行想去邊度呀？", romanization: "nei5 hou2! nei5 haa6 ci3 leoi5 hang4 soeng2 heoi3 bin1 dou6 aa3?", translation: "Hi! Where do you want to go on your next trip?" },
+  { text: "你好！你放工之後通常做乜嘢呀？", romanization: "nei5 hou2! nei5 fong3 gung1 zi1 hau6 tung1 soeng4 zou6 mat1 je5 aa3?", translation: "Hi! What do you usually do after work?" },
+  { text: "你好！你鍾唔鍾意煮嘢食呀？", romanization: "nei5 hou2! nei5 zung1 m4 zung1 ji3 zyu2 je5 sik6 aa3?", translation: "Hi! Do you like cooking?" },
+  { text: "你好！你嗰邊今日天氣點呀？", romanization: "nei5 hou2! nei5 go2 bin1 gam1 jat6 tin1 hei3 dim2 aa3?", translation: "Hi! What's the weather like where you are today?" },
+  { text: "你好！你今個星期點呀？", romanization: "nei5 hou2! nei5 gam1 go3 sing1 kei4 dim2 aa3?", translation: "Hi! How is your week going?" },
+  { text: "你好！你今日有冇開心嘅事呀？", romanization: "nei5 hou2! nei5 gam1 jat6 jau5 mou5 hoi1 sam1 ge3 si6 aa3?", translation: "Hi! Did anything make you happy today?" },
+  { text: "你好！我啱啱食咗薄餅。你晏晝食咗乜嘢呀？", romanization: "nei5 hou2! ngo5 aam1 aam1 sik6 zo2 bok6 beng2. nei5 aan3 zau3 sik6 zo2 mat1 je5 aa3?", translation: "Hi! I just had pizza. What did you have for lunch?" },
+  { text: "你好！你有冇兄弟姊妹呀？", romanization: "nei5 hou2! nei5 jau5 mou5 hing1 dai6 zi2 mui6 aa3?", translation: "Hi! Do you have any brothers or sisters?" },
+  { text: "你好！你平時點返工呀？", romanization: "nei5 hou2! nei5 ping4 si4 dim2 faan1 gung1 aa3?", translation: "Hi! How do you usually get to work?" },
+  { text: "你好！你最鍾意邊個季節呀？", romanization: "nei5 hou2! nei5 zeoi3 zung1 ji3 bin1 go3 gwai3 zit3 aa3?", translation: "Hi! What's your favorite season?" },
+  { text: "你好！你今晚想食乜嘢呀？", romanization: "nei5 hou2! nei5 gam1 maan5 soeng2 sik6 mat1 je5 aa3?", translation: "Hi! What do you want to eat tonight?" },
+  { text: "你好！你有冇玩遊戲機呀？", romanization: "nei5 hou2! nei5 jau5 mou5 waan2 jau4 hei3 gei1 aa3?", translation: "Hi! Do you play video games?" },
+  { text: "你好！你鍾唔鍾意行街呀？", romanization: "nei5 hou2! nei5 zung1 m4 zung1 ji3 haang4 gaai1 aa3?", translation: "Hi! Do you like going shopping?" },
+  { text: "你好！你最近有冇睇書呀？", romanization: "nei5 hou2! nei5 zeoi3 gan6 jau5 mou5 tai2 syu1 aa3?", translation: "Hi! Have you read any books lately?" },
+  { text: "你好！你屋企附近有冇好食嘅餐廳呀？", romanization: "nei5 hou2! nei5 uk1 kei2 fu6 gan6 jau5 mou5 hou2 sik6 ge3 caan1 teng1 aa3?", translation: "Hi! Are there any good restaurants near your home?" },
+  { text: "你好！你今日忙唔忙呀？", romanization: "nei5 hou2! nei5 gam1 jat6 mong4 m4 mong4 aa3?", translation: "Hi! Are you busy today?" },
+  { text: "你好！你生日係幾時呀？", romanization: "nei5 hou2! nei5 saang1 jat6 hai6 gei2 si4 aa3?", translation: "Hi! When is your birthday?" },
+  { text: "你好！你放假鍾意去邊度玩呀？", romanization: "nei5 hou2! nei5 fong3 gaa3 zung1 ji3 heoi3 bin1 dou6 waan2 aa3?", translation: "Hi! Where do you like to go on your days off?" },
 ];
 
 function fixedOpeners(targetLanguage: string): ChallengeOpener[] {

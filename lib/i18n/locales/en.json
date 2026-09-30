@@ -206,6 +206,7 @@
   "badges.best_week": "Best week: {{progress}} / {{target}}",
   "badges.earned": "Earned",
   "badges.earned_of": "{{earned}} of {{total}} earned",
+  "badges.earned_on": "Earned {{date}}",
   "badges.goal_challenges_done": "Complete {{count}} daily challenges",
   "badges.goal_in_a_day": "{{goal}} in a day",
   "badges.goal_in_a_week": "{{goal}} in a week",

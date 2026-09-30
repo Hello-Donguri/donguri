@@ -2,20 +2,27 @@ import { Lock } from "lucide-react";
 import { badgeGoal } from "@/lib/badge-metrics";
 import type { BadgeView } from "@/lib/badges";
 import type { TFunction } from "@/lib/i18n/translate";
+import type { Locale } from "@/lib/i18n/config";
 
-// One badge card — earned in full colour, or locked: greyed out with the
-// learner's progress (their best day or week, for a timed badge). Shared by
-// the dashboard shelf and the course page's badge modal, so takes `t`
-// rather than choosing a server or client translator itself.
+// One badge card — earned in full colour, with a hanko-style stamp of the
+// day it was earned, or locked: greyed out with the learner's progress
+// (their best day or week, for a timed badge). Shared by the dashboard
+// shelf, the course page's badge modal and profile pages, so takes `t` and
+// `locale` rather than choosing a server or client translator itself.
 export function BadgeTile({
   badge,
   progress,
+  awardedAt,
   t,
+  locale,
 }: {
   badge: BadgeView;
   // Set for a locked badge; left out for an earned one.
   progress?: number;
+  // When an earned badge was awarded.
+  awardedAt?: Date;
   t: TFunction;
+  locale: Locale;
 }) {
   const locked = progress !== undefined;
   const goal = badgeGoal(badge.metric, badge.threshold, t, badge.timescale);
@@ -27,6 +34,25 @@ export function BadgeTile({
         <img src={badge.imageUrl} alt="" className="h-20 w-20 object-contain drop-shadow" />
         <p className="mt-2 font-semibold leading-snug text-sumi">{badge.name}</p>
         <p className="mt-0.5 text-xs text-sumi-soft">{goal}</p>
+        {awardedAt && (
+          <p className="mt-auto pt-3">
+            <time
+              dateTime={awardedAt.toISOString()}
+              className="inline-block -rotate-3 rounded-md border-[3px] border-double border-shu/70 px-2 py-0.5 font-nunito text-[11px] font-extrabold tracking-wide text-shu"
+            >
+              {t("badges.earned_on", "Earned {{date}}", {
+                // UTC, like the rest of the app's days — and so the server
+                // and browser always agree on it.
+                date: new Intl.DateTimeFormat(locale, {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                  timeZone: "UTC",
+                }).format(awardedAt),
+              })}
+            </time>
+          </p>
+        )}
       </div>
     );
   }

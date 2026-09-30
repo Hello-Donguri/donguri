@@ -34,6 +34,7 @@ import { ResetProgressButton } from "@/components/vocab/reset-progress-button";
 import { ReviewQueueDevPanel } from "@/components/vocab/review-queue-dev-panel";
 import { DailyChallengeDevReset } from "@/components/vocab/daily-challenge-dev-reset";
 import ReadingRabbit from "@/components/icons/ReadingRabbit";
+import { SleepingDuck } from "@/components/icons/SleepingDuck";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -311,12 +312,17 @@ export default async function CourseHomePage({ params }: PageProps) {
         </div>
       </div>
 
-      <img
-        src="/images/charles.webp"
-        alt=""
-        aria-hidden="true"
-        className="pointer-events-none absolute bottom-2 right-20 z-0 h-[92%] select-none object-contain transition-transform duration-300 group-hover:-translate-y-1 sm:right-56"
-      />
+      {/* Charles is asleep once today's challenges are used up. */}
+      {challengesDone ? (
+        <SleepingDuck className="pointer-events-none absolute bottom-2 right-20 z-0 h-[92%] w-auto select-none sm:right-56" />
+      ) : (
+        <img
+          src="/images/charles.webp"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute bottom-2 right-20 z-0 h-[92%] select-none object-contain transition-transform duration-300 group-hover:-translate-y-1 sm:right-56"
+        />
+      )}
 
       {!challengesDone && (
         <div className="absolute right-5 top-1/2 z-20 -translate-y-1/2">
