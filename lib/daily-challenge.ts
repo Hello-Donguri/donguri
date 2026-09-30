@@ -157,6 +157,8 @@ export const JAPANESE_FEEDBACK_RULE = `Every "...Ja" field is the same content w
 export type DailyChallengeResult = {
   id: string;
   xpEarned: number;
+  // Skipped as too hard: no message, scores or XP.
+  skipped: boolean;
   targetTerms: string[];
   // targetTerms with each one's Japanese from the course, looked up when
   // read; null if the word has since been renamed or removed.

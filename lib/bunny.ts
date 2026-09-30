@@ -35,6 +35,10 @@ export function buildDeckCoverImageKey(mime: string): string {
   return buildImageKey("decks", mime);
 }
 
+export function buildBadgeImageKey(mime: string): string {
+  return buildImageKey("badges", mime);
+}
+
 export async function uploadImage(file: File, key: string): Promise<void> {
   const endpoint =
     process.env.BUNNY_STORAGE_ENDPOINT || "https://storage.bunnycdn.com";

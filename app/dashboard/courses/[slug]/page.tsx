@@ -23,6 +23,9 @@ import { ActivityOverviewCard } from "@/components/vocab/activity-overview-card"
 import { Greeting } from "@/components/dashboard/greeting";
 import { LeaderboardTabs } from "@/components/leaderboard/leaderboard-tabs";
 import { DeckCompleteCelebration } from "@/components/vocab/deck-complete-celebration";
+import { BadgeCelebration } from "@/components/badges/badge-celebration";
+import { CourseBadges } from "@/components/badges/course-badges";
+import { badgeShelf, startOfBadgeWeek } from "@/lib/badges";
 import {
   BrowseDecksTrigger,
   FindDeckModal,
@@ -78,7 +81,12 @@ async function loadCourseHome(slug: string) {
   ]);
 
   const isAdmin = profile.role === "admin";
-  const reviewQueueDebug = isAdmin ? await getReviewQueueDebug(slug) : null;
+  const [reviewQueueDebug, badges] = await Promise.all([
+    isAdmin ? getReviewQueueDebug(slug) : null,
+    // This course's badges plus the every-course ones.
+    badgeShelf(profile.id, course.id),
+  ]);
+  const badgeWeekStart = startOfBadgeWeek();
 
   return {
     course,
@@ -96,6 +104,8 @@ async function loadCourseHome(slug: string) {
     enrolledCourseCount,
     isAdmin,
     reviewQueueDebug,
+    badges,
+    weeklyBadges: badges.earned.filter((badge) => badge.awardedAt >= badgeWeekStart),
   };
 }
 
@@ -118,6 +128,8 @@ export default async function CourseHomePage({ params }: PageProps) {
       enrolledCourseCount,
       isAdmin,
       reviewQueueDebug,
+      badges,
+      weeklyBadges,
     },
     { t },
   ] = await Promise.all([loadCourseHome(slug), getTranslator()]);
@@ -318,6 +330,9 @@ export default async function CourseHomePage({ params }: PageProps) {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
       <DeckCompleteCelebration slug={slug} decks={decks} />
+      {/* After the deck card in the DOM, so a badge earned alongside a
+          finished deck is celebrated first, on top. */}
+      <BadgeCelebration />
 
       <main className="flex min-w-0 flex-col gap-6 sm:gap-8">
         <div>
@@ -331,16 +346,14 @@ export default async function CourseHomePage({ params }: PageProps) {
               ]}
             />
           )}
-          <Greeting firstName={profile.first_name ?? profile.email} />
+          <Greeting firstName={profile.first_name ?? profile.email}>
+            <CourseBadges earned={badges.earned} locked={badges.locked} />
+          </Greeting>
 
+          {/* Dev mode's automatic reset — draws nothing. The manual reset is
+              in the header's Admin menu. */}
           {isAdmin && (
-            <div className="mt-4">
-              <DailyChallengeDevReset
-                courseSlug={slug}
-                attemptsToday={challengeStatus.attemptsToday}
-                maxAttemptsPerDay={challengeStatus.maxAttemptsPerDay}
-              />
-            </div>
+            <DailyChallengeDevReset courseSlug={slug} attemptsToday={challengeStatus.attemptsToday} />
           )}
 
           {isAdmin && reviewQueueDebug && (
@@ -417,6 +430,8 @@ export default async function CourseHomePage({ params }: PageProps) {
           longestStreak={longestStreak}
           activeToday={activeToday}
           weeklyStats={weeklyStats}
+          weeklyBadges={weeklyBadges}
+          hasBadges={badges.earned.length + badges.locked.length > 0}
         />
       </main>
 

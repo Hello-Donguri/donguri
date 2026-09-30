@@ -205,11 +205,22 @@ export async function DailyChallengeSummary({
                         : "bg-washi-soft text-sumi-soft",
                     )}
                   >
-                    {t("daily_challenge.xp_gain", "+{{xp}} XP", {
-                      xp: result.xpEarned,
-                    })}
+                    {result.skipped
+                      ? t("daily_challenge.skipped", "Skipped")
+                      : t("daily_challenge.xp_gain", "+{{xp}} XP", {
+                          xp: result.xpEarned,
+                        })}
                   </span>
                 </div>
+
+                {result.skipped && (
+                  <p className="rounded-2xl bg-washi-soft px-4 py-3 text-sm text-sumi-soft">
+                    {t(
+                      "daily_challenge.skipped_note",
+                      "You skipped this one — it can come up again another day.",
+                    )}
+                  </p>
+                )}
 
                 {result.message && (
                   <div className="flex flex-col">

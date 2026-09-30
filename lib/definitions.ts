@@ -1,5 +1,11 @@
 import * as z from "zod";
 import type { AccessoryId } from "@/lib/levels";
+import {
+  BADGE_METRICS,
+  BADGE_TIMESCALES,
+  metricAllowsCourse,
+  metricAllowsTimescale,
+} from "@/lib/badge-metrics";
 
 export const LoginFormSchema = z.object({
   email: z.email({ error: "Please enter a valid email." }).trim(),
@@ -621,6 +627,80 @@ const WordCategoryFieldsSchema = {
 };
 
 export const CreateWordCategoryFormSchema = z.object(WordCategoryFieldsSchema);
+
+// Badges (see lib/badges.ts). The metric is fixed once a badge exists — it
+// decides who was skipped at creation — so only the create form has it,
+// and the "give to existing users" choice.
+const BadgeFieldsSchema = {
+  name: z
+    .string()
+    .trim()
+    .min(1, { error: "Give the badge a name." })
+    .max(40, { error: "Keep it under 40 characters." }),
+  threshold: z.coerce
+    .number({ error: "Enter a number." })
+    .int({ error: "Use a whole number." })
+    .min(1, { error: "At least 1." })
+    .max(1_000_000, { error: "That's too high." }),
+};
+
+export const CreateBadgeFormSchema = z
+  .object({
+    ...BadgeFieldsSchema,
+    metric: z.enum(BADGE_METRICS, { error: "Pick a milestone." }),
+    // Empty means every course / all time.
+    courseId: z.union([z.uuid(), z.literal("")]).transform((value) => value || null),
+    timescale: z
+      .union([z.enum(BADGE_TIMESCALES), z.literal("")])
+      .transform((value) => value || null),
+    image: z
+      .file({ error: "Choose an image." })
+      .max(MAX_IMAGE_BYTES, { error: "Image must be under 5MB." })
+      .mime(["image/webp", "image/png", "image/jpeg"], {
+        error: "Use a WebP, PNG, or JPEG image.",
+      }),
+    awardExisting: z.boolean(),
+  })
+  .superRefine((badge, context) => {
+    if (badge.courseId && !metricAllowsCourse(badge.metric)) {
+      context.addIssue({
+        code: "custom",
+        path: ["courseId"],
+        message: "XP isn't tracked per course, so XP badges are for all courses.",
+      });
+    }
+    if (badge.timescale && !metricAllowsTimescale(badge.metric)) {
+      context.addIssue({
+        code: "custom",
+        path: ["timescale"],
+        message:
+          badge.metric === "streak_days"
+            ? "A streak is already about days, so it can't have a timescale."
+            : "When a word was mastered isn't recorded, so this can't have a timescale.",
+      });
+    }
+  });
+
+export const UpdateBadgeFormSchema = z.object({
+  badgeId: z.uuid({ error: "Missing badge." }),
+  ...BadgeFieldsSchema,
+  image: IMAGE_FIELD_SCHEMA,
+});
+
+export type BadgeFormState =
+  | {
+      errors?: {
+        name?: string[];
+        threshold?: string[];
+        metric?: string[];
+        courseId?: string[];
+        timescale?: string[];
+        image?: string[];
+      };
+      message?: string;
+      success?: boolean;
+    }
+  | undefined;
 
 export type CreateWordCategoryFormState =
   | {

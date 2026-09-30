@@ -821,26 +821,74 @@ function revalidateChallengePaths(courseSlug: string) {
   revalidatePath("/dashboard", "layout");
 }
 
-// Dev-mode tool (admin only): deletes the caller's attempts for today in
-// this course so the daily cap stops getting in the way while testing, and
-// takes back the XP they earned — with a negative xp_events row, so weekly
-// totals stay in step with `profiles.xp`. Re-guarded here, not just hidden
-// in the UI, since server actions are callable directly.
+// "Too hard? Skip it": uses up the learner's current attempt without
+// playing it, so the page moves on to the day's next challenge (or the
+// end-of-day summary after the last). Saved as a skipped attempt — no XP,
+// no scores — with its target, so pickChallengeTarget doesn't hand the same
+// one back today; skipped attempts don't count as doing a challenge (see
+// section 42 of supabase/schema.sql). The target is re-derived here, never
+// taken from the client.
+export async function skipDailyChallenge(courseSlug: string): Promise<{ ok: boolean }> {
+  const user = await requireSubscriber();
+
+  const enrollment = await prisma.courseEnrollment.findFirst({
+    where: { userId: user.id, course: { slug: courseSlug, active: true } },
+    select: { courseId: true },
+  });
+  if (!enrollment) return { ok: false };
+
+  const today = startOfUTCDay(new Date());
+  const attemptsToday = await prisma.dailyChallengeAttempt.count({
+    where: { userId: user.id, courseId: enrollment.courseId, challengeDate: today },
+  });
+  if (attemptsToday >= MAX_DAILY_CHALLENGE_ATTEMPTS) return { ok: false };
+
+  const target = await pickChallengeTarget(user.id, enrollment.courseId, today, attemptsToday);
+  if (!target) return { ok: false };
+
+  await prisma.dailyChallengeAttempt.create({
+    data: {
+      userId: user.id,
+      courseId: enrollment.courseId,
+      challengeDate: today,
+      skipped: true,
+      xpEarned: 0,
+      targetTerms: [target.vocab?.term, target.grammar?.term].filter(
+        (term): term is string => term !== undefined,
+      ),
+    },
+  });
+
+  revalidateChallengePaths(courseSlug);
+  return { ok: true };
+}
+
+// Admin tool (the Admin menu's "Reset daily challenges", and dev mode's
+// automatic reset): deletes the caller's attempts for today — in one
+// course, or every course when `courseSlug` is null — so the daily cap
+// stops getting in the way while testing, and takes back the XP they
+// earned, with a negative xp_events row so weekly totals stay in step with
+// `profiles.xp`. Re-guarded here, not just hidden in the UI, since server
+// actions are callable directly.
 export async function resetDailyChallengeToday(
-  courseSlug: string,
+  courseSlug: string | null,
 ): Promise<{ ok: boolean }> {
   const profile = await requireProfile();
   if (profile.role !== "admin") return { ok: false };
 
-  const course = await prisma.course.findFirst({
-    where: { slug: courseSlug },
-    select: { id: true },
-  });
-  if (!course) return { ok: false };
+  let courseId: string | undefined;
+  if (courseSlug) {
+    const course = await prisma.course.findFirst({
+      where: { slug: courseSlug },
+      select: { id: true },
+    });
+    if (!course) return { ok: false };
+    courseId = course.id;
+  }
 
   const where = {
     userId: profile.id,
-    courseId: course.id,
+    ...(courseId ? { courseId } : {}),
     challengeDate: startOfUTCDay(new Date()),
   };
   try {
@@ -869,6 +917,7 @@ export async function resetDailyChallengeToday(
     return { ok: false };
   }
 
-  revalidateChallengePaths(courseSlug);
+  if (courseSlug) revalidateChallengePaths(courseSlug);
+  else revalidatePath("/dashboard", "layout");
   return { ok: true };
 }

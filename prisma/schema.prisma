@@ -41,6 +41,7 @@ model Profile {
   xpEvents               XpEvent[]
   reviewEvents           ReviewEvent[]
   subscription           Subscription?
+  badges                 UserBadge[]
 
   @@map("profiles")
 }
@@ -75,6 +76,7 @@ model Course {
   enrollments            CourseEnrollment[]
   languageDecks          LanguageDeck[]
   dailyChallengeAttempts DailyChallengeAttempt[]
+  badges                 Badge[]
 
   @@map("courses")
 }
@@ -331,6 +333,9 @@ model DailyChallengeAttempt {
   // { overall, tips, betterVersion } — see ChallengeSummary in
   // lib/actions/daily-challenge.ts.
   summary          Json?
+  // Skipped as too hard: uses up the attempt, but earns nothing and isn't
+  // counted as doing a challenge (see section 42 of supabase/schema.sql).
+  skipped          Boolean  @default(false)
   course           Course   @relation(fields: [courseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   profile          Profile  @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
@@ -389,4 +394,47 @@ model Subscription {
   profile              Profile   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@map("subscriptions")
+}
+
+// An admin-made badge a learner earns by reaching a milestone — `metric` ≥
+// `threshold` (see BADGE_METRICS in lib/badge-metrics.ts and lib/badges.ts).
+// `awardExisting` is set once, at creation: true gives it to everyone who
+// already qualifies, false records them as skipped (see UserBadge).
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model Badge {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String
+  imageKey      String      @map("image_key")
+  metric        String
+  threshold     Int
+  active        Boolean     @default(true)
+  awardExisting Boolean     @default(false) @map("award_existing")
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  // Null: every course. See section 41 of supabase/schema.sql.
+  courseId      String?     @map("course_id") @db.Uuid
+  // Null: all time; "day" or "week": within one UTC day / week.
+  timescale     String?
+  course        Course?     @relation(fields: [courseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  userBadges    UserBadge[]
+
+  @@index([courseId], map: "badges_course_id_idx")
+  @@map("badges")
+}
+
+// One learner's badge: `status` "awarded", or "skipped" when they already
+// qualified as a badge was made without `awardExisting` (they never get
+// it). `seenAt` is set once its celebration has been shown.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model UserBadge {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  badgeId   String    @map("badge_id") @db.Uuid
+  status    String    @default("awarded")
+  awardedAt DateTime  @default(now()) @map("awarded_at") @db.Timestamptz(6)
+  seenAt    DateTime? @map("seen_at") @db.Timestamptz(6)
+  badge     Badge     @relation(fields: [badgeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  profile   Profile   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([userId, badgeId], map: "user_badges_user_badge_key")
+  @@map("user_badges")
 }

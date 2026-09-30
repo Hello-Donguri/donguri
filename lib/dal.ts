@@ -942,11 +942,13 @@ export const getDailyActivityCounts = cache(
         },
         select: { createdAt: true, wordId: true },
       }),
+      // Skipped attempts aren't a challenge done.
       prisma.dailyChallengeAttempt.findMany({
         where: {
           userId: user.id,
           courseId: course.id,
           challengeDate: { gte: rangeStart, lt: rangeEndExclusive },
+          skipped: false,
         },
         select: { challengeDate: true },
       }),
@@ -1057,8 +1059,9 @@ async function courseActiveDays(userId: string, courseId: string): Promise<Set<s
       where: { userId, word: inCourse },
       select: { createdAt: true },
     }),
+    // A skipped challenge doesn't keep a streak alive.
     prisma.dailyChallengeAttempt.findMany({
-      where: { userId, courseId },
+      where: { userId, courseId, skipped: false },
       select: { challengeDate: true },
     }),
   ]);
@@ -1106,6 +1109,28 @@ export const getCourseStreaks = cache(async (): Promise<Record<string, number>> 
   return Object.fromEntries(entries);
 });
 
+// A user's longest-ever run of active days — in one course when `courseId`
+// is given, else the best of any course. What a streak badge measures (see
+// lib/badges.ts). The longest rather than the current run, so a 14-day
+// streak that's since lapsed still counts. Takes a user id, since badges
+// given to existing users are worked out for everyone at once.
+export async function longestStreakForUser(
+  userId: string,
+  courseId: string | null = null,
+): Promise<number> {
+  const enrollments = await prisma.courseEnrollment.findMany({
+    where: { userId, ...(courseId ? { courseId } : {}) },
+    select: { courseId: true },
+  });
+  const streaks = await Promise.all(
+    enrollments.map(
+      async ({ courseId }) =>
+        computeStreakFromActiveDays(await courseActiveDays(userId, courseId)).longestStreak,
+    ),
+  );
+  return Math.max(0, ...streaks);
+}
+
 // How many of today's (UTC) 3 daily-challenge attempts this user has used up
 // for this course — see sendDailyChallengeMessage in
 // lib/actions/daily-challenge.ts, which enforces the same cap on write.
@@ -1125,8 +1150,8 @@ export const getDailyChallengeStatus = cache(
   },
 );
 
-// Today's (UTC) finished attempts in this course, oldest first — what the
-// end-of-day summary on the daily-challenge page reviews.
+// Today's (UTC) finished or skipped attempts in this course, oldest first
+// — what the end-of-day summary on the daily-challenge page reviews.
 export const getDailyChallengeResults = cache(
   async (courseSlug: string): Promise<DailyChallengeResult[]> => {
     const { user, course } = await requireEnrolledCourse(courseSlug);
@@ -1141,6 +1166,7 @@ export const getDailyChallengeResults = cache(
       select: {
         id: true,
         xpEarned: true,
+        skipped: true,
         targetTerms: true,
         message: true,
         grammarScore: true,

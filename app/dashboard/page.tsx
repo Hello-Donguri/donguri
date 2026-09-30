@@ -5,6 +5,9 @@ import { getEnrolledCourses, requireProfile } from "@/lib/dal";
 import { Button } from "@/components/ui/button";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
 import { getTranslator } from "@/lib/i18n/server";
+import { badgeShelf } from "@/lib/badges";
+import { BadgeCelebration } from "@/components/badges/badge-celebration";
+import { BadgeShelf } from "@/components/badges/badge-shelf";
 
 export const metadata: Metadata = {
   title: "Dashboard — Donguri",
@@ -21,16 +24,19 @@ async function loadDashboard() {
     requireProfile(),
     getEnrolledCourses(),
   ]);
+  const badges = await badgeShelf(profile.id);
 
-  return { profile, courses };
+  return { profile, courses, badges };
 }
 
 export default async function DashboardPage() {
-  const { profile, courses } = await loadDashboard();
+  const { profile, courses, badges } = await loadDashboard();
   const { t } = await getTranslator();
 
   return (
     <div className="flex flex-col gap-8">
+      {/* Awards anything newly reached and celebrates it (see claimBadges). */}
+      <BadgeCelebration />
       <div>
         <PageTitle>
           {t("dashboard_home.welcome_back", "Welcome back, {{name}}", {
@@ -100,6 +106,8 @@ export default async function DashboardPage() {
           </div>
         )}
       </div>
+
+      <BadgeShelf earned={badges.earned} locked={badges.locked} t={t} />
 
       {profile.role === "admin" && (
         <section className="rounded-2xl border border-shu/20 bg-shu/5 p-6">

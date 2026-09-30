@@ -6,6 +6,9 @@ type SelectFieldProps = {
   defaultValue?: string;
   placeholder?: string;
   errors?: string[];
+  // A disabled select isn't submitted, so its field reads as empty.
+  disabled?: boolean;
+  hint?: string;
 };
 
 export function SelectField({
@@ -16,6 +19,8 @@ export function SelectField({
   defaultValue = "",
   placeholder = "Select…",
   errors,
+  disabled = false,
+  hint,
 }: SelectFieldProps) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -28,7 +33,8 @@ export function SelectField({
         required={required}
         aria-invalid={errors && errors.length > 0}
         defaultValue={defaultValue}
-        className="rounded-lg border border-sumi/15 bg-washi px-4 py-2.5 text-sumi outline-none transition focus:border-ai focus:ring-2 focus:ring-ai-soft"
+        disabled={disabled}
+        className="rounded-lg border border-sumi/15 bg-washi px-4 py-2.5 text-sumi outline-none transition focus:border-ai focus:ring-2 focus:ring-ai-soft disabled:cursor-not-allowed disabled:opacity-60"
       >
         <option value="" disabled={required}>
           {placeholder}
@@ -39,6 +45,7 @@ export function SelectField({
           </option>
         ))}
       </select>
+      {hint && <p className="text-xs text-sumi-soft">{hint}</p>}
       {errors?.map((error) => (
         <p key={error} className="text-sm text-shu">
           {error}

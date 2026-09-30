@@ -4,13 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bug, ChevronDown, CreditCard, Flame, GraduationCap, LogOut, Menu, Settings, User, Users, X } from "lucide-react";
+import { Award, Bug, ChevronDown, RotateCcw, CreditCard, Flame, GraduationCap, LogOut, Menu, Settings, User, Users, X } from "lucide-react";
 import { DonguriAvatar } from "@/components/icons/DonguriAvatar";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { useDevMode } from "@/components/dashboard/dev-mode-context";
 import { logout } from "@/lib/actions/auth";
+import { resetDailyChallengeToday } from "@/lib/actions/daily-challenge";
 import { levelForXp, xpRangeForLevel, type AccessoryId } from "@/lib/levels";
 import type { UserRole } from "@/lib/definitions";
 import { cn } from "@/lib/utils";
@@ -164,14 +165,29 @@ function AdminMenu({ role, className }: { role: UserRole; className?: string }) 
   const { enabled: devModeEnabled, toggle: toggleDevMode } = useDevMode();
   const [open, setOpen] = useState(false);
   const ref = useDismissableMenu(open, () => setOpen(false));
+  // The course in the URL, if any: the reset below clears just that one,
+  // or every course from anywhere else.
+  const courseSlug = /^\/dashboard\/courses\/([^/]+)/.exec(usePathname())?.[1] ?? null;
+  const [resetStatus, setResetStatus] = useState<"idle" | "resetting" | "done" | "failed">("idle");
 
   if (role !== "admin") return null;
+
+  const resetChallenges = () => {
+    if (resetStatus === "resetting") return;
+    setResetStatus("resetting");
+    resetDailyChallengeToday(courseSlug)
+      .then((result) => setResetStatus(result.ok ? "done" : "failed"))
+      .catch(() => setResetStatus("failed"));
+  };
 
   return (
     <div ref={ref} className={cn("relative", className)}>
       <button
         type="button"
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          setOpen((current) => !current);
+          setResetStatus("idle");
+        }}
         aria-haspopup="menu"
         aria-expanded={open}
         // Light mode: cream on the sage header, like the other header chips
@@ -208,6 +224,42 @@ function AdminMenu({ role, className }: { role: UserRole; className?: string }) 
               <Users className="h-4 w-4 text-sumi-soft" aria-hidden="true" />
               {t("dashboard_home.user_management", "User management")}
             </Link>
+            <Link
+              href="/dashboard/admin/badges"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-sumi transition hover:bg-sumi/5"
+            >
+              <Award className="h-4 w-4 text-sumi-soft" aria-hidden="true" />
+              {t("admin_badges.title", "Badges")}
+            </Link>
+
+            <div className="my-1 border-t border-card-border" />
+
+            {/* Clears your own attempts for today (and the XP they earned),
+                so testing isn't capped at three a day. */}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={resetChallenges}
+              disabled={resetStatus === "resetting"}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-sumi transition hover:bg-sumi/5 disabled:opacity-60"
+            >
+              <RotateCcw className="h-4 w-4 shrink-0 text-sumi-soft" aria-hidden="true" />
+              <span className="flex min-w-0 flex-col">
+                {t("admin_menu.reset_challenges", "Reset daily challenges")}
+                <span className="text-xs font-normal text-sumi-soft">
+                  {resetStatus === "resetting"
+                    ? t("daily_challenge.dev_resetting", "Resetting…")
+                    : resetStatus === "done"
+                      ? t("admin_menu.reset_done", "Reset — today's attempts cleared.")
+                      : resetStatus === "failed"
+                        ? t("admin_menu.reset_failed", "Reset failed — check the server log.")
+                        : courseSlug
+                          ? t("admin_menu.reset_this_course", "Today's attempts in this course")
+                          : t("admin_menu.reset_all_courses", "Today's attempts in all courses")}
+                </span>
+              </span>
+            </button>
 
             <div className="my-1 border-t border-card-border" />
 

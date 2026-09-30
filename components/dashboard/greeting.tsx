@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 function pickGreeting() {
   const hour = new Date().getHours();
@@ -28,7 +28,8 @@ const inspirationOptions = [
   "君はすごい！",
 ];
 
-export const Greeting = ({ firstName }: { firstName: string }) => {
+// `children` sits under the greeting — the course page's badge row.
+export const Greeting = ({ firstName, children }: { firstName: string; children?: ReactNode }) => {
   const [greeting] = useState(pickGreeting);
 
   const [randomInspiration] = useState(
@@ -51,6 +52,8 @@ export const Greeting = ({ firstName }: { firstName: string }) => {
         <p className="mt-3 text-base font-bold sm:text-lg text-sumi-soft">
           {randomInspiration}
         </p>
+
+        {children}
       </div>
 
       <div className="flex min-w-0 justify-center sm:justify-end">

@@ -1636,3 +1636,94 @@ drop trigger if exists prevent_username_self_update on public.profiles;
 create trigger prevent_username_self_update
   before update on public.profiles
   for each row execute function public.prevent_username_self_update();
+
+-- 40. Badges -------------------------------------------------------------------------
+-- Admin-made badges a learner earns by reaching a milestone (see
+-- lib/badges.ts): an image, a name, and a metric + threshold — e.g.
+-- words_learnt ≥ 100, or streak_days ≥ 14. Awarded when the learner next
+-- lands on the dashboard or a course page after a session, and celebrated
+-- there once (`user_badges.seen_at`).
+--
+-- `award_existing` is the admin's choice at creation: true gives the badge
+-- to everyone who already qualifies; false records those users as
+-- 'skipped' in user_badges, so only learners who reach it afterwards earn
+-- it. Writes all go through the server (Prisma, which bypasses RLS).
+
+create table if not exists public.badges (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  image_key text not null,
+  metric text not null,
+  threshold integer not null,
+  active boolean not null default true,
+  award_existing boolean not null default false,
+  created_at timestamptz not null default now(),
+  constraint badges_metric_check check (
+    metric in ('xp', 'words_learnt', 'words_mastered', 'streak_days', 'reviews_done', 'challenges_done')
+  ),
+  constraint badges_threshold_check check (threshold > 0)
+);
+
+create table if not exists public.user_badges (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  badge_id uuid not null references public.badges (id) on delete cascade,
+  -- 'awarded', or 'skipped' for users who already qualified when the badge
+  -- was made without award_existing — they never get it.
+  status text not null default 'awarded',
+  awarded_at timestamptz not null default now(),
+  -- When its celebration was shown; null until then.
+  seen_at timestamptz,
+  constraint user_badges_status_check check (status in ('awarded', 'skipped')),
+  constraint user_badges_user_badge_key unique (user_id, badge_id)
+);
+
+alter table public.badges enable row level security;
+alter table public.user_badges enable row level security;
+
+drop policy if exists "Signed-in users can view badges" on public.badges;
+create policy "Signed-in users can view badges"
+  on public.badges for select
+  to authenticated
+  using (true);
+
+drop policy if exists "Users can view own badges" on public.user_badges;
+create policy "Users can view own badges"
+  on public.user_badges for select
+  using (auth.uid() = user_id);
+
+-- 41. Course badges and timescales ---------------------------------------------------
+-- `course_id`: a badge for one course only counts activity in that course,
+-- and shows on that course's page; null means every course (and XP, which
+-- isn't recorded per course, is only offered for those).
+-- `timescale`: null counts all time; 'day' or 'week' means reaching the
+-- target within one UTC day or one Monday-to-Sunday UTC week — e.g. "learn
+-- 10 words in a day". Not offered for streaks, which are already about
+-- days, or for mastered words, since when a word was mastered isn't kept.
+-- Both are chosen when the badge is made and fixed after.
+
+alter table public.badges
+  add column if not exists course_id uuid references public.courses (id) on delete cascade,
+  add column if not exists timescale text;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'badges_timescale_check') then
+    alter table public.badges
+      add constraint badges_timescale_check check (timescale in ('day', 'week'));
+  end if;
+end;
+$$;
+
+create index if not exists badges_course_id_idx on public.badges (course_id);
+
+-- 42. Skipped daily challenges -----------------------------------------------------
+-- A learner can skip a challenge that's too hard (see skipDailyChallenge in
+-- lib/actions/daily-challenge.ts). It still uses up that attempt — so the
+-- next one is the day's next challenge, and its target isn't picked again
+-- that day — but earns nothing and isn't counted as doing a challenge:
+-- streaks, the activity chart, "challenges completed" badges and the
+-- end-of-day review all leave skipped attempts out.
+
+alter table public.daily_challenge_attempts
+  add column if not exists skipped boolean not null default false;

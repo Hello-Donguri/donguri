@@ -1,6 +1,8 @@
 type FileFieldProps = {
   label: string;
   name: string;
+  // Defaults to `name`; pass one when several fields share a name on a page.
+  id?: string;
   accept?: string;
   required?: boolean;
   errors?: string[];
@@ -10,6 +12,7 @@ type FileFieldProps = {
 export function FileField({
   label,
   name,
+  id = name,
   accept,
   required = false,
   errors,
@@ -17,11 +20,11 @@ export function FileField({
 }: FileFieldProps) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={name} className="text-sm font-medium text-sumi-soft">
+      <label htmlFor={id} className="text-sm font-medium text-sumi-soft">
         {label}
       </label>
       <input
-        id={name}
+        id={id}
         name={name}
         type="file"
         accept={accept}

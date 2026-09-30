@@ -1,10 +1,12 @@
-import { BookOpen, Flame, Sparkles, Target } from "lucide-react";
+import { Award, BookOpen, Flame, Sparkles, Target } from "lucide-react";
 import type { DailyActivityCount, WeeklyStats } from "@/lib/definitions";
 import { getTranslator } from "@/lib/i18n/server";
 import { StreakChart } from "@/components/vocab/streak-chart";
+import type { BadgeView } from "@/lib/badges";
 
 // The course home page's activity card: "Your progress this week" (words
-// learnt, accuracy, XP earned, streak — a 2x2 grid) beside the day-by-day
+// learnt, accuracy, XP earned, streak — a 2x2 grid — then the badges earned
+// this week, once badges exist) beside the day-by-day
 // activity chart. Level/total XP live in the header instead (see
 // HeaderStats in components/dashboard/header-actions.tsx).
 export async function ActivityOverviewCard({
@@ -13,12 +15,19 @@ export async function ActivityOverviewCard({
   longestStreak,
   activeToday,
   weeklyStats,
+  weeklyBadges,
+  hasBadges,
 }: {
   dailyActivity: DailyActivityCount[];
   currentStreak: number;
   longestStreak: number;
   activeToday: boolean;
   weeklyStats: WeeklyStats;
+  // Badges earned in the same trailing week, newest first.
+  weeklyBadges: BadgeView[];
+  // Whether this course has any badges to earn at all — the strip is left
+  // out until it does.
+  hasBadges: boolean;
 }) {
   const { t } = await getTranslator();
 
@@ -70,6 +79,38 @@ export async function ActivityOverviewCard({
           activeToday={activeToday}
         />
       </div>
+
+      {/* Across the whole card, under the stats and the chart alike: just
+          the badge images, named on hover and for screen readers. */}
+      {hasBadges && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-card-border bg-acorn-soft/50 px-6 py-3 dark:bg-kin/10">
+          <p className="flex shrink-0 items-center gap-2 text-xs font-semibold uppercase tracking-wide text-acorn dark:text-sumi-soft">
+            <Award aria-hidden className="h-4 w-4" />
+            {t("weekly_stats.badges", "Badges this week")}
+          </p>
+          {weeklyBadges.length > 0 ? (
+            <ul className="flex flex-wrap items-center gap-2">
+              {weeklyBadges.map((badge) => (
+                <li key={badge.id} title={badge.name}>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- an admin-uploaded bunny.net image. */}
+                  <img
+                    src={badge.imageUrl}
+                    alt={badge.name}
+                    className="h-10 w-10 object-contain transition hover:-translate-y-0.5"
+                  />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-sumi-soft">
+              {t(
+                "weekly_stats.no_badges",
+                "None yet this week — keep going and you'll earn one.",
+              )}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

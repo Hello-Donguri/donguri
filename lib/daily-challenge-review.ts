@@ -110,15 +110,17 @@ export async function getDailyChallengeReview(
   results: DailyChallengeResult[],
   targetLanguage: string,
 ): Promise<DailyChallengeReview | null> {
+  // Skipped attempts have nothing to look back on.
+  const attempted = results.filter((result) => !result.skipped);
   if (
     !process.env.OPENAI_API_KEY ||
-    results.every((result) => result.message === null)
+    attempted.every((result) => result.message === null)
   ) {
     return null;
   }
 
   try {
-    return await generateReview(results, targetLanguage);
+    return await generateReview(attempted, targetLanguage);
   } catch (error) {
     console.error("Daily challenge review generation failed:", error);
     return null;

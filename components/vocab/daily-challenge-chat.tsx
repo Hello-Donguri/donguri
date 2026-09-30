@@ -14,6 +14,7 @@ import {
 import { useRouter } from "next/navigation";
 import {
   sendDailyChallengeMessage,
+  skipDailyChallenge,
   type ChallengeCompletion,
   type ChatReply,
   type ChatTurn,
@@ -187,6 +188,7 @@ function DailyChallengeChat({
     () => new Set(),
   );
   const [isReplying, startReply] = useTransition();
+  const [isSkipping, startSkip] = useTransition();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const feedbackRef = useRef<HTMLElement>(null);
@@ -353,6 +355,29 @@ function DailyChallengeChat({
     });
   }
 
+  // "Too hard? Skip": uses up this attempt without XP and moves on to the
+  // day's next challenge — or the end-of-day summary after the last. The
+  // page re-renders with the next attempt (see skipDailyChallenge).
+  function handleSkip() {
+    const confirmed = confirm(
+      t(
+        "daily_challenge.skip_confirm",
+        "Skip this challenge? It uses up one of today's attempts and earns no XP.",
+      ),
+    );
+    if (!confirmed) return;
+
+    setError(null);
+    startSkip(async () => {
+      const result = await skipDailyChallenge(courseSlug).catch(() => ({ ok: false }));
+      if (!result.ok) {
+        setError(t("daily_challenge.skip_failed", "Couldn't skip this challenge. Please try again."));
+        return;
+      }
+      onAdvance();
+    });
+  }
+
   function toggleTranslation(id: number) {
     setTranslatedIds((current) => {
       const next = new Set(current);
@@ -497,6 +522,8 @@ function DailyChallengeChat({
               target={target}
               isComplete={isComplete}
               used={latestTargets}
+              onSkip={handleSkip}
+              skipDisabled={isCharlesTyping || isSkipping || isAdvancing}
             />
 
             <MotionConfig reducedMotion="user">
@@ -867,11 +894,16 @@ function TargetBanner({
   target,
   isComplete,
   used,
+  onSkip,
+  skipDisabled,
 }: {
   target: ChallengeTarget;
   isComplete: boolean;
   // Word + grammar chats: which of the two are done so far.
   used: { vocab: boolean; grammar: boolean } | null;
+  // "Too hard? Skip" — moves on to the day's next challenge.
+  onSkip: () => void;
+  skipDisabled: boolean;
 }) {
   const t = useTranslations();
   const items = [
@@ -959,6 +991,16 @@ function TargetBanner({
           ))}
         </ul>
       </div>
+      {!isComplete && (
+        <button
+          type="button"
+          onClick={onSkip}
+          disabled={skipDisabled}
+          className="shrink-0 self-center rounded-full border border-matcha/30 bg-washi/80 px-3 py-1.5 text-xs font-semibold text-matcha-dark shadow-sm transition hover:bg-washi disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {t("daily_challenge.skip", "Too hard? Skip")}
+        </button>
+      )}
     </div>
   );
 }

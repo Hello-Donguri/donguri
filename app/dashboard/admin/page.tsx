@@ -66,6 +66,18 @@ export default async function AdminHubPage() {
             )}
           </p>
         </Link>
+        <Link
+          href="/dashboard/admin/badges"
+          className="rounded-2xl border border-card-border bg-washi-soft p-6 transition hover:border-ai/40"
+        >
+          <h2 className="font-semibold text-sumi">{t("admin_hub.badges_title", "Manage badges")}</h2>
+          <p className="mt-1 text-sm text-sumi-soft">
+            {t(
+              "admin_hub.badges_subtitle",
+              "Create badges learners earn for milestones like words learnt or a long streak.",
+            )}
+          </p>
+        </Link>
       </div>
     </div>
   );
