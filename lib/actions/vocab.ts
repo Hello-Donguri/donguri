@@ -46,27 +46,48 @@ type TypedAnswerMatch = {
   fullAnswer: string | null;
 };
 
-// Case-insensitive, whitespace-trimmed match against any one reading of
-// the stored answer (see answerReadings), then — for vocab — against each
-// reading with its bracketed note taken off. Shared by every typed-answer
-// check.
-function matchTypedAnswer(typed: string, stored: string, leniency: AnswerLeniency): TypedAnswerMatch {
-  const guess = typed.trim().toLowerCase();
-  const readings = answerReadings(stored, leniency);
+// Lower-cased and trimmed, with the spacing around slashes and between
+// words evened out — so "he/she/it" and "He / she / it" compare equal.
+function normaliseAnswer(text: string): string {
+  return text.trim().toLowerCase().replace(/\s*\/\s*/g, "/").replace(/\s+/g, " ");
+}
 
-  if (readings.some((reading) => reading.toLowerCase() === guess)) {
+// Whether `guess` (already normalised) is one reading, as-is or — for
+// vocab — with its bracketed note taken off.
+function matchReading(guess: string, readings: string[], leniency: AnswerLeniency): TypedAnswerMatch {
+  if (readings.some((reading) => normaliseAnswer(reading) === guess)) {
     return { correct: true, fullAnswer: null };
   }
 
   if (leniency.vocab) {
     const noteless = readings.find((reading) => {
       const bare = reading.replace(READING_NOTE, "").trim();
-      return bare !== "" && bare !== reading && bare.toLowerCase() === guess;
+      return bare !== "" && bare !== reading && normaliseAnswer(bare) === guess;
     });
     if (noteless) return { correct: true, fullAnswer: noteless };
   }
 
   return { correct: false, fullAnswer: null };
+}
+
+// Case-insensitive match against any one reading of the stored answer (see
+// answerReadings), ignoring spacing around slashes, then — for vocab —
+// against each reading with its bracketed note taken off. A vocab answer
+// typed as several alternatives at once ("he/she/it" for "he / she / it",
+// or just "she/he") is right when every part is. Shared by every
+// typed-answer check.
+function matchTypedAnswer(typed: string, stored: string, leniency: AnswerLeniency): TypedAnswerMatch {
+  const guess = normaliseAnswer(typed);
+  const readings = answerReadings(stored, leniency);
+
+  const single = matchReading(guess, readings, leniency);
+  if (single.correct || !leniency.vocab || !guess.includes("/")) return single;
+
+  const parts = guess.split("/");
+  const allAccepted =
+    parts.length > 1 &&
+    parts.every((part) => part !== "" && matchReading(part.trim(), readings, leniency).correct);
+  return { correct: allAccepted, fullAnswer: null };
 }
 
 // Every reading of the answer, when there's more than one — so a learner

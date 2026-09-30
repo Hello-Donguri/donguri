@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { addDays, startOfUTCDay } from "@/lib/srs";
 
 // What a daily-challenge attempt asks the learner to use in their chat with
 // Charles Duck: a vocab word, a grammar point, or one of each (anywhere in
@@ -317,35 +318,62 @@ function challengeModeFor(xp: number, hasVocab: boolean, hasGrammar: boolean): C
 // `challengeDate` in this course. Only draws from words and grammar the user
 // has learnt (introduced, not skipped); how hard it is depends on their XP
 // (see challengeModeFor). Null when they haven't learnt anything yet.
+// - Nothing used in one of today's earlier attempts comes up again, while
+//   anything else is left — read from the saved attempts, so the page and
+//   the chat action always agree. Only once everything learnt has been used
+//   today can a target repeat.
+// - Words and grammar learnt since the start of yesterday are picked first;
+//   with nothing that new, it draws from everything learnt.
 export async function pickChallengeTarget(
   userId: string,
   courseId: string,
   challengeDate: Date,
   attemptIndex: number,
 ): Promise<ChallengeTarget | null> {
-  const [words, profile, course] = await Promise.all([
+  const [words, profile, course, todaysAttempts] = await Promise.all([
     prisma.word.findMany({
       where: {
         active: true,
         languageDeck: { courseId, active: true },
         progress: { some: { userId, skipped: false } },
       },
-      select: challengeWordSelect,
+      select: {
+        ...challengeWordSelect,
+        progress: { where: { userId }, select: { introducedAt: true } },
+      },
       orderBy: { id: "asc" },
     }),
     prisma.profile.findUnique({ where: { id: userId }, select: { xp: true } }),
     prisma.course.findUniqueOrThrow({ where: { id: courseId }, select: { targetLanguage: true } }),
+    prisma.dailyChallengeAttempt.findMany({
+      where: { userId, courseId, challengeDate },
+      select: { targetTerms: true },
+    }),
   ]);
 
-  const vocab = words.filter((word) => word.path !== "grammar");
-  const grammar = words.filter((word) => word.path === "grammar");
+  if (words.length === 0) return null;
 
-  if (vocab.length === 0 && grammar.length === 0) return null;
+  const usedToday = new Set(todaysAttempts.flatMap((attempt) => attempt.targetTerms));
+  const unused = words.filter((word) => !usedToday.has(word.term));
+  const pool = unused.length > 0 ? unused : words;
+
+  const vocab = pool.filter((word) => word.path !== "grammar");
+  const grammar = pool.filter((word) => word.path === "grammar");
 
   const seed = `${userId}:${courseId}:${challengeDate.toISOString().slice(0, 10)}:${attemptIndex}`;
   const random = mulberry32(hashSeed(seed));
-  const pick = <T>(items: T[]): T => items[Math.floor(random() * items.length)];
+  const freshSince = addDays(startOfUTCDay(challengeDate), -1);
+  const isFresh = (word: (typeof words)[number]) =>
+    word.progress.some((progress) => progress.introducedAt >= freshSince);
+  // Something learnt since yesterday if there is one, else anything.
+  const pick = (items: typeof words) => {
+    const fresh = items.filter(isFresh);
+    const from = fresh.length > 0 ? fresh : items;
+    return from[Math.floor(random() * from.length)];
+  };
 
+  // Stepped down to what's still unused today — e.g. a grammar-tier learner
+  // whose only grammar point came up in an earlier attempt gets a word.
   const mode = challengeModeFor(profile?.xp ?? 0, vocab.length > 0, grammar.length > 0);
 
   const toItem = (word: (typeof words)[number]): ChallengeItem => ({

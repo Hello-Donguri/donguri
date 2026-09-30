@@ -137,8 +137,12 @@ export const Jyutping = ({
 // nothing else changed — no weight or spacing, unlike Jyutping above — so
 // it stays exactly as wide as the plain text in the input under it (see
 // JyutpingInput). Syllables still missing a tone stay the normal colour.
+// All in one inline span: laid out straight inside a flex box, each run of
+// text would become its own flex item, and a run that's only a space (the
+// gap between two coloured syllables) is dropped — shifting everything
+// after it out of line with the input.
 const ToneColouredText = ({ text }: { text: string }) => (
-  <>
+  <span className="shrink-0 whitespace-pre">
     {parseJyutping(text).map((segment, index) =>
       segment.tone ? (
         <span key={index} className={TONE_TEXT[segment.tone]}>
@@ -148,7 +152,7 @@ const ToneColouredText = ({ text }: { text: string }) => (
         segment.text
       ),
     )}
-  </>
+  </span>
 );
 
 const LEVEL_Y = (level: number) => 16 - (level - 1) * 3.5;
