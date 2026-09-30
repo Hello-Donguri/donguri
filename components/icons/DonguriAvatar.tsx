@@ -1,6 +1,7 @@
 import Image from "next/image";
 import DonguriMascot from "@/components/icons/DonguriMascot";
 import { ACCESSORIES, type AccessoryId } from "@/lib/levels";
+import { cn } from "@/lib/utils";
 
 type DonguriAvatarProps = {
   equippedAccessory: AccessoryId | string | null | undefined;
@@ -18,13 +19,16 @@ export function DonguriAvatar({ equippedAccessory, className }: DonguriAvatarPro
     return <DonguriMascot className={className} />;
   }
 
+  // object-contain: the costume art isn't square (1224×1285), and callers
+  // often size the avatar as a square box (h-8 w-8) — without it the
+  // picture is squashed to fit instead of kept in proportion.
   return (
     <Image
       src={accessory.image}
       alt={`Donguri wearing ${accessory.label}`}
       width={1224}
       height={1285}
-      className={className}
+      className={cn("object-contain", className)}
     />
   );
 }

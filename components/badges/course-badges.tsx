@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { Award, ChevronRight, X } from "lucide-react";
 import { BadgeTile } from "@/components/badges/badge-tile";
+import { BadgeTooltip } from "@/components/badges/badge-tooltip";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import type { BadgeView } from "@/lib/badges";
 
@@ -35,13 +36,13 @@ export function CourseBadges({
         {shown.length > 0 ? (
           <ul className="flex items-center" aria-label={t("badges.your_badges", "Your badges")}>
             {shown.map((badge, index) => (
-              <li
-                key={badge.id}
-                title={badge.name}
-                className={`relative flex h-12 w-12 items-center justify-center rounded-full bg-raised shadow-sm ring-2 ring-washi transition hover:z-10 hover:-translate-y-1 ${index > 0 ? "-ml-2.5" : ""}`}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element -- an admin-uploaded bunny.net image. */}
-                <img src={badge.imageUrl} alt={badge.name} className="h-10 w-10 object-contain" />
+              <li key={badge.id} className={`relative hover:z-10 focus-within:z-10 ${index > 0 ? "-ml-2.5" : ""}`}>
+                <BadgeTooltip name={badge.name}>
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-raised shadow-sm ring-2 ring-washi transition group-hover/badge:-translate-y-1">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- an admin-uploaded bunny.net image. */}
+                    <img src={badge.imageUrl} alt="" className="h-10 w-10 object-contain" />
+                  </span>
+                </BadgeTooltip>
               </li>
             ))}
           </ul>

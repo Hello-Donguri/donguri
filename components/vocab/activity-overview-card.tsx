@@ -3,6 +3,7 @@ import type { DailyActivityCount, WeeklyStats } from "@/lib/definitions";
 import { getTranslator } from "@/lib/i18n/server";
 import { StreakChart } from "@/components/vocab/streak-chart";
 import type { BadgeView } from "@/lib/badges";
+import { BadgeTooltip } from "@/components/badges/badge-tooltip";
 
 // The course home page's activity card: "Your progress this week" (words
 // learnt, accuracy, XP earned, streak — a 2x2 grid — then the badges earned
@@ -91,13 +92,15 @@ export async function ActivityOverviewCard({
           {weeklyBadges.length > 0 ? (
             <ul className="flex flex-wrap items-center gap-2">
               {weeklyBadges.map((badge) => (
-                <li key={badge.id} title={badge.name}>
-                  {/* eslint-disable-next-line @next/next/no-img-element -- an admin-uploaded bunny.net image. */}
-                  <img
-                    src={badge.imageUrl}
-                    alt={badge.name}
-                    className="h-10 w-10 object-contain transition hover:-translate-y-0.5"
-                  />
+                <li key={badge.id}>
+                  <BadgeTooltip name={badge.name}>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- an admin-uploaded bunny.net image. */}
+                    <img
+                      src={badge.imageUrl}
+                      alt=""
+                      className="h-10 w-10 object-contain transition group-hover/badge:-translate-y-0.5"
+                    />
+                  </BadgeTooltip>
                 </li>
               ))}
             </ul>
