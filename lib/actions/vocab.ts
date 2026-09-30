@@ -46,10 +46,38 @@ type TypedAnswerMatch = {
   fullAnswer: string | null;
 };
 
+// English contractions written out in full, so "She isn't" matches "She is
+// not" (and "I'm" matches "I am") either way round. Irregular ones first,
+// before the general "-n't". Only pronoun + 's is expanded — "Tom's" could
+// be possessive — and 'd is left alone, being either "had" or "would".
+const CONTRACTIONS: [RegExp, string][] = [
+  [/\bcan't\b/g, "can not"],
+  [/\bcannot\b/g, "can not"],
+  [/\bwon't\b/g, "will not"],
+  [/\bshan't\b/g, "shall not"],
+  [/\b([a-z]+)n't\b/g, "$1 not"],
+  [/\bi'm\b/g, "i am"],
+  [/\b(you|we|they)'re\b/g, "$1 are"],
+  [/\b(he|she|it|that|what|where|who|there|here)'s\b/g, "$1 is"],
+  [/\b(i|you|we|they)'ve\b/g, "$1 have"],
+  [/\b(i|you|he|she|it|we|they)'ll\b/g, "$1 will"],
+];
+
 // Lower-cased and trimmed, with the spacing around slashes and between
-// words evened out — so "he/she/it" and "He / she / it" compare equal.
+// words evened out — so "he/she/it" and "He / she / it" compare equal —
+// curly apostrophes (as phone keyboards type them) made straight, and
+// contractions written out in full (see CONTRACTIONS).
 function normaliseAnswer(text: string): string {
-  return text.trim().toLowerCase().replace(/\s*\/\s*/g, "/").replace(/\s+/g, " ");
+  let normalised = text
+    .trim()
+    .toLowerCase()
+    .replace(/[’‘]/g, "'")
+    .replace(/\s*\/\s*/g, "/")
+    .replace(/\s+/g, " ");
+  for (const [pattern, expansion] of CONTRACTIONS) {
+    normalised = normalised.replace(pattern, expansion);
+  }
+  return normalised;
 }
 
 // Whether `guess` (already normalised) is one reading, as-is or — for
@@ -141,17 +169,34 @@ function spellingDistance(a: string, b: string): number {
 // word (cat / cut). Checked against each reading with its bracketed note
 // off, since that's the part people type.
 function nearMissReading(typed: string, stored: string, leniency: AnswerLeniency): string | null {
-  const guess = typed.trim().toLowerCase().replace(/\s+/g, " ");
+  const guess = normaliseAnswer(typed);
   if (!guess) return null;
+  const guessWords = guess.split(" ");
 
+  // A near miss is one misspelt word: same number of words, every word
+  // but one exactly right, and that one close enough. So "She is nto"
+  // counts for "She is not", but a different phrasing never does — that's
+  // grammar, not spelling.
   for (const reading of answerReadings(stored, leniency)) {
-    const target = reading.replace(READING_NOTE, "").trim().toLowerCase().replace(/\s+/g, " ");
-    if (target.length < 4 || guess[0] !== target[0]) continue;
-    const allowed = target.length >= 8 ? 2 : 1;
-    const distance = spellingDistance(guess, target);
-    if (distance > 0 && distance <= allowed) return reading.replace(READING_NOTE, "").trim();
+    const answer = reading.replace(READING_NOTE, "").trim();
+    const targetWords = normaliseAnswer(answer).split(" ");
+    if (targetWords.length !== guessWords.length) continue;
+
+    const differing = targetWords.flatMap((word, index) =>
+      word === guessWords[index] ? [] : [[guessWords[index], word] as const],
+    );
+    if (differing.length === 1 && isNearMissWord(...differing[0])) return answer;
   }
   return null;
+}
+
+// One word nearly spelt right: the same first letter, and 1 slip for a
+// 4-7 letter word, up to 2 from 8 letters. Words under 4 letters never
+// count (cat / cut).
+function isNearMissWord(guess: string, target: string): boolean {
+  if (target.length < 4 || guess[0] !== target[0]) return false;
+  const distance = spellingDistance(guess, target);
+  return distance > 0 && distance <= (target.length >= 8 ? 2 : 1);
 }
 
 // A typed answer that's nearly right isn't marked wrong straight away:
@@ -476,7 +521,9 @@ export async function submitFormAnswer(
     throw new Error("Form does not belong to the given word.");
   }
 
-  const correct = typedAnswer.trim().toLowerCase() === form.value.trim().toLowerCase();
+  // Same forgiving comparison as every other typed answer — case, spacing
+  // and contractions ("isn't" for "is not") don't matter.
+  const correct = normaliseAnswer(typedAnswer) === normaliseAnswer(form.value);
   // A form is one exact value, so it's checked as a single reading.
   const retry =
     correct || isRetry

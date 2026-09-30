@@ -90,7 +90,41 @@ export type ChallengeTarget = {
   vocab: ChallengeItem | null;
   grammar: ChallengeItem | null;
   fallbackOpener: ChallengeOpener;
+  // Charles's friends for this attempt, one "he" and one "she" (see
+  // friendsPromptRule) — who he talks about when a third person comes up.
+  friends: ChallengeFriend[];
 };
+
+// One of Charles's animal friends: a traditional English first name and a
+// cute animal, e.g. "Christopher Mouse".
+export type ChallengeFriend = { name: string; animal: string; pronoun: "he" | "she" };
+
+const HE_NAMES = [
+  "Christopher", "Reginald", "Archibald", "Bartholomew", "Humphrey", "Percival",
+  "Frederick", "Montgomery", "Theodore", "Rupert", "Albert", "Edmund",
+];
+const SHE_NAMES = [
+  "Beatrice", "Agatha", "Winifred", "Harriet", "Mildred", "Penelope",
+  "Florence", "Matilda", "Cordelia", "Josephine", "Eleanor", "Rosalind",
+];
+const ANIMALS = [
+  "Mouse", "Rabbit", "Badger", "Hedgehog", "Otter", "Squirrel", "Fox",
+  "Mole", "Owl", "Hamster", "Panda", "Penguin", "Koala", "Kitten",
+];
+
+// How Charles brings in a third person — shared by his opener and his chat
+// replies, so the friend he names first is the one he keeps talking about.
+export function friendsPromptRule(target: ChallengeTarget): string {
+  const [he, she] = [
+    target.friends.find((friend) => friend.pronoun === "he"),
+    target.friends.find((friend) => friend.pronoun === "she"),
+  ];
+  if (!he || !she) return "";
+  const cantonese = target.targetLanguage === "yue";
+  const fullName = (friend: ChallengeFriend) => `${friend.name} ${friend.animal}`;
+
+  return `- Whenever you talk about someone other than you two — and especially when the target is a third-person word or pattern (he, she, they, him, her, his${cantonese ? ", 佢, 佢哋" : ""}) — make it one of your friends: ${fullName(he)} (a he) or ${fullName(she)} (a she), whichever fits; both of them together for "they". Introduce them by full name the first time ("my friend ${fullName(he)}"), then just use he or she.${cantonese ? ` In Cantonese, keep the first name in English letters and write the animal in Cantonese (e.g. "${he.name} + the Cantonese for ${he.animal.toLowerCase()}"), the way people in Hong Kong mix in English names; in the Jyutping, leave the English name as it is.` : ""} Only bring them up when it's natural — never just to mention them.`;
+}
 
 // The course languages the chat knows how to run in: who Charles is
 // talking to, and how his messages and feedback are written. Anything
@@ -390,10 +424,24 @@ export async function pickChallengeTarget(
 
   const openers = fixedOpeners(course.targetLanguage);
 
+  // Also its own stream: new friends each attempt, without moving the target.
+  const friendRandom = mulberry32(hashSeed(`${seed}:friends`));
+  const pickFrom = <T>(items: T[]): T => items[Math.floor(friendRandom() * items.length)];
+  const heAnimal = pickFrom(ANIMALS);
+  const friends: ChallengeFriend[] = [
+    { name: pickFrom(HE_NAMES), animal: heAnimal, pronoun: "he" },
+    {
+      name: pickFrom(SHE_NAMES),
+      animal: pickFrom(ANIMALS.filter((animal) => animal !== heAnimal)),
+      pronoun: "she",
+    },
+  ];
+
   return {
     targetLanguage: course.targetLanguage,
     vocab: mode === "grammar" ? null : toItem(pick(vocab)),
     grammar: mode === "vocab" ? null : toItem(pick(grammar)),
     fallbackOpener: openers[Math.floor(openerRandom() * openers.length)],
+    friends,
   };
 }

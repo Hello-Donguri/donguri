@@ -15,6 +15,7 @@ import {
   CANTONESE_QUOTE_RULE,
   JAPANESE_FEEDBACK_RULE,
   challengeLanguage,
+  friendsPromptRule,
   glossesPromptField,
   glossesPromptRule,
   parseGlosses,
@@ -414,7 +415,7 @@ ${language.writing ? `${language.writing}\n` : ""}- Never use the target word or
 - Keep every question something the user can easily understand and answer. A vague or abstract question that just happens to invite the target is worse than a clear one that takes one more turn to get there.
 - If the user's latest message is only one or two words, or is vague and doesn't really answer what you just asked, warmly ask them to say a little more.
 - If the user tries to end the chat early, kindly keep it going with a new simple, friendly question.
-- Never break character or mention that this is a language exercise, scoring, or practice.
+${friendsPromptRule(target) ? `${friendsPromptRule(target)} If you already mentioned one of them earlier in this chat, keep talking about the same friend.\n` : ""}- Never break character or mention that this is a language exercise, scoring, or practice.
 
 Return only a JSON object with exactly these fields, in this order:
 {

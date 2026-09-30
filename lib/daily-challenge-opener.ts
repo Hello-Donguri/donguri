@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { cacheLife } from "next/cache";
 import {
   challengeLanguage,
+  friendsPromptRule,
   glossesPromptField,
   glossesPromptRule,
   parseGlosses,
@@ -91,6 +92,7 @@ ${firstName ? `- Greet them by their first name, "${firstName}", in the greeting
 - It must sound natural — exactly how a friend would really text.
 - Pick an everyday topic that is loosely related to the target, so the chat can drift towards it later. Only loosely: never use the target word or pattern yourself, and don't ask a question whose obvious answer is just the target.
 - If the target doesn't point to a clear everyday topic (for example a small function word, or an abstract grammar pattern), don't force it. Instead use the topic of this general opener, reworded in your own way: "${target.fallbackOpener.text}" (${target.fallbackOpener.translation})
+${friendsPromptRule(target)}
 
 Return only a JSON object:
 ${fields}
