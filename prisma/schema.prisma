@@ -20,6 +20,9 @@ model Profile {
   // Public handle for the leaderboards — set once, never editable (see
   // section 39 of supabase/schema.sql). Null until the user picks one.
   username               String?                 @unique
+  // Keeps /dashboard/users/<username> to its owner — see section 43 of
+  // supabase/schema.sql.
+  profileHidden          Boolean                 @default(false) @map("profile_hidden")
   role                  String                  @default("user")
   createdAt              DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime                @default(now()) @map("updated_at") @db.Timestamptz(6)

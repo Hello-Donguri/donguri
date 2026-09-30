@@ -1727,3 +1727,13 @@ create index if not exists badges_course_id_idx on public.badges (course_id);
 
 alter table public.daily_challenge_attempts
   add column if not exists skipped boolean not null default false;
+
+-- 43. Hidden profiles ------------------------------------------------------------------
+-- Every learner has a profile page at /user/<username> showing
+-- their username, XP, XP this week, when they were last active and their
+-- badges — never their real name. `profile_hidden`, set from account
+-- settings, keeps it to themselves: anyone else gets a 404, and the
+-- leaderboards stop linking to it.
+
+alter table public.profiles
+  add column if not exists profile_hidden boolean not null default false;

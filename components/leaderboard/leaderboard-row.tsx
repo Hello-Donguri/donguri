@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { DonguriAvatar } from "@/components/icons/DonguriAvatar";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import type { LeaderboardEntry } from "@/lib/definitions";
@@ -70,7 +71,16 @@ export function LeaderboardRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-baseline gap-1 text-sm font-semibold text-sumi">
-          <span className="truncate">{entry.name}</span>
+          {entry.profileHref ? (
+            <Link
+              href={entry.profileHref}
+              className="truncate hover:underline focus-visible:underline"
+            >
+              {entry.name}
+            </Link>
+          ) : (
+            <span className="truncate">{entry.name}</span>
+          )}
           {entry.isSelf && (
             <span className="shrink-0 text-xs font-medium text-sumi-soft">
               {t("leaderboard.you_suffix", "(you)")}

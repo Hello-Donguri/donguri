@@ -33,6 +33,7 @@ import {
 import { ResetProgressButton } from "@/components/vocab/reset-progress-button";
 import { ReviewQueueDevPanel } from "@/components/vocab/review-queue-dev-panel";
 import { DailyChallengeDevReset } from "@/components/vocab/daily-challenge-dev-reset";
+import ReadingRabbit from "@/components/icons/ReadingRabbit";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -105,7 +106,9 @@ async function loadCourseHome(slug: string) {
     isAdmin,
     reviewQueueDebug,
     badges,
-    weeklyBadges: badges.earned.filter((badge) => badge.awardedAt >= badgeWeekStart),
+    weeklyBadges: badges.earned.filter(
+      (badge) => badge.awardedAt >= badgeWeekStart,
+    ),
   };
 }
 
@@ -257,12 +260,13 @@ export default async function CourseHomePage({ params }: PageProps) {
         </FakeButton>
       </div>
 
-      <img
+      {/* <img
         src="/images/rabbit-reading.webp"
         alt=""
         aria-hidden="true"
         className="pointer-events-none absolute bottom-3 right-2 z-0 h-28 select-none object-contain transition-transform duration-300 group-hover:-translate-y-1"
-      />
+      /> */}
+      <ReadingRabbit className="pointer-events-none absolute bottom-3 -right-95 z-0 h-28 select-none object-contain transition-transform duration-300 group-hover:-translate-y-1" />
     </>
   );
 
@@ -353,7 +357,10 @@ export default async function CourseHomePage({ params }: PageProps) {
           {/* Dev mode's automatic reset — draws nothing. The manual reset is
               in the header's Admin menu. */}
           {isAdmin && (
-            <DailyChallengeDevReset courseSlug={slug} attemptsToday={challengeStatus.attemptsToday} />
+            <DailyChallengeDevReset
+              courseSlug={slug}
+              attemptsToday={challengeStatus.attemptsToday}
+            />
           )}
 
           {isAdmin && reviewQueueDebug && (

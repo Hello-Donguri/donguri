@@ -39,6 +39,21 @@ export async function updateName(
   return { success: true, message: "Name updated." };
 }
 
+// Account settings' profile-visibility switch — `visible` false hides
+// /user/<username> from everyone but the owner.
+export async function setProfileVisible(visible: boolean): Promise<void> {
+  const user = await requireUser();
+
+  await prisma.profile.update({
+    where: { id: user.id },
+    data: { profileHidden: !visible },
+  });
+
+  // The settings page and the leaderboards' links, then the profile page.
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/user/[username]", "page");
+}
+
 export async function updateProfile(
   _state: UpdateProfileFormState,
   formData: FormData,

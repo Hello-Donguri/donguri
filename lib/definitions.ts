@@ -175,6 +175,9 @@ export type Profile = {
   first_name: string | null;
   last_name: string | null;
   username: string | null;
+  // Whether their profile page is kept to themselves (see
+  // app/user/[username]).
+  profile_hidden: boolean;
   // Synced copy of their Stripe subscription (see lib/billing.ts), null if
   // they've never started Checkout.
   subscription: ProfileSubscription | null;
@@ -304,6 +307,16 @@ export type RevealWord = {
 // A multiple-choice option — text only, never a picture (see toOption in
 // buildMultipleChoiceQuestion, lib/dal.ts).
 export type QuizOption = {
+  text: string;
+  romanization: string | null;
+};
+
+// What a multiple-choice option means — the other side of the word it came
+// from (its translation when the options are terms, its term when they're
+// translations). Only sent back once the question's answered (see
+// submitAnswer in lib/actions/vocab.ts), since the right option's meaning
+// is the prompt itself.
+export type OptionMeaning = {
   text: string;
   romanization: string | null;
 };
@@ -1140,6 +1153,22 @@ export type UpdateProfileFormState =
     }
   | undefined;
 
+// Another learner's profile page — see getPublicProfile in lib/dal.ts.
+export type PublicProfile = {
+  id: string;
+  username: string;
+  xp: number;
+  // XP earned in the trailing 7 days, as the leaderboard counts it.
+  weeklyXp: number;
+  lastActiveAt: Date | null;
+  memberSince: Date;
+  wordsLearnt: number;
+  equippedAccessory: AccessoryId | null;
+  // Only ever true when `isSelf` — nobody else can load a hidden profile.
+  hidden: boolean;
+  isSelf: boolean;
+};
+
 export type LeaderboardEntry = {
   id: string;
   name: string;
@@ -1149,4 +1178,7 @@ export type LeaderboardEntry = {
   weeklyXp: number;
   equippedAccessory: AccessoryId | null;
   isSelf: boolean;
+  // Their profile page, or null when they've hidden it (from everyone but
+  // themselves) or never picked a username.
+  profileHref: string | null;
 };

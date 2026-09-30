@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { getCourseHome, getCourseTitle, getReviewQueue, requireProfile } from "@/lib/dal";
 import { ReviewSession } from "@/components/vocab/review-session";
 import { FreshSession } from "@/components/vocab/fresh-session";
@@ -15,6 +16,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function CourseReviewPage({ params }: PageProps) {
+  // Request time, not a prerender: the session read checks token expiry
+  // against `Date.now()`, which Cache Components rejects outside a cache
+  // scope. Unlike the course page this isn't a private cache — a session's
+  // queue must always be fresh.
+  await connection();
   const { slug } = await params;
   const [{ course }, quiz, profile, { t }] = await Promise.all([
     getCourseHome(slug),

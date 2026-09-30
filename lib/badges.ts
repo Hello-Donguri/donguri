@@ -304,6 +304,20 @@ export async function badgeShelf(
   return { earned, locked };
 }
 
+// Just the badges a learner has earned, across every course, newest first —
+// for their profile page, where others see them (no progress on the rest).
+export async function earnedBadges(userId: string): Promise<EarnedBadge[]> {
+  const rows = await prisma.userBadge.findMany({
+    where: { userId, status: "awarded", badge: { active: true } },
+    orderBy: { awardedAt: "desc" },
+    select: { awardedAt: true, badge: true },
+  });
+  return rows.flatMap((row) => {
+    const view = toView(row.badge);
+    return view ? [{ ...view, awardedAt: row.awardedAt }] : [];
+  });
+}
+
 // The start of "this week" on the course page — the trailing 7 UTC days,
 // today included, as the weekly stats use.
 export function startOfBadgeWeek(): Date {

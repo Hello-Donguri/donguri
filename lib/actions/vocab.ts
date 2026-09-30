@@ -17,7 +17,7 @@ import {
   toUTCDateString,
 } from "@/lib/srs";
 import { ACCESSORIES, levelForXp, parseDonguriConfig, type AccessoryId } from "@/lib/levels";
-import type { QuizDirection, RevealWord } from "@/lib/definitions";
+import type { OptionMeaning, QuizDirection, RevealWord } from "@/lib/definitions";
 import { isLatinTypeable } from "@/lib/language";
 
 // How loosely a typed answer is read. Vocab answers are lenient: slashes
@@ -352,20 +352,68 @@ export async function submitAnswer(
   direction: QuizDirection,
   selectedAnswer: string,
   advancesStage = false,
-): Promise<{ correct: boolean; correctAnswer: string; xp: number }> {
+  // Every option on screen, so each one's meaning can be shown once it's
+  // answered — looked up by text within the word's own course, the pool
+  // the distractors were drawn from (see buildMultipleChoiceQuestion in
+  // lib/dal.ts).
+  optionTexts: string[] = [],
+): Promise<{
+  correct: boolean;
+  correctAnswer: string;
+  xp: number;
+  meanings: Record<string, OptionMeaning>;
+}> {
   const user = await requireSubscriber();
 
   const word = await prisma.word.findUniqueOrThrow({
     where: { id: wordId },
-    select: { term: true, translation: true },
+    select: {
+      term: true,
+      translation: true,
+      romanization: true,
+      languageDeck: { select: { courseId: true } },
+    },
   });
 
-  const correctAnswer = direction === "term-to-translation" ? word.translation : word.term;
+  const optionsAreTerms = direction === "translation-to-term";
+  const correctAnswer = optionsAreTerms ? word.term : word.translation;
   const correct = selectedAnswer === correctAnswer;
 
   const { xp } = await recordAnswer(user.id, wordId, correct, advancesStage);
 
-  return { correct, correctAnswer, xp };
+  const meaningOf = (option: {
+    term: string;
+    translation: string;
+    romanization: string | null;
+  }): OptionMeaning =>
+    optionsAreTerms
+      ? { text: option.translation, romanization: null }
+      : { text: option.term, romanization: option.romanization };
+
+  const optionWords =
+    optionTexts.length > 0
+      ? await prisma.word.findMany({
+          where: {
+            active: true,
+            languageDeck: { courseId: word.languageDeck.courseId },
+            ...(optionsAreTerms
+              ? { term: { in: optionTexts } }
+              : { translation: { in: optionTexts } }),
+          },
+          select: { term: true, translation: true, romanization: true },
+        })
+      : [];
+
+  const meanings: Record<string, OptionMeaning> = {};
+  for (const option of optionWords) {
+    const text = optionsAreTerms ? option.term : option.translation;
+    meanings[text] ??= meaningOf(option);
+  }
+  // Two words can share a translation — the right answer always shows its
+  // own word's meaning.
+  meanings[correctAnswer] = meaningOf(word);
+
+  return { correct, correctAnswer, xp, meanings };
 }
 
 // The typed counterpart to `submitAnswer`, for `TypeAnswerQuestion` — same

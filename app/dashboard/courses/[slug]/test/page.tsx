@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { getCourseHome, getCourseTitle, getTestQueueForCourse, requireProfile } from "@/lib/dal";
 import { TestSession } from "@/components/vocab/test-session";
 import { FreshSession } from "@/components/vocab/fresh-session";
@@ -16,6 +17,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function TestPage({ params, searchParams }: PageProps) {
+  // Request time, not a prerender: the session read checks token expiry
+  // against `Date.now()`, which Cache Components rejects outside a cache
+  // scope. Unlike the course page this isn't a private cache — a session's
+  // queue must always be fresh.
+  await connection();
   const [{ slug }, { words }] = await Promise.all([params, searchParams]);
   // The just-learnt batch, passed by the Learn session's "Start quiz" button
   // — scopes the quiz to those words only (see `getTestQueueForCourse`).

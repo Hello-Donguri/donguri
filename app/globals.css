@@ -290,3 +290,24 @@ body {
     opacity: 0;
   }
 }
+
+/* Profile page: the Donguri avatar gently bobs, as if pleased to see you. */
+.profile-bob {
+  animation: profile-bob 3.2s ease-in-out infinite;
+}
+
+@keyframes profile-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1.5deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(1.5deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-bob {
+    animation: none;
+  }
+}

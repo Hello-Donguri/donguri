@@ -5,6 +5,8 @@ import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
 import { Button } from "@/components/ui/button";
 import { NameForm } from "@/components/settings/name-form";
+import { VisibilityToggle } from "@/components/ui/visibility-toggle";
+import { setProfileVisible } from "@/lib/actions/profile";
 import { getTranslator } from "@/lib/i18n/server";
 
 export const metadata: Metadata = {
@@ -61,6 +63,35 @@ export default async function SettingsPage() {
           )}
         </p>
         <NameForm firstName={profile.first_name ?? ""} lastName={profile.last_name ?? ""} />
+      </div>
+
+      <div className="max-w-lg rounded-2xl border border-card-border bg-washi-soft p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="font-semibold text-sumi">
+              {t("settings_page.profile_visibility_title", "Public profile")}
+            </h2>
+            <p className="mt-1 text-sm text-sumi-soft">
+              {t(
+                "settings_page.profile_visibility_description",
+                "Other learners can see your username, XP, when you were last active and your badges. Hide it to keep it to yourself.",
+              )}
+            </p>
+          </div>
+          <VisibilityToggle
+            active={!profile.profile_hidden}
+            toggleAction={setProfileVisible}
+            label={t("settings_page.profile_visibility_label", "your profile")}
+          />
+        </div>
+        <Button
+          href={`/user/${profile.username}`}
+          variant="outline"
+          size="sm"
+          className="mt-4"
+        >
+          {t("settings_page.view_profile", "View your profile")}
+        </Button>
       </div>
 
       <div className="max-w-lg rounded-2xl border border-card-border bg-washi-soft p-6">

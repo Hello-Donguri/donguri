@@ -22,6 +22,7 @@ import type {
   LeaderboardEntry,
   LanguageDeckSummary,
   Profile,
+  PublicProfile,
   QuizDirection,
   QuizOption,
   QuizQuestion,
@@ -128,6 +129,7 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
       firstName: true,
       lastName: true,
       username: true,
+      profileHidden: true,
       subscription: {
         select: {
           status: true,
@@ -154,6 +156,7 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
     first_name: profile.firstName,
     last_name: profile.lastName,
     username: profile.username,
+    profile_hidden: profile.profileHidden,
     subscription: profile.subscription,
     hasAccess: hasActiveAccess(profile.role, profile.subscription),
   };
@@ -1249,6 +1252,7 @@ type LeaderboardProfile = {
   email: string;
   xp: number;
   donguriConfig: unknown;
+  profileHidden: boolean;
 };
 
 const LEADERBOARD_PROFILE_SELECT = {
@@ -1258,6 +1262,7 @@ const LEADERBOARD_PROFILE_SELECT = {
   email: true,
   xp: true,
   donguriConfig: true,
+  profileHidden: true,
 } as const;
 
 function toLeaderboardEntry(
@@ -1276,7 +1281,19 @@ function toLeaderboardEntry(
         | AccessoryId
         | undefined) ?? null,
     isSelf: profile.id === selfId,
+    profileHref: profileHref(profile, selfId),
   };
+}
+
+// A profile page's path, or null when the viewer (`selfId`) isn't allowed to
+// see it — hidden profiles are only reachable by their owner.
+export function profileHref(
+  profile: { id: string; username: string | null; profileHidden: boolean },
+  selfId: string,
+): string | null {
+  if (!profile.username) return null;
+  if (profile.profileHidden && profile.id !== selfId) return null;
+  return `/user/${profile.username}`;
 }
 
 // Ranked by XP earned this week, total XP breaking ties.
@@ -1381,6 +1398,81 @@ export const getLeaderboards = cache(
     };
   },
 );
+
+// A learner's profile page (app/user/[username]): only public
+// stats — username, never their real name. Null when there's no such user,
+// or they've hidden their profile from everyone but themselves.
+export const getPublicProfile = cache(
+  async (username: string): Promise<PublicProfile | null> => {
+    const user = await requireUser();
+
+    const profile = await prisma.profile.findUnique({
+      where: { username: username.toLowerCase() },
+      select: {
+        id: true,
+        username: true,
+        xp: true,
+        donguriConfig: true,
+        profileHidden: true,
+        createdAt: true,
+      },
+    });
+    if (!profile?.username) return null;
+
+    const isSelf = profile.id === user.id;
+    if (profile.profileHidden && !isSelf) return null;
+
+    const [weeklyXp, lastActiveAt, wordsLearnt] = await Promise.all([
+      getWeeklyXpByUser([profile.id]),
+      getLastActiveAt(profile.id),
+      // Across every course; "I already know this" skips don't count, as
+      // with the words-learnt badges.
+      prisma.userWordProgress.count({
+        where: { userId: profile.id, skipped: false },
+      }),
+    ]);
+
+    return {
+      id: profile.id,
+      username: profile.username,
+      xp: profile.xp,
+      weeklyXp: weeklyXp.get(profile.id) ?? 0,
+      lastActiveAt,
+      memberSince: profile.createdAt,
+      wordsLearnt,
+      equippedAccessory:
+        (parseDonguriConfig(profile.donguriConfig).equippedAccessory as
+          | AccessoryId
+          | undefined) ?? null,
+      hidden: profile.profileHidden,
+      isSelf,
+    };
+  },
+);
+
+// The last time the user did anything that counts as studying — earned XP,
+// answered a review, or learnt or answered a word. Null if they never have.
+async function getLastActiveAt(userId: string): Promise<Date | null> {
+  const [xp, review, progress] = await Promise.all([
+    prisma.xpEvent.aggregate({ where: { userId }, _max: { createdAt: true } }),
+    prisma.reviewEvent.aggregate({ where: { userId }, _max: { createdAt: true } }),
+    prisma.userWordProgress.aggregate({
+      where: { userId },
+      _max: { introducedAt: true, lastSeenAt: true },
+    }),
+  ]);
+
+  const times = [
+    xp._max.createdAt,
+    review._max.createdAt,
+    progress._max.introducedAt,
+    progress._max.lastSeenAt,
+  ].filter((time): time is Date => time !== null);
+
+  return times.length > 0
+    ? new Date(Math.max(...times.map((time) => time.getTime())))
+    : null;
+}
 
 // Picks up to SET_SIZE new words pooled from *every currently active deck*,
 // vocab and grammar together (see `getActiveDeckIds`) — "you can have more

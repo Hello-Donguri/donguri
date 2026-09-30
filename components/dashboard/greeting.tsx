@@ -1,6 +1,5 @@
-"use client";
-
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { connection } from "next/server";
 
 function pickGreeting() {
   const hour = new Date().getHours();
@@ -28,14 +27,19 @@ const inspirationOptions = [
   "君はすごい！",
 ];
 
+// A Server Component, so the random picks happen once, on the server, and the
+// HTML arrives already decided — picking in a Client Component ran them again
+// during hydration and mismatched. `connection()` defers to request time, as
+// Cache Components requires before `Math.random()` / `new Date()`. The time of
+// day is the server's clock, not the learner's.
 // `children` sits under the greeting — the course page's badge row.
-export const Greeting = ({ firstName, children }: { firstName: string; children?: ReactNode }) => {
-  const [greeting] = useState(pickGreeting);
+export const Greeting = async ({ firstName, children }: { firstName: string; children?: ReactNode }) => {
+  await connection();
 
-  const [randomInspiration] = useState(
-    () =>
-      inspirationOptions[Math.floor(Math.random() * inspirationOptions.length)],
-  );
+  const greeting = pickGreeting();
+
+  const randomInspiration =
+    inspirationOptions[Math.floor(Math.random() * inspirationOptions.length)];
 
   const fullGreeting = `${greeting}, ${firstName}`;
 

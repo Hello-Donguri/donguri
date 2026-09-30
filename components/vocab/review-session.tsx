@@ -186,11 +186,22 @@ const ReviewSessionQuestions = ({
         question.kind === "form-choice"
           ? await submitFormAnswer(question.wordId, question.formId, option, true)
           : question.kind === "multiple-choice"
-            ? await submitAnswer(question.wordId, question.direction, option, true)
+            ? await submitAnswer(
+                question.wordId,
+                question.direction,
+                option,
+                true,
+                question.options.map((choice) => choice.text),
+              )
             : null;
       if (!result) return;
 
-      setFeedback({ selected: option, correct: result.correct, correctAnswer: result.correctAnswer });
+      setFeedback({
+        selected: option,
+        correct: result.correct,
+        correctAnswer: result.correctAnswer,
+        meanings: "meanings" in result ? result.meanings : undefined,
+      });
       recordResult(result.correct);
       setXp(result.xp);
     } finally {

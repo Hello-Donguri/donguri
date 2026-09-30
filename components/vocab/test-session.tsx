@@ -107,8 +107,19 @@ export const TestSession = ({
     setPending(true);
 
     try {
-      const result = await submitAnswer(question.wordId, question.direction, option.text);
-      setFeedback({ selected: option.text, correct: result.correct, correctAnswer: result.correctAnswer });
+      const result = await submitAnswer(
+        question.wordId,
+        question.direction,
+        option.text,
+        false,
+        question.options.map((choice) => choice.text),
+      );
+      setFeedback({
+        selected: option.text,
+        correct: result.correct,
+        correctAnswer: result.correctAnswer,
+        meanings: result.meanings,
+      });
       recordResult(result.correct);
       setXp(result.xp);
     } finally {

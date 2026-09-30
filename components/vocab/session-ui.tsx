@@ -6,7 +6,7 @@ import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { useSpeech } from "@/lib/speech";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { Jyutping } from "@/components/vocab/jyutping";
-import type { MultipleChoiceQuestion, QuizOption } from "@/lib/definitions";
+import type { MultipleChoiceQuestion, OptionMeaning, QuizOption } from "@/lib/definitions";
 import type { RetryReason } from "@/lib/actions/vocab";
 
 export const SpeakButton = ({
@@ -134,6 +134,9 @@ export type ChoiceFeedback = {
   // Right on the second go after a near miss (see RetryNote) — correct, but
   // for half XP.
   retried?: RetryReason;
+  // What each multiple-choice option means, keyed by its text — revealed
+  // under every option once answered.
+  meanings?: Record<string, OptionMeaning>;
 };
 
 // A nearly-right answer waiting to be typed again (see submitTypedAnswer's
@@ -382,41 +385,55 @@ export const MultipleChoiceOptions = ({
     <div
       className={`mt-6 grid w-full grid-cols-1 gap-3 ${singleColumn ? "" : "md:grid-cols-2"}`}
     >
-      {question.options.map((option, index) => (
-        <div
-          key={option.text}
-          // The ring goes on the whole row, since the focusable button is
-          // only its middle (the speak button sits beside it).
-          className={`flex min-h-16 items-center gap-4 rounded-2xl border-2 px-4 py-2.5 transition has-[[data-option]:focus-visible]:ring-4 has-[[data-option]:focus-visible]:ring-ai/30 ${choiceStyle(feedback, option.text)}`}
-        >
-          <ChoiceBadge index={index} feedback={feedback} option={option.text} />
-          <button
-            ref={(element) => {
-              optionRefs.current[index] = element;
-            }}
-            data-option
-            type="button"
-            disabled={disabled}
-            onClick={() => onChoose(option)}
-            aria-label={t("test_session.choose_option", "Choose {{option}}", {
-              option: option.text,
-            })}
-            className="flex min-w-0 flex-1 items-center self-stretch text-left text-lg font-semibold outline-none disabled:cursor-not-allowed"
+      {question.options.map((option, index) => {
+        const meaning = feedback?.meanings?.[option.text];
+        return (
+          <div
+            key={option.text}
+            // The ring goes on the whole row, since the focusable button is
+            // only its middle (the speak button sits beside it).
+            className={`flex min-h-16 items-center gap-4 rounded-2xl border-2 px-4 py-2.5 transition has-[[data-option]:focus-visible]:ring-4 has-[[data-option]:focus-visible]:ring-ai/30 ${choiceStyle(feedback, option.text)}`}
           >
-            <span className="capitalize">
-              {option.text}
-              {option.romanization && (
-                <span className="mt-0.5 block text-sm font-normal lowercase">
-                  <Jyutping text={option.romanization} />
-                </span>
-              )}
-            </span>
-          </button>
-          {!promptIsTargetLanguage && (
-            <SpeakButton text={option.text} language={question.targetLanguage} />
-          )}
-        </div>
-      ))}
+            <ChoiceBadge index={index} feedback={feedback} option={option.text} />
+            <button
+              ref={(element) => {
+                optionRefs.current[index] = element;
+              }}
+              data-option
+              type="button"
+              disabled={disabled}
+              onClick={() => onChoose(option)}
+              aria-label={t("test_session.choose_option", "Choose {{option}}", {
+                option: option.text,
+              })}
+              className="flex min-w-0 flex-1 items-center self-stretch text-left text-lg font-semibold outline-none disabled:cursor-not-allowed"
+            >
+              <span className="capitalize">
+                {option.text}
+                {option.romanization && (
+                  <span className="mt-0.5 block text-sm font-normal lowercase">
+                    <Jyutping text={option.romanization} />
+                  </span>
+                )}
+                {meaning && (
+                  <span className="mt-1 block text-sm font-normal normal-case opacity-75">
+                    {meaning.text}
+                    {meaning.romanization && (
+                      <span className="lowercase">
+                        {" "}
+                        (<Jyutping text={meaning.romanization} />)
+                      </span>
+                    )}
+                  </span>
+                )}
+              </span>
+            </button>
+            {!promptIsTargetLanguage && (
+              <SpeakButton text={option.text} language={question.targetLanguage} />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };

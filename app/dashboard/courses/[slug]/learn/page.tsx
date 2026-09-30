@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import Link from "next/link";
 import { getCourseHome, getCourseTitle, getLearnQueueForCourse } from "@/lib/dal";
 import { LearnSession } from "@/components/vocab/learn-session";
@@ -18,6 +19,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function LearnPage({ params }: PageProps) {
+  // Request time, not a prerender: the session read checks token expiry
+  // against `Date.now()`, which Cache Components rejects outside a cache
+  // scope. Unlike the course page this isn't a private cache — a session's
+  // queue must always be fresh.
+  await connection();
   const { slug } = await params;
 
   const [{ course }, words, { t }] = await Promise.all([

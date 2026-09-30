@@ -198,9 +198,11 @@ export function StreakChart({
         )}
       </div>
 
+      {/* Gold text is too faint on cream (1.5:1), so light mode writes it
+          in acorn brown (5.4:1) and keeps just the flame gold. */}
       {currentStreak > 0 && activeToday === false && (
-        <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-kin">
-          <Flame className="h-3.5 w-3.5 shrink-0" />
+        <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-acorn dark:font-medium dark:text-kin">
+          <Flame className="h-3.5 w-3.5 shrink-0 fill-kin text-kin" />
           {t(
             "streak_chart.at_risk",
             "Learn or review today so you don't lose your {{count}}-day streak!",
