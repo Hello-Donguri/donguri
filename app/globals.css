@@ -311,3 +311,16 @@ body {
     animation: none;
   }
 }
+
+/* The review's inline lesson (see InlineLesson) eases in under the feedback
+   rather than popping in. */
+@keyframes lesson-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

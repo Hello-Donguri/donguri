@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
-import { getCourseHome, getCourseTitle, getReviewQueue, requireProfile } from "@/lib/dal";
+import { ArrowLeft } from "lucide-react";
+import { getCourseTitle, getReviewQueue, requireProfile } from "@/lib/dal";
 import { ReviewSession } from "@/components/vocab/review-session";
 import { FreshSession } from "@/components/vocab/fresh-session";
-import { Breadcrumbs, type BreadcrumbItem } from "@/components/ui/breadcrumbs";
+import { Button } from "@/components/ui/button";
 import { getTranslator } from "@/lib/i18n/server";
 
 type PageProps = {
@@ -22,19 +23,11 @@ export default async function CourseReviewPage({ params }: PageProps) {
   // queue must always be fresh.
   await connection();
   const { slug } = await params;
-  const [{ course }, quiz, profile, { t }] = await Promise.all([
-    getCourseHome(slug),
+  const [quiz, profile, { t }] = await Promise.all([
     getReviewQueue(slug),
     requireProfile(),
     getTranslator(),
   ]);
-
-  const breadcrumbItems: BreadcrumbItem[] = [
-    { href: "/dashboard", label: t("breadcrumbs.dashboard", "Dashboard") },
-    { href: "/dashboard/courses", label: t("breadcrumbs.courses", "Courses") },
-    { href: `/dashboard/courses/${slug}`, label: course.title, prefetch: true },
-    { label: t("review_session.review", "Review") },
-  ];
 
   // An empty queue is still handed to ReviewSession rather than rendering
   // an empty state here: it sends a learner who arrives with nothing due
@@ -42,7 +35,13 @@ export default async function CourseReviewPage({ params }: PageProps) {
   // screen when this page re-renders underneath them.
   return (
     <div className="flex flex-col gap-6">
-      <Breadcrumbs items={breadcrumbItems} />
+      {/* No breadcrumb mid-review — just the way back out. */}
+      <div className="flex justify-start">
+        <Button href={`/dashboard/courses/${slug}`} prefetch variant="outline" size="sm">
+          <ArrowLeft aria-hidden className="h-4 w-4" />
+          {t("test_session.back_to_course", "Back to course")}
+        </Button>
+      </div>
       <FreshSession>
         <ReviewSession
           quiz={quiz}

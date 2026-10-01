@@ -16,7 +16,10 @@ export type AccessoryId =
   | "viking"
   | "dinosaur"
   | "shark"
-  | "pirate";
+  | "pirate"
+  | "kiss"
+  | "beer-hat"
+  | "dungarees";
 
 export type Accessory = {
   id: AccessoryId;
@@ -38,6 +41,9 @@ export const ACCESSORIES: Accessory[] = [
   { id: "dinosaur", label: "Dinosaur", threshold: 250, image: "/costumes/dinosaur.webp" },
   { id: "shark", label: "Shark", threshold: 250, image: "/costumes/shark.webp" },
   { id: "pirate", label: "Pirate", threshold: 250, image: "/costumes/pirate.webp" },
+  { id: "kiss", label: "Kiss", threshold: 400, image: "/costumes/kiss.webp" },
+  { id: "beer-hat", label: "Beer hat", threshold: 400, image: "/costumes/drinkhat.webp" },
+  { id: "dungarees", label: "Dungarees", threshold: 400, image: "/costumes/dungarees.webp" },
 ];
 
 const LEVEL_THRESHOLDS = [...new Set(ACCESSORIES.map((accessory) => accessory.threshold))].sort(

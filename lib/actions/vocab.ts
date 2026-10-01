@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import {
   bumpStreak,
   ensureDeckActivations,
-  getLessonWord,
   introduceLearnWords,
   requireSubscriber,
 } from "@/lib/dal";
@@ -17,7 +16,7 @@ import {
   toUTCDateString,
 } from "@/lib/srs";
 import { ACCESSORIES, levelForXp, parseDonguriConfig, type AccessoryId } from "@/lib/levels";
-import type { OptionMeaning, QuizDirection, RevealWord } from "@/lib/definitions";
+import type { OptionMeaning, QuizDirection } from "@/lib/definitions";
 import { isLatinTypeable } from "@/lib/language";
 
 // How loosely a typed answer is read. Vocab answers are lenient: slashes
@@ -905,13 +904,4 @@ export async function resetCourseProgress(courseId: string): Promise<void> {
   // "layout" scope too: the header's XP/level badge lives in the shared
   // dashboard layout, not just the vocab pages under this exact path.
   revalidatePath("/dashboard", "layout");
-}
-
-// The learn card for one word, for the quiz's "See the lesson" modal —
-// read-only, so it records nothing.
-export async function getWordLesson(
-  courseSlug: string,
-  wordId: string,
-): Promise<RevealWord | null> {
-  return getLessonWord(courseSlug, wordId);
 }

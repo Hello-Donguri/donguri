@@ -30,7 +30,7 @@ import { Button } from "@/components/ui/button";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { Jyutping, JyutpingInput } from "@/components/vocab/jyutping";
-import { LessonButton } from "@/components/vocab/word-lesson";
+import { InlineLesson, LessonButton, loadLesson } from "@/components/vocab/word-lesson";
 import { parseDonguriConfig, formatXp, type AccessoryId } from "@/lib/levels";
 
 type ReviewSessionProps = {
@@ -119,6 +119,13 @@ const ReviewSessionQuestions = ({
   ) {
     throw new Error(`ReviewSession received an unexpected question kind: ${question.kind}`);
   }
+
+  // Fetch this question's lesson in the background while it's being
+  // answered, so it's ready to show the moment they get it wrong. A route
+  // handler fetch at low priority, so it never holds up the answer itself.
+  useEffect(() => {
+    loadLesson(courseSlug, question.wordId);
+  }, [courseSlug, question.wordId]);
 
   const recordResult = (correct: boolean) => {
     setScore((current) => ({
@@ -530,7 +537,12 @@ const ReviewSessionQuestions = ({
         </p>
       )}
 
-      {feedback && (
+      {/* Wrong: the lesson, right here. Right: still a tap away. */}
+      {feedback && !feedback.correct && (
+        <InlineLesson courseSlug={courseSlug} wordId={question.wordId} />
+      )}
+
+      {feedback && feedback.correct && (
         <div className="mt-3 flex justify-center">
           <LessonButton courseSlug={courseSlug} wordId={question.wordId} />
         </div>

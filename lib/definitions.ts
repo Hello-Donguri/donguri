@@ -689,7 +689,9 @@ export const CreateBadgeFormSchema = z
         message:
           badge.metric === "streak_days"
             ? "A streak is already about days, so it can't have a timescale."
-            : "When a word was mastered isn't recorded, so this can't have a timescale.",
+            : badge.metric === "challenge_xp"
+              ? "Daily challenge XP is always counted within one day."
+              : "When a word was mastered isn't recorded, so this can't have a timescale.",
       });
     }
   });

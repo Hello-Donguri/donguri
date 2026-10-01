@@ -1,10 +1,9 @@
 "use client";
 
-import { useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useAnimate } from "framer-motion";
 import { BookOpen, MessageSquareQuote } from "lucide-react";
 import type { RevealWord, WordType } from "@/lib/definitions";
-import { getWordLesson } from "@/lib/actions/vocab";
 import { ListenButton, SpeakButton } from "@/components/vocab/session-ui";
 import { Jyutping } from "@/components/vocab/jyutping";
 import { syllableRanges } from "@/lib/cloze";
@@ -419,6 +418,61 @@ const Highlighted = ({
     ),
   );
 
+// Lessons fetched this visit, by course and word — one request per word,
+// however many places ask (the review's preload, its inline lesson, the
+// modal). Through the /api/lesson route handler rather than a server
+// action, so a preload never queues the learner's answer behind it. A
+// failed load is forgotten, so asking again retries.
+const lessonRequests = new Map<string, Promise<RevealWord | null>>();
+
+export function loadLesson(courseSlug: string, wordId: string): Promise<RevealWord | null> {
+  const key = `${courseSlug}:${wordId}`;
+  let request = lessonRequests.get(key);
+  if (!request) {
+    const params = new URLSearchParams({ course: courseSlug, word: wordId });
+    request = fetch(`/api/lesson?${params}`, { priority: "low" })
+      .then((response) => (response.ok ? (response.json() as Promise<RevealWord | null>) : null))
+      .catch(() => null)
+      .then((lesson) => {
+        if (!lesson) lessonRequests.delete(key);
+        return lesson;
+      });
+    lessonRequests.set(key, request);
+  }
+  return request;
+}
+
+// The lesson for a question the learner just got wrong, shown straight
+// under the feedback — usually already loaded, since the review preloads
+// each question's lesson while it's on screen (see loadLesson). Nothing is
+// shown until it arrives, or if it can't be loaded.
+export const InlineLesson = ({ courseSlug, wordId }: { courseSlug: string; wordId: string }) => {
+  const t = useTranslations();
+  const [lesson, setLesson] = useState<{ wordId: string; word: RevealWord } | null>(null);
+
+  useEffect(() => {
+    let current = true;
+    loadLesson(courseSlug, wordId).then((word) => {
+      if (current && word) setLesson({ wordId, word });
+    });
+    return () => {
+      current = false;
+    };
+  }, [courseSlug, wordId]);
+
+  // Kept from a previous question only until this one's lesson arrives.
+  if (lesson?.wordId !== wordId) return null;
+
+  return (
+    <section
+      aria-label={t("lesson_modal.inline_label", "Lesson")}
+      className={`mt-6 w-full animate-[lesson-in_250ms_ease-out] rounded-4xl border bg-raised p-4 shadow-sm motion-reduce:animate-none sm:p-6 ${lessonAccent(lesson.word.path).card}`}
+    >
+      <WordLesson word={lesson.word} />
+    </section>
+  );
+};
+
 // "See the lesson" for the question just answered: reopens the word's
 // learn card in a dialog, loaded on first open (and kept for re-opens of
 // the same word). The native <dialog> handles focus trapping and Escape.
@@ -439,7 +493,7 @@ export const LessonButton = ({ courseSlug, wordId }: { courseSlug: string; wordI
       setLesson(null);
       setFailed(false);
       startLoading(async () => {
-        const result = await getWordLesson(courseSlug, wordId).catch(() => null);
+        const result = await loadLesson(courseSlug, wordId);
         if (loadedFor.current !== wordId) return;
         setLesson(result);
         setFailed(result === null);

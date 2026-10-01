@@ -1737,3 +1737,16 @@ alter table public.daily_challenge_attempts
 
 alter table public.profiles
   add column if not exists profile_hidden boolean not null default false;
+
+-- 44. Daily challenge XP badges --------------------------------------------------------
+-- A badge for the most daily challenge XP earned in one UTC day (three chats
+-- of up to 6 XP each, so 18 a day per course) — e.g. 3, 6, 12, 15 and 18 XP
+-- tiers. Always counted within one day: the admin form locks the timescale
+-- and the badge is saved with timescale 'day' (see fixedTimescale in
+-- lib/badge-metrics.ts).
+
+alter table public.badges drop constraint if exists badges_metric_check;
+alter table public.badges
+  add constraint badges_metric_check check (
+    metric in ('xp', 'words_learnt', 'words_mastered', 'streak_days', 'reviews_done', 'challenges_done', 'challenge_xp')
+  );

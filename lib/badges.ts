@@ -108,6 +108,14 @@ function metricEvents(scope: BadgeScope): Prisma.Sql {
         from daily_challenge_attempts a
         where a.skipped = false
         ${scope.courseId ? Prisma.sql`and a.course_id = ${scope.courseId}::uuid` : Prisma.empty}`;
+    case "challenge_xp":
+      // Always scoped to a day (see fixedTimescale), so this sums to the
+      // best single day's daily challenge XP.
+      return Prisma.sql`
+        select a.user_id, (a.challenge_date::timestamp at time zone 'UTC') as at, a.xp_earned::float8 as amount
+        from daily_challenge_attempts a
+        where a.xp_earned > 0
+        ${scope.courseId ? Prisma.sql`and a.course_id = ${scope.courseId}::uuid` : Prisma.empty}`;
     case "streak_days":
       throw new Error("Streaks aren't counted from events — see scopedValues.");
   }

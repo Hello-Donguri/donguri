@@ -11,6 +11,7 @@ export const BADGE_METRICS = [
   "streak_days",
   "reviews_done",
   "challenges_done",
+  "challenge_xp",
 ] as const;
 
 export type BadgeMetric = (typeof BADGE_METRICS)[number];
@@ -29,9 +30,17 @@ export function isBadgeTimescale(value: string | null): value is BadgeTimescale 
 }
 
 // Streaks are already about days, and when a word was mastered isn't kept,
-// so neither can be "in a day/week".
+// so neither can be "in a day/week". Daily challenge XP is always counted
+// within one day (see fixedTimescale), so there's nothing to pick.
 export function metricAllowsTimescale(metric: BadgeMetric): boolean {
-  return metric !== "streak_days" && metric !== "words_mastered";
+  return metric !== "streak_days" && metric !== "words_mastered" && metric !== "challenge_xp";
+}
+
+// A metric that only makes sense over one window: daily challenge XP is
+// about one day's three chats (6 XP each at most, so 18 a day per course).
+// Saved as the badge's timescale when it's made.
+export function fixedTimescale(metric: BadgeMetric): BadgeTimescale | null {
+  return metric === "challenge_xp" ? "day" : null;
 }
 
 // XP isn't recorded per course, so an XP badge is always for every course.
@@ -65,6 +74,8 @@ export function badgeMetricLabel(metric: BadgeMetric, t: TFunction): string {
       return t("badges.metric_reviews_done", "Reviews done");
     case "challenges_done":
       return t("badges.metric_challenges_done", "Daily challenges completed");
+    case "challenge_xp":
+      return t("badges.metric_challenge_xp", "Daily challenge XP in one day");
   }
 }
 
@@ -97,5 +108,7 @@ function allTimeGoal(metric: BadgeMetric, threshold: number, t: TFunction): stri
       return t("badges.goal_reviews_done", "Do {{count}} reviews", params);
     case "challenges_done":
       return t("badges.goal_challenges_done", "Complete {{count}} daily challenges", params);
+    case "challenge_xp":
+      return t("badges.goal_challenge_xp", "Earn {{count}} XP from daily challenges", params);
   }
 }

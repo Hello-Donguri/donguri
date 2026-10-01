@@ -9,6 +9,7 @@ import { formatXp, levelForXp } from "@/lib/levels";
 import { Button } from "@/components/ui/button";
 import { DonguriAvatar } from "@/components/icons/DonguriAvatar";
 import { BadgeTile } from "@/components/badges/badge-tile";
+import { levelRingClass } from "@/components/donguri/level-ring";
 import { getTranslator } from "@/lib/i18n/server";
 import type { TFunction } from "@/lib/i18n/translate";
 import type { Locale } from "@/lib/i18n/config";
@@ -87,6 +88,7 @@ export default async function UserProfilePage({ params }: PageProps) {
     year: "numeric",
     timeZone: "UTC",
   }).format(profile.memberSince);
+  const level = levelForXp(profile.xp);
   const activeNow = lastActiveAgoMs !== null && lastActiveAgoMs < NOW_WINDOW;
   const activeToday = lastActiveAgoMs !== null && lastActiveAgoMs < DAY;
 
@@ -112,14 +114,14 @@ export default async function UserProfilePage({ params }: PageProps) {
 
         <div className="relative flex flex-col items-center gap-6 text-center sm:flex-row sm:gap-10 sm:text-left">
           <div className="group relative shrink-0">
-            <div className="flex h-44 w-44 items-center justify-center rounded-full bg-washi/80 shadow-inner ring-4 ring-washi sm:h-56 sm:w-56">
+            <div className={`flex h-44 w-44 items-center justify-center rounded-full bg-washi/80 shadow-inner sm:h-56 sm:w-56 ${levelRingClass(level)}`}>
               <DonguriAvatar
                 equippedAccessory={profile.equippedAccessory}
                 className="profile-bob h-36 w-36 drop-shadow-md sm:h-48 sm:w-48"
               />
             </div>
             <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 -rotate-3 rounded-full bg-acorn px-3 py-1 font-nunito text-sm font-extrabold text-ink-on-dark shadow-md ring-2 ring-washi">
-              {t("xp_counter.level", "Lv {{level}}", { level: levelForXp(profile.xp) })}
+              {t("xp_counter.level", "Lv {{level}}", { level })}
             </span>
           </div>
 

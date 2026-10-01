@@ -15,6 +15,7 @@ import {
   UpdateBadgeFormSchema,
   type BadgeFormState,
 } from "@/lib/definitions";
+import { fixedTimescale } from "@/lib/badge-metrics";
 
 const NOT_ALLOWED = "You don't have permission to do that.";
 
@@ -63,7 +64,8 @@ export async function createBadge(_state: BadgeFormState, formData: FormData): P
   });
   if (!validated.success) return { errors: validated.error.flatten().fieldErrors };
 
-  const { name, threshold, metric, courseId, timescale, image, awardExisting } = validated.data;
+  const { name, threshold, metric, courseId, image, awardExisting } = validated.data;
+  const timescale = fixedTimescale(metric) ?? validated.data.timescale;
   const imageKey = buildBadgeImageKey(image.type);
   try {
     await uploadImage(image, imageKey);

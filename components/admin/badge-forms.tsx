@@ -144,7 +144,9 @@ export function CreateBadgeForm({ courses }: { courses: { id: string; title: str
           disabled={timescaleLocked}
           hint={
             timescaleLocked
-              ? t("admin_badges.timescale_locked", "Streaks and mastered words can only be all time.")
+              ? metric === "challenge_xp"
+                ? t("admin_badges.timescale_locked_day", "Daily challenge XP is always counted within one day.")
+                : t("admin_badges.timescale_locked", "Streaks and mastered words can only be all time.")
               : t("admin_badges.timescale_hint", 'e.g. "In one day" + 10 words learnt = learn 10 words in a single day.')
           }
           errors={state?.errors?.timescale}
