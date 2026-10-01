@@ -27,6 +27,10 @@ const inspirationOptions = [
   "君はすごい！",
 ];
 
+function pickInspiration() {
+  return inspirationOptions[Math.floor(Math.random() * inspirationOptions.length)];
+}
+
 // A Server Component, so the random picks happen once, on the server, and the
 // HTML arrives already decided — picking in a Client Component ran them again
 // during hydration and mismatched. `connection()` defers to request time, as
@@ -38,8 +42,7 @@ export const Greeting = async ({ firstName, children }: { firstName: string; chi
 
   const greeting = pickGreeting();
 
-  const randomInspiration =
-    inspirationOptions[Math.floor(Math.random() * inspirationOptions.length)];
+  const randomInspiration = pickInspiration();
 
   const fullGreeting = `${greeting}, ${firstName}`;
 

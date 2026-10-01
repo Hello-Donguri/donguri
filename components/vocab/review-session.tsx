@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import {
   submitAnswer,
@@ -14,6 +15,8 @@ import {
   SpeakButton,
   ProgressDots,
   ClozeCard,
+  reducedSessionCardVariants,
+  sessionCardVariants,
   FormChoiceOptions,
   useAnswerFocus,
   useEnterToContinue,
@@ -25,7 +28,9 @@ import {
 } from "@/components/vocab/session-ui";
 import { WordImage } from "@/components/ui/word-image";
 import { XpCounter } from "@/components/xp/xp-counter";
+import { XpGainToast, type XpGain } from "@/components/xp/xp-gain-toast";
 import { LevelUpModal } from "@/components/donguri/level-up-modal";
+import { markLevelUpSeen } from "@/lib/actions/donguri";
 import { Button } from "@/components/ui/button";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
 import { useTranslations } from "@/components/i18n/locale-provider";
@@ -41,6 +46,11 @@ type ReviewSessionProps = {
 };
 
 type Feedback = ChoiceFeedback;
+
+// The answer box: a blue-tinted border on a lighter background, and a clear
+// focus ring, so where to type stands out from the card above it.
+const ANSWER_FIELD_CLASS =
+  "h-14 w-full rounded-2xl border-2 border-ai/35 bg-raised px-5 text-lg text-sumi shadow-sm outline-none transition placeholder:text-sumi-soft/70 hover:border-ai/60 focus:border-ai focus:ring-4 focus:ring-ai/20 disabled:opacity-60";
 
 type LevelUpInfo = {
   newLevel: number;
@@ -89,6 +99,7 @@ const ReviewSessionQuestions = ({
   const [quiz] = useState(initialQuiz);
   const t = useTranslations();
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
   const [quizIndex, setQuizIndex] = useState(0);
   const [pending, setPending] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
@@ -98,6 +109,9 @@ const ReviewSessionQuestions = ({
   const [score, setScore] = useState({ correct: 0, incorrect: 0 });
   const [finished, setFinished] = useState(false);
   const [xp, setXp] = useState(initialXp);
+  // The last XP earned mid-session, for the pop-up that replaces an
+  // always-visible counter.
+  const [xpGain, setXpGain] = useState<XpGain | null>(null);
   const [bonusAwarded, setBonusAwarded] = useState(false);
   const [streakBonus, setStreakBonus] = useState(0);
   const [equippedAccessory, setEquippedAccessory] = useState<AccessoryId | null>(
@@ -126,6 +140,11 @@ const ReviewSessionQuestions = ({
   useEffect(() => {
     loadLesson(courseSlug, question.wordId);
   }, [courseSlug, question.wordId]);
+
+  const updateXp = (newXp: number) => {
+    if (newXp > xp) setXpGain({ from: xp, to: newXp, id: Date.now() });
+    setXp(newXp);
+  };
 
   const recordResult = (correct: boolean) => {
     setScore((current) => ({
@@ -177,7 +196,7 @@ const ReviewSessionQuestions = ({
       });
       setRetry(null);
       recordResult(result.correct);
-      setXp(result.xp);
+      updateXp(result.xp);
     } finally {
       setPending(false);
     }
@@ -210,7 +229,7 @@ const ReviewSessionQuestions = ({
         meanings: "meanings" in result ? result.meanings : undefined,
       });
       recordResult(result.correct);
-      setXp(result.xp);
+      updateXp(result.xp);
     } finally {
       setPending(false);
     }
@@ -228,7 +247,9 @@ const ReviewSessionQuestions = ({
         setXp(result.xp);
         setBonusAwarded(result.bonusAwarded);
         setStreakBonus(result.streakBonus);
-        if (result.newLevel > result.previousLevel) {
+        // Only when something unlocked just now — a level-up already shown
+        // elsewhere (see LevelUpCelebration) isn't shown again.
+        if (result.newlyUnlockedAccessories.length > 0) {
           setLevelUpInfo({
             newLevel: result.newLevel,
             newlyUnlockedAccessories: result.newlyUnlockedAccessories,
@@ -331,6 +352,9 @@ const ReviewSessionQuestions = ({
             equippedAccessory={equippedAccessory}
             onDone={(id) => {
               setEquippedAccessory(id);
+              markLevelUpSeen(levelUpInfo.newLevel).catch((error) =>
+                console.error("Couldn't record the level-up as seen:", error),
+              );
               setLevelUpInfo(null);
               refreshDashboardHeader();
             }}
@@ -342,9 +366,7 @@ const ReviewSessionQuestions = ({
 
   return (
     <section className="mx-auto flex w-full max-w-4xl flex-col items-center">
-      <div className="mb-4 flex w-full justify-center">
-        <XpCounter value={xp} />
-      </div>
+      <XpGainToast gain={xpGain} />
 
       <div className="mb-7 flex flex-col items-center gap-3 text-center">
         <span className="rounded-full bg-matcha-soft px-4 py-1.5 text-sm font-medium text-matcha-dark">
@@ -361,192 +383,206 @@ const ReviewSessionQuestions = ({
         <ProgressDots current={quizIndex + 1} total={quiz.length} />
       </div>
 
-      {question.kind === "type-form" || question.kind === "form-choice" ? (
-        <ClozeCard
-          sentence={question.clozeSentence}
-          translation={question.clozeSentenceJa}
-          highlight={question.clozeHighlightJa}
-          romanization={question.clozeRomanization}
-          path={question.path}
-          feedback={feedback}
-        />
-      ) : (
-        <div className="w-full rounded-3xl border border-card-border bg-washi-soft p-7 text-center shadow-sm sm:p-9">
-          {question.direction === "translation-to-term" ? null : (
-            <WordImage
-              src={question.image}
-              alt={question.prompt}
-              className="mx-auto mb-6 max-h-64 w-full object-contain sm:max-h-72"
+      {/* Each question pops out to the left and the next springs in from
+          the right, as in the learn and test sessions. The header above
+          stays put, so progress doesn't jump around. */}
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={quizIndex}
+          variants={reduceMotion ? reducedSessionCardVariants : sessionCardVariants}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          className="flex w-full flex-col items-center"
+        >
+          {question.kind === "type-form" || question.kind === "form-choice" ? (
+            <ClozeCard
+              sentence={question.clozeSentence}
+              translation={question.clozeSentenceJa}
+              highlight={question.clozeHighlightJa}
+              romanization={question.clozeRomanization}
+              path={question.path}
+              feedback={feedback}
             />
+          ) : (
+            <div className="w-full rounded-3xl border border-card-border bg-washi-soft p-7 text-center shadow-sm sm:p-9">
+              {question.direction === "translation-to-term" ? null : (
+                <WordImage
+                  src={question.image}
+                  alt={question.prompt}
+                  className="mx-auto mb-6 max-h-64 w-full object-contain sm:max-h-72"
+                />
+              )}
+              <p className="text-xs font-medium uppercase tracking-wide text-sumi-soft">
+                {question.kind === "multiple-choice"
+                  ? question.direction === "translation-to-term"
+                    ? t("test_session.what_does_this_mean", "What does this mean?")
+                    : t("test_session.find_the_right_word", "Can you find the right word?")
+                  : question.answerRomanized
+                    ? t("test_session.type_the_romanized_word", "Type the romanized word")
+                    : question.direction === "translation-to-term"
+                      ? t("test_session.what_does_this_mean", "What does this mean?")
+                      : t("test_session.type_the_word", "Type the word")}
+              </p>
+              <div className="mt-3 flex items-center justify-center gap-3">
+                <p className="text-3xl font-semibold text-sumi capitalize">{question.prompt}</p>
+
+                {question.direction === "term-to-translation" && (
+                  <SpeakButton text={question.prompt} language={question.targetLanguage} />
+                )}
+              </div>
+              {question.promptRomanization && (
+                <p className="mt-2 text-sm text-sumi-soft">
+                  <Jyutping text={question.promptRomanization} chart />
+                </p>
+              )}
+            </div>
           )}
-          <p className="text-xs font-medium uppercase tracking-wide text-sumi-soft">
-            {question.kind === "multiple-choice"
-              ? question.direction === "translation-to-term"
-                ? t("test_session.what_does_this_mean", "What does this mean?")
-                : t("test_session.find_the_right_word", "Can you find the right word?")
-              : question.answerRomanized
-                ? t("test_session.type_the_romanized_word", "Type the romanized word")
-                : question.direction === "translation-to-term"
-                  ? t("test_session.what_does_this_mean", "What does this mean?")
-                  : t("test_session.type_the_word", "Type the word")}
-          </p>
-          <div className="mt-3 flex items-center justify-center gap-3">
-            <p className="text-3xl font-semibold text-sumi capitalize">{question.prompt}</p>
 
-            {question.direction === "term-to-translation" && (
-              <SpeakButton text={question.prompt} language={question.targetLanguage} />
-            )}
-          </div>
-          {question.promptRomanization && (
-            <p className="mt-2 text-sm text-sumi-soft">
-              <Jyutping text={question.promptRomanization} chart />
-            </p>
-          )}
-        </div>
-      )}
-
-      {question.kind === "form-choice" ? (
-        <FormChoiceOptions
-          options={question.options}
-          feedback={feedback}
-          disabled={pending || Boolean(feedback)}
-          onChoose={handleChoice}
-        />
-      ) : question.kind === "multiple-choice" ? (
-        <MultipleChoiceOptions
-          question={question}
-          feedback={feedback}
-          disabled={pending || Boolean(feedback)}
-          onChoose={(option) => handleChoice(option.text)}
-        />
-      ) : (
-        <>
-          {retry && !feedback && <RetryNote retry={retry} />}
-          <form
-            className="mt-5 flex w-full flex-col gap-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              handleSubmit();
-            }}
-          >
-            {question.kind === "type-answer" &&
-            question.answerRomanized &&
-            question.targetLanguage === "yue" ? (
-              <JyutpingInput
-                inputRef={answerInputRef}
-                autoFocus={false}
-                value={typedAnswer}
-                onChange={setTypedAnswer}
-                disabled={pending || Boolean(feedback)}
-                placeholder={t("test_session.type_jyutping_placeholder", "Type the Jyutping")}
-                className="h-14 w-full rounded-2xl border border-sumi/15 bg-washi px-5 text-lg text-sumi outline-none transition focus:border-ai/50 disabled:opacity-60"
-              />
-            ) : (
-              <input
-                type="text"
-                value={typedAnswer}
-                onChange={(event) => setTypedAnswer(event.target.value)}
-                disabled={pending || Boolean(feedback)}
-                ref={answerInputRef}
-                autoComplete="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                placeholder={
-                  question.kind === "type-answer" && question.answerRomanized
-                    ? t("test_session.type_romanized_placeholder", "Type the romanization")
-                    : t("test_session.type_answer_placeholder", "Type your answer")
-                }
-                className="h-14 w-full rounded-2xl border border-sumi/15 bg-washi px-5 text-lg text-sumi outline-none transition focus:border-ai/50 disabled:opacity-60"
-              />
-            )}
-
-            {!feedback && (
-              <Button
-                type="submit"
-                disabled={pending || typedAnswer.trim() === ""}
-                size="lg"
-                fullWidth
-                className="shadow-sm hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0"
+          {question.kind === "form-choice" ? (
+            <FormChoiceOptions
+              options={question.options}
+              feedback={feedback}
+              disabled={pending || Boolean(feedback)}
+              onChoose={handleChoice}
+            />
+          ) : question.kind === "multiple-choice" ? (
+            <MultipleChoiceOptions
+              question={question}
+              feedback={feedback}
+              disabled={pending || Boolean(feedback)}
+              onChoose={(option) => handleChoice(option.text)}
+            />
+          ) : (
+            <>
+              {retry && !feedback && <RetryNote retry={retry} />}
+              <form
+                className="mt-5 flex w-full flex-col gap-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  handleSubmit();
+                }}
               >
-                {t("test_session.check", "Check")}
-              </Button>
-            )}
-          </form>
-        </>
-      )}
+                {question.kind === "type-answer" &&
+                question.answerRomanized &&
+                question.targetLanguage === "yue" ? (
+                  <JyutpingInput
+                    inputRef={answerInputRef}
+                    autoFocus={false}
+                    value={typedAnswer}
+                    onChange={setTypedAnswer}
+                    disabled={pending || Boolean(feedback)}
+                    placeholder={t("test_session.type_jyutping_placeholder", "Type the Jyutping")}
+                    className={ANSWER_FIELD_CLASS}
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    value={typedAnswer}
+                    onChange={(event) => setTypedAnswer(event.target.value)}
+                    disabled={pending || Boolean(feedback)}
+                    ref={answerInputRef}
+                    autoComplete="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    placeholder={
+                      question.kind === "type-answer" && question.answerRomanized
+                        ? t("test_session.type_romanized_placeholder", "Type the romanization")
+                        : t("test_session.type_answer_placeholder", "Type your answer")
+                    }
+                    className={ANSWER_FIELD_CLASS}
+                  />
+                )}
 
-      {feedback && (
-        <div
-          aria-live="polite"
-          className={`mt-5 w-full rounded-2xl px-5 py-4 text-center ${
-            feedback.correct ? "bg-matcha-soft text-matcha-dark" : "bg-shu/5 text-shu-dark"
-          }`}
-        >
-          <p className="font-semibold">
-            {feedback.correct
-              ? t("test_session.great_job", "Great job! You got it.")
-              : t("test_session.almost", "Almost! You'll get it next time.")}
-          </p>
+                {!feedback && (
+                  <Button
+                    type="submit"
+                    disabled={pending || typedAnswer.trim() === ""}
+                    size="lg"
+                    fullWidth
+                    className="shadow-sm hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0"
+                  >
+                    {t("test_session.check", "Check")}
+                  </Button>
+                )}
+              </form>
+            </>
+          )}
 
-          {!feedback.correct && (
-            <p className="mt-1 text-sm">
-              {t("test_session.correct_answer_is", "The correct answer is")}{" "}
-              <strong>
-                <Jyutping text={feedback.correctAnswer} />
-              </strong>
-              .
+          {feedback && (
+            <div
+              aria-live="polite"
+              className={`mt-5 w-full rounded-2xl px-5 py-4 text-center ${
+                feedback.correct ? "bg-matcha-soft text-matcha-dark" : "bg-shu/5 text-shu-dark"
+              }`}
+            >
+              <p className="font-semibold">
+                {feedback.correct
+                  ? t("test_session.great_job", "Great job! You got it.")
+                  : t("test_session.almost", "Almost! You'll get it next time.")}
+              </p>
+
+              {!feedback.correct && (
+                <p className="mt-1 text-sm">
+                  {t("test_session.correct_answer_is", "The correct answer is")}{" "}
+                  <strong>
+                    <Jyutping text={feedback.correctAnswer} />
+                  </strong>
+                  .
+                </p>
+              )}
+
+              {feedback.correct && feedback.fullAnswer && (
+                <p className="mt-1 text-sm">
+                  {t("test_session.full_answer_is", "Just note the full answer:")}{" "}
+                  <strong>{feedback.fullAnswer}</strong>
+                </p>
+              )}
+
+              {feedback.correct && feedback.alternatives && feedback.alternatives.length > 1 && (
+                <p className="mt-1 text-sm">
+                  {t("test_session.either_is_fine", "Either answer is fine:")}{" "}
+                  <strong>{feedback.alternatives.join(" / ")}</strong>
+                </p>
+              )}
+
+              {feedback.retried && (
+                <p className="mt-1 text-sm">{retriedMessage(feedback.retried, t)}</p>
+              )}
+            </div>
+          )}
+
+          {feedback && (
+            <Button
+              onClick={advance}
+              size="lg"
+              fullWidth
+              className="mt-5 shadow-sm hover:-translate-y-0.5 hover:shadow-md"
+            >
+              {quizIndex + 1 < quiz.length
+                ? t("review_session.next_word", "Next word")
+                : t("test_session.see_my_results", "See my results")}
+            </Button>
+          )}
+
+          {feedback && (
+            <p className="mt-2 hidden text-center text-xs text-sumi-soft/80 sm:block">
+              {t("learn_session.enter_hint", "or press Enter")}
             </p>
           )}
 
-          {feedback.correct && feedback.fullAnswer && (
-            <p className="mt-1 text-sm">
-              {t("test_session.full_answer_is", "Just note the full answer:")}{" "}
-              <strong>{feedback.fullAnswer}</strong>
-            </p>
+          {/* Wrong: the lesson, right here. Right: still a tap away. */}
+          {feedback && !feedback.correct && (
+            <InlineLesson courseSlug={courseSlug} wordId={question.wordId} />
           )}
 
-          {feedback.correct && feedback.alternatives && feedback.alternatives.length > 1 && (
-            <p className="mt-1 text-sm">
-              {t("test_session.either_is_fine", "Either answer is fine:")}{" "}
-              <strong>{feedback.alternatives.join(" / ")}</strong>
-            </p>
+          {feedback && feedback.correct && (
+            <div className="mt-3 flex justify-center">
+              <LessonButton courseSlug={courseSlug} wordId={question.wordId} />
+            </div>
           )}
-
-          {feedback.retried && (
-            <p className="mt-1 text-sm">{retriedMessage(feedback.retried, t)}</p>
-          )}
-        </div>
-      )}
-
-      {feedback && (
-        <Button
-          onClick={advance}
-          size="lg"
-          fullWidth
-          className="mt-5 shadow-sm hover:-translate-y-0.5 hover:shadow-md"
-        >
-          {quizIndex + 1 < quiz.length
-            ? t("review_session.next_word", "Next word")
-            : t("test_session.see_my_results", "See my results")}
-        </Button>
-      )}
-
-      {feedback && (
-        <p className="mt-2 hidden text-center text-xs text-sumi-soft/80 sm:block">
-          {t("learn_session.enter_hint", "or press Enter")}
-        </p>
-      )}
-
-      {/* Wrong: the lesson, right here. Right: still a tap away. */}
-      {feedback && !feedback.correct && (
-        <InlineLesson courseSlug={courseSlug} wordId={question.wordId} />
-      )}
-
-      {feedback && feedback.correct && (
-        <div className="mt-3 flex justify-center">
-          <LessonButton courseSlug={courseSlug} wordId={question.wordId} />
-        </div>
-      )}
+        </motion.div>
+      </AnimatePresence>
     </section>
   );
 };

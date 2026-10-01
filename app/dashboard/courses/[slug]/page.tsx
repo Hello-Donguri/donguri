@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cacheLife } from "next/cache";
-import { ArrowRight } from "lucide-react";
 
 import {
   getCourseDecks,
@@ -24,6 +23,7 @@ import { Greeting } from "@/components/dashboard/greeting";
 import { LeaderboardTabs } from "@/components/leaderboard/leaderboard-tabs";
 import { DeckCompleteCelebration } from "@/components/vocab/deck-complete-celebration";
 import { BadgeCelebration } from "@/components/badges/badge-celebration";
+import { LevelUpCelebration } from "@/components/donguri/level-up-celebration";
 import { CourseBadges } from "@/components/badges/course-badges";
 import { badgeShelf, startOfBadgeWeek } from "@/lib/badges";
 import {
@@ -34,6 +34,7 @@ import { ResetProgressButton } from "@/components/vocab/reset-progress-button";
 import { ReviewQueueDevPanel } from "@/components/vocab/review-queue-dev-panel";
 import { DailyChallengeDevReset } from "@/components/vocab/daily-challenge-dev-reset";
 import ReadingRabbit from "@/components/icons/ReadingRabbit";
+import { FakeButton } from "@/components/ui/fake-button";
 import { SleepingDuck } from "@/components/icons/SleepingDuck";
 
 type PageProps = {
@@ -343,6 +344,8 @@ export default async function CourseHomePage({ params }: PageProps) {
       {/* After the deck card in the DOM, so a badge earned alongside a
           finished deck is celebrated first, on top. */}
       <BadgeCelebration />
+      {/* After badges in the DOM, so a level-up shows on top, first. */}
+      <LevelUpCelebration />
 
       <main className="flex min-w-0 flex-col gap-6 sm:gap-8">
         <div>
@@ -483,25 +486,6 @@ export default async function CourseHomePage({ params }: PageProps) {
 
 // Button-styled label inside a card link. Rendered as a span because the
 // whole card is already the link, and nesting a real <button> in an <a> is invalid.
-function FakeButton({
-  children,
-  className,
-  labelClassName,
-}: {
-  children: React.ReactNode;
-  className: string;
-  labelClassName?: string;
-}) {
-  return (
-    <span
-      className={`inline-flex h-11 items-center gap-2 rounded-full px-4 text-sm font-bold shadow-sm backdrop-blur-sm transition-[gap] group-hover:gap-3 ${className}`}
-    >
-      <span className={labelClassName}>{children}</span>
-      <ArrowRight className="h-4 w-4 shrink-0" />
-    </span>
-  );
-}
-
 // Notification-style count bubble pinned to the corner of a card's icon chip.
 function CountBadge({ count }: { count: number }) {
   if (count <= 0) return null;

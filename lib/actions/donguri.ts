@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
-import { isAccessoryId, parseDonguriConfig, type AccessoryId } from "@/lib/levels";
+import { isAccessoryId, levelForXp, parseDonguriConfig, type AccessoryId } from "@/lib/levels";
+import { markLevelSeen, unlockEarnedAccessories, type AccessoryUnlocks } from "@/lib/accessory-unlocks";
 
 export async function equipAccessory(accessoryId: AccessoryId | null): Promise<void> {
   const user = await requireUser();
@@ -45,4 +46,30 @@ export async function equipAccessory(accessoryId: AccessoryId | null): Promise<v
   // the next `completeQuiz` (which does revalidate the layout) — an
   // acceptable trade-off for not breaking the flow it's shown inside.
   revalidatePath("/dashboard/profile");
+}
+
+// A level-up the learner hasn't seen yet — e.g. crossed by an answer in a
+// review they left before the results screen (which is where a session
+// normally shows it), one whose results screen they left before the modal
+// appeared, or one from daily challenge XP. Checked when they land on the
+// dashboard or a course page (see LevelUpCelebration), the way badges are:
+// unlocks the level's accessories and returns what the level-up modal needs,
+// or null when there's nothing unseen.
+export async function claimLevelUp(): Promise<(AccessoryUnlocks & { newLevel: number }) | null> {
+  const user = await requireUser();
+  const profile = await prisma.profile.findUniqueOrThrow({
+    where: { id: user.id },
+    select: { xp: true },
+  });
+
+  const unlocks = await unlockEarnedAccessories(user.id, profile.xp);
+  if (!unlocks.levelUpUnseen) return null;
+  return { ...unlocks, newLevel: levelForXp(profile.xp) };
+}
+
+// Called when a level-up modal is dismissed — from a session's results
+// screen or LevelUpCelebration — so it isn't shown again.
+export async function markLevelUpSeen(level: number): Promise<void> {
+  const user = await requireUser();
+  await markLevelSeen(user.id, level);
 }

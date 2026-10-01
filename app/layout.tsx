@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist_Mono, Nunito, Open_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import GoogleAnalytics from "@/components/vocab/GoogleAnalytics";
 import { WebVitals } from "@/components/WebVitals";
@@ -9,24 +9,34 @@ import { getLocale } from "@/lib/i18n/get-locale";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import PeeringDonguriAcorn from "@/components/auth/peering-donguri";
 
+// Self-hosted (app/fonts/) rather than next/font/google: Google started
+// answering with font URLs (fonts.gstatic.com/l/font?kit=…&skey=…) that
+// next/font/google can't parse ("queries have exactly one entry"), which
+// broke the build. Each file is the Latin subset of the Google Fonts
+// variable font, so one file covers every weight in its range.
+
 // Site content — body text everywhere.
-const openSans = Open_Sans({
+const openSans = localFont({
+  src: "./fonts/open-sans-latin.woff2",
   variable: "--font-open-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: "400 700",
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: "./fonts/geist-mono-latin.woff2",
   variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: "100 900",
+  display: "swap",
 });
 
 // Site titles — headings and the wordmark (see the `h1`-`h6` rule in
 // globals.css and font-nunito on the logo).
-const nunito = Nunito({
+const nunito = localFont({
+  src: "./fonts/nunito-latin.woff2",
   variable: "--font-nunito",
-  subsets: ["latin"],
-  weight: ["400", "600", "700", "800"],
+  weight: "400 800",
+  display: "swap",
 });
 
 export const metadata: Metadata = {

@@ -13,6 +13,7 @@ import type {
   AdminCourseOption,
   AdminQuizQuestionSummary,
   AdminWordSummary,
+  AvailableCourse,
   CourseSummary,
   DailyActivityCount,
   DailyChallengeStatus,
@@ -217,7 +218,7 @@ export const requireAdminProfile = cache(async (): Promise<Profile> => {
 export const getEnrolledCourseCount = cache(async (): Promise<number> => {
   const user = await requireSubscriber();
   return prisma.courseEnrollment.count({
-    where: { userId: user.id, course: { active: true } },
+    where: { userId: user.id, unenrolledAt: null, course: { active: true } },
   });
 });
 
@@ -226,7 +227,7 @@ export const getEnrolledCourses = cache(
     const user = await requireSubscriber();
 
     const enrollments = await prisma.courseEnrollment.findMany({
-      where: { userId: user.id, course: { active: true } },
+      where: { userId: user.id, unenrolledAt: null, course: { active: true } },
       orderBy: { course: { position: "asc" } },
       include: {
         course: {
@@ -566,15 +567,20 @@ export const getAdminWordQuizQuestions = cache(async (wordId: string) => {
   };
 });
 
-export const getAvailableCourses = cache(async (): Promise<CourseSummary[]> => {
+export const getAvailableCourses = cache(async (): Promise<AvailableCourse[]> => {
   const user = await requireSubscriber();
 
   const courses = await prisma.course.findMany({
-    where: { active: true, enrollments: { none: { userId: user.id } } },
+    // Courses they're not currently in — including ones they've left, which
+    // they can rejoin with their progress intact.
+    where: { active: true, enrollments: { none: { userId: user.id, unenrolledAt: null } } },
     orderBy: { position: "asc" },
+    // Any row left here is a course they've left before.
+    include: { enrollments: { where: { userId: user.id }, select: { id: true } } },
   });
 
   return courses.map((course) => ({
+    previouslyEnrolled: course.enrollments.length > 0,
     id: course.id,
     slug: course.slug,
     title: course.title,
@@ -597,7 +603,7 @@ const requireEnrolledCourse = cache(async (courseSlug: string) => {
   const user = await requireSubscriber();
 
   const enrollment = await prisma.courseEnrollment.findFirst({
-    where: { userId: user.id, course: { slug: courseSlug, active: true } },
+    where: { userId: user.id, unenrolledAt: null, course: { slug: courseSlug, active: true } },
     include: { course: true },
   });
 
@@ -1097,7 +1103,7 @@ export const getCourseStreak = cache(async (courseSlug: string): Promise<CourseS
 export const getCourseStreaks = cache(async (): Promise<Record<string, number>> => {
   const user = await requireUser();
   const enrollments = await prisma.courseEnrollment.findMany({
-    where: { userId: user.id, course: { active: true } },
+    where: { userId: user.id, unenrolledAt: null, course: { active: true } },
     select: { course: { select: { id: true, slug: true } } },
   });
 
@@ -1806,7 +1812,7 @@ export async function getReviewDueStatus(): Promise<ReviewDueStatus[]> {
 
   const now = new Date();
   const enrollments = await prisma.courseEnrollment.findMany({
-    where: { userId: profile.id, course: { active: true } },
+    where: { userId: profile.id, unenrolledAt: null, course: { active: true } },
     orderBy: { course: { position: "asc" } },
     select: { course: { select: { id: true, slug: true, title: true } } },
   });

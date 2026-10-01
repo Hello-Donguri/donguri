@@ -15,7 +15,8 @@ import {
   streakBonusXp,
   toUTCDateString,
 } from "@/lib/srs";
-import { ACCESSORIES, levelForXp, parseDonguriConfig, type AccessoryId } from "@/lib/levels";
+import { levelForXp, parseDonguriConfig, type AccessoryId } from "@/lib/levels";
+import { unlockEarnedAccessories } from "@/lib/accessory-unlocks";
 import type { OptionMeaning, QuizDirection } from "@/lib/definitions";
 import { isLatinTypeable } from "@/lib/language";
 
@@ -198,10 +199,32 @@ function isNearMissWord(guess: string, target: string): boolean {
   return distance > 0 && distance <= (target.length >= 8 ? 2 : 1);
 }
 
+// The accepted Jyutping reading a wrong romanized answer was nearly spelt
+// as, or null: the same syllables bar one, and that one a single letter off
+// — an extra, missing, changed or swapped letter ("gaam1" for "gam1"),
+// whatever its tone. Tones are judged separately (see isToneMiss), so
+// they're ignored here; the retry shows the right tones either way.
+function jyutpingSpellingMiss(typed: string, stored: string, leniency: AnswerLeniency): string | null {
+  const guess = withoutTones(typed).split(" ").filter(Boolean);
+  if (guess.length === 0) return null;
+
+  for (const reading of answerReadings(stored, leniency)) {
+    const target = withoutTones(reading).split(" ").filter(Boolean);
+    if (target.length !== guess.length) continue;
+
+    const differing = target.flatMap((syllable, index) =>
+      syllable === guess[index] ? [] : [[guess[index], syllable] as const],
+    );
+    if (differing.length === 1 && spellingDistance(...differing[0]) === 1) return reading;
+  }
+  return null;
+}
+
 // A typed answer that's nearly right isn't marked wrong straight away:
 // the learner is shown the right answer and types it again. "tone" is a
-// Cantonese answer with only its tones wrong; "spelling" is an English
-// answer with a small spelling slip (see nearMissReading). Getting it on
+// Cantonese answer with only its tones wrong; "spelling" is a small
+// spelling slip — in an English answer (see nearMissReading), or one letter
+// in one syllable of a Jyutping answer (see jyutpingSpellingMiss). Getting it on
 // that second go counts as correct, for half the usual XP.
 export type RetryReason = "tone" | "spelling";
 const RETRY_XP = 0.5;
@@ -215,8 +238,12 @@ function retryFor(
   targetLanguage: string,
   romanized: boolean,
 ): { reason: RetryReason; answer: string } | null {
-  if (romanized && targetLanguage === "yue" && isToneMiss(typed, stored, leniency)) {
-    return { reason: "tone", answer: stored.split(",")[0].trim() };
+  if (romanized && targetLanguage === "yue") {
+    if (isToneMiss(typed, stored, leniency)) {
+      return { reason: "tone", answer: stored.split(",")[0].trim() };
+    }
+    const answer = jyutpingSpellingMiss(typed, stored, leniency);
+    if (answer) return { reason: "spelling", answer };
   }
   if (targetLanguage === "en" && isLatinTypeable(stored)) {
     const answer = nearMissReading(typed, stored, leniency);
@@ -669,39 +696,12 @@ export async function completeQuiz(
   const previousLevel = levelForXp(initialXp);
   const newLevel = levelForXp(xp);
 
-  let newlyUnlockedAccessories: AccessoryId[] = [];
-  let unlockedAccessories: AccessoryId[] = [];
-
-  if (newLevel > previousLevel) {
-    const profile = await prisma.profile.findUniqueOrThrow({
-      where: { id: user.id },
-      select: { donguriConfig: true },
-    });
-
-    const config = parseDonguriConfig(profile.donguriConfig);
-    const alreadyUnlocked = new Set(config.unlockedAccessories ?? []);
-
-    // Every accessory whose own threshold has been reached is unlocked at
-    // once — not one-at-a-time in list order, so a level that has several
-    // accessories sharing its threshold (e.g. level 2's set) all become
-    // available together for free choice, without pulling in a later
-    // level's costumes early.
-    const earnedIds = ACCESSORIES.filter((accessory) => accessory.threshold <= xp).map(
-      (accessory) => accessory.id,
-    );
-    newlyUnlockedAccessories = earnedIds.filter((id) => !alreadyUnlocked.has(id));
-    unlockedAccessories = earnedIds;
-
-    // Every level-up reopens the outfit choice — `equipAccessory` locks it
-    // again the moment the learner actually picks something (in the
-    // level-up modal or later from their profile), so this only needs to
-    // flip it back open here, unconditionally, every time a level is
-    // crossed — including later ones where nothing new unlocks.
-    await prisma.profile.update({
-      where: { id: user.id },
-      data: { donguriConfig: { ...config, unlockedAccessories: earnedIds, canChooseOutfit: true } },
-    });
-  }
+  // Unlocks whatever this XP has reached, including a level crossed by an
+  // answer earlier in the session. Empty if it was already claimed (e.g. by
+  // the course page after an earlier session the learner left early) — the
+  // sessions show the level-up modal only when something new unlocked here,
+  // so it's never shown twice.
+  const { newlyUnlockedAccessories, unlockedAccessories } = await unlockEarnedAccessories(user.id, xp);
 
   // Deliberately NOT revalidating here (see `refreshDashboardHeader` below)
   // — a level-up modal may still be showing, and revalidating now was

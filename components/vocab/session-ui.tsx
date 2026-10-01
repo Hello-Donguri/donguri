@@ -173,7 +173,10 @@ export const RetryNote = ({ retry }: { retry: PendingRetry }) => {
       ) : (
         <p className="mt-1 font-semibold">
           {t("test_session.spelling_miss", "The correct spelling is")}{" "}
-          <strong className="text-lg">{retry.answer}</strong>
+          <strong className="text-lg">
+            {/* A Jyutping answer (tone numbers) gets its tone colours. */}
+            {/[a-z][1-6]\b/i.test(retry.answer) ? <Jyutping text={retry.answer} chart /> : retry.answer}
+          </strong>
         </p>
       )}
       <p className="mt-1 text-sm text-sumi-soft">

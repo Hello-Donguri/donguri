@@ -1750,3 +1750,14 @@ alter table public.badges
   add constraint badges_metric_check check (
     metric in ('xp', 'words_learnt', 'words_mastered', 'streak_days', 'reviews_done', 'challenges_done', 'challenge_xp')
   );
+
+-- 45. Unenrolling ----------------------------------------------------------------------
+-- A learner can leave a course from the course list and come back later
+-- with everything intact. Leaving only stamps unenrolled_at — the row (and
+-- with it the course's streak) stays, as does everything kept per word or
+-- per user: user_word_progress, review_events, deck activations, daily
+-- challenge attempts. Enrolling again clears it. Enrolled-course queries
+-- filter on unenrolled_at is null (see lib/dal.ts).
+
+alter table public.course_enrollments
+  add column if not exists unenrolled_at timestamptz;

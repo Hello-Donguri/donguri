@@ -7,6 +7,7 @@ import {
   FormEvent,
   ReactNode,
   useEffect,
+  useId,
   useRef,
   useState,
   useTransition,
@@ -36,6 +37,7 @@ import {
   type DailyChallengeXpBand,
 } from "@/lib/srs";
 import { Button } from "@/components/ui/button";
+import { SkipForward } from "lucide-react";
 import { useLocale, useTranslations } from "@/components/i18n/locale-provider";
 import { cn } from "@/lib/utils";
 import { scoreTone } from "@/components/vocab/challenge-score";
@@ -189,6 +191,7 @@ function DailyChallengeChat({
   );
   const [isReplying, startReply] = useTransition();
   const [isSkipping, startSkip] = useTransition();
+  const skipDialogRef = useRef<HTMLDialogElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const feedbackRef = useRef<HTMLElement>(null);
@@ -355,21 +358,20 @@ function DailyChallengeChat({
     });
   }
 
-  // "Too hard? Skip": uses up this attempt without XP and moves on to the
-  // day's next challenge — or the end-of-day summary after the last. The
-  // page re-renders with the next attempt (see skipDailyChallenge).
+  // "Too hard? Skip": asks first (see SkipChallengeDialog), since it uses
+  // up this attempt without XP. Then moves on to the day's next challenge —
+  // or the end-of-day summary after the last. The page re-renders with the
+  // next attempt (see skipDailyChallenge).
   function handleSkip() {
-    const confirmed = confirm(
-      t(
-        "daily_challenge.skip_confirm",
-        "Skip this challenge? It uses up one of today's attempts and earns no XP.",
-      ),
-    );
-    if (!confirmed) return;
+    skipDialogRef.current?.showModal();
+  }
 
+  function confirmSkip() {
+    if (isSkipping) return;
     setError(null);
     startSkip(async () => {
       const result = await skipDailyChallenge(courseSlug).catch(() => ({ ok: false }));
+      skipDialogRef.current?.close();
       if (!result.ok) {
         setError(t("daily_challenge.skip_failed", "Couldn't skip this challenge. Please try again."));
         return;
@@ -524,6 +526,11 @@ function DailyChallengeChat({
               used={latestTargets}
               onSkip={handleSkip}
               skipDisabled={isCharlesTyping || isSkipping || isAdvancing}
+            />
+            <SkipChallengeDialog
+              dialogRef={skipDialogRef}
+              pending={isSkipping}
+              onConfirm={confirmSkip}
             />
 
             <MotionConfig reducedMotion="user">
@@ -996,7 +1003,7 @@ function TargetBanner({
           type="button"
           onClick={onSkip}
           disabled={skipDisabled}
-          className="shrink-0 self-center rounded-full border border-matcha/30 bg-washi/80 px-3 py-1.5 text-xs font-semibold text-matcha-dark shadow-sm transition hover:bg-washi disabled:cursor-not-allowed disabled:opacity-50"
+          className="shrink-0 cursor-pointer self-center rounded-full border border-matcha/30 bg-washi/80 px-3 py-1.5 text-xs font-semibold text-matcha-dark shadow-sm transition hover:border-matcha/50 hover:bg-washi disabled:cursor-not-allowed disabled:opacity-50"
         >
           {t("daily_challenge.skip", "Too hard? Skip")}
         </button>
@@ -1617,5 +1624,61 @@ function InfoIcon({ className }: IconProps) {
     >
       <path d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16Zm0 3.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2ZM9 9.5a1 1 0 0 1 2 0v4.5a1 1 0 1 1-2 0V9.5Z" />
     </svg>
+  );
+}
+
+// "Are you sure?" before skipping — in Charles's green rather than a
+// warning red, since skipping loses nothing but this attempt.
+function SkipChallengeDialog({
+  dialogRef,
+  pending,
+  onConfirm,
+}: {
+  dialogRef: React.RefObject<HTMLDialogElement | null>;
+  pending: boolean;
+  onConfirm: () => void;
+}) {
+  const t = useTranslations();
+  const titleId = useId();
+  const descriptionId = useId();
+
+  return (
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      aria-describedby={descriptionId}
+      aria-busy={pending}
+      onCancel={(event) => {
+        if (pending) event.preventDefault();
+      }}
+      onClick={(event) => {
+        // A click on the backdrop lands on the <dialog> itself.
+        if (event.target === event.currentTarget && !pending) event.currentTarget.close();
+      }}
+      className="m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-3xl border border-matcha/25 bg-washi p-6 text-sumi shadow-2xl backdrop:bg-sumi/40 backdrop:backdrop-blur-[2px] sm:p-8"
+    >
+      <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-matcha-soft text-matcha-dark">
+        <SkipForward className="h-6 w-6" aria-hidden="true" />
+      </div>
+      <h2 id={titleId} className="text-xl font-bold">
+        {t("daily_challenge.skip_title", "Skip this challenge?")}
+      </h2>
+      <p id={descriptionId} className="mt-3 text-sm leading-relaxed text-sumi-soft">
+        {t(
+          "daily_challenge.skip_description",
+          "It uses up one of today's attempts and earns no XP. You'll move straight on to the next challenge.",
+        )}
+      </p>
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+        <Button variant="outline" autoFocus disabled={pending} onClick={() => dialogRef.current?.close()}>
+          {t("daily_challenge.skip_keep_going", "Keep trying")}
+        </Button>
+        <Button variant="secondary" disabled={pending} onClick={onConfirm}>
+          {pending
+            ? t("daily_challenge.skipping", "Skipping…")
+            : t("daily_challenge.skip_confirm_button", "Skip it")}
+        </Button>
+      </div>
+    </dialog>
   );
 }

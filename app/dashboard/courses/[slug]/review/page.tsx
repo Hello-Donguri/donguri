@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { getCourseTitle, getReviewQueue, requireProfile } from "@/lib/dal";
 import { ReviewSession } from "@/components/vocab/review-session";
 import { FreshSession } from "@/components/vocab/fresh-session";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { getTranslator } from "@/lib/i18n/server";
 
 type PageProps = {
@@ -34,13 +34,22 @@ export default async function CourseReviewPage({ params }: PageProps) {
   // back to the course, but keeps a just-finished review's results on
   // screen when this page re-renders underneath them.
   return (
-    <div className="flex flex-col gap-6">
-      {/* No breadcrumb mid-review — just the way back out. */}
+    // Clips sideways at the edges of the dashboard's main area (the negative
+    // margins cancel its padding), not at the review's narrow column — so a
+    // question card can slide fully out of view between words without being
+    // cut off mid-slide, and without causing a horizontal scrollbar.
+    <div className="-mx-4 flex flex-col gap-6 overflow-x-clip px-4 sm:-mx-6 sm:px-6">
+      {/* No breadcrumb mid-review — just a quiet way back out, styled
+          like the breadcrumb links it stands in for. */}
       <div className="flex justify-start">
-        <Button href={`/dashboard/courses/${slug}`} prefetch variant="outline" size="sm">
-          <ArrowLeft aria-hidden className="h-4 w-4" />
+        <Link
+          href={`/dashboard/courses/${slug}`}
+          prefetch
+          className="group inline-flex items-center gap-1.5 text-sm font-medium text-sumi-soft transition hover:text-sumi"
+        >
+          <ArrowLeft aria-hidden className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
           {t("test_session.back_to_course", "Back to course")}
-        </Button>
+        </Link>
       </div>
       <FreshSession>
         <ReviewSession

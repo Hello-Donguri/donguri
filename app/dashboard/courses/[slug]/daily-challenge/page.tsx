@@ -11,7 +11,8 @@ import { DailyChallenge } from "@/components/vocab/daily-challenge-chat";
 import { firstNameOf, getChallengeOpener } from "@/lib/daily-challenge-opener";
 import { getDailyChallengeReview } from "@/lib/daily-challenge-review";
 import { DailyChallengeSummary } from "@/components/vocab/daily-challenge-summary";
-import { Breadcrumbs, type BreadcrumbItem } from "@/components/ui/breadcrumbs";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { getTranslator } from "@/lib/i18n/server";
 import { Button } from "@/components/ui/button";
 import { parseDonguriConfig, type AccessoryId } from "@/lib/levels";
@@ -44,7 +45,6 @@ async function loadDailyChallenge(slug: string) {
     .equippedAccessory ?? null) as AccessoryId | null;
 
   return {
-    courseTitle: course.title,
     targetLanguage: course.targetLanguage,
     challenge,
     results,
@@ -57,7 +57,7 @@ export default async function DailyChallengePage({ params }: PageProps) {
   const { slug } = await params;
 
   const [
-    { courseTitle, targetLanguage, challenge, results, equippedAccessory, firstName },
+    { targetLanguage, challenge, results, equippedAccessory, firstName },
     { t },
   ] = await Promise.all([
     loadDailyChallenge(slug),
@@ -71,16 +71,20 @@ export default async function DailyChallengePage({ params }: PageProps) {
     : null;
   const isDayComplete = challenge.attemptsToday >= challenge.maxAttemptsPerDay;
 
-  const breadcrumbItems: BreadcrumbItem[] = [
-    { href: "/dashboard", label: t("breadcrumbs.dashboard", "Dashboard") },
-    { href: "/dashboard/courses", label: t("breadcrumbs.courses", "Courses") },
-    { href: `/dashboard/courses/${slug}`, label: courseTitle, prefetch: true },
-    { label: t("course_home.challenge_label", "Daily Challenge") },
-  ];
-
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-      <Breadcrumbs items={breadcrumbItems} />
+      {/* No breadcrumb mid-challenge — just a quiet way back out, the same
+          as the review page's. */}
+      <div className="flex justify-start">
+        <Link
+          href={`/dashboard/courses/${slug}`}
+          prefetch
+          className="group inline-flex items-center gap-1.5 text-sm font-medium text-sumi-soft transition hover:text-sumi"
+        >
+          <ArrowLeft aria-hidden className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+          {t("daily_challenge.back_to_course", "Back to course")}
+        </Link>
+      </div>
 
       <DailyChallenge
         courseSlug={slug}

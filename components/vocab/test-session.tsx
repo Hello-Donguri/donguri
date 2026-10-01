@@ -32,6 +32,7 @@ import {
 import { WordImage } from "@/components/ui/word-image";
 import { XpCounter } from "@/components/xp/xp-counter";
 import { LevelUpModal } from "@/components/donguri/level-up-modal";
+import { markLevelUpSeen } from "@/lib/actions/donguri";
 import { Button } from "@/components/ui/button";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
 import { useTranslations } from "@/components/i18n/locale-provider";
@@ -240,7 +241,9 @@ export const TestSession = ({
         setXp(result.xp);
         setBonusAwarded(result.bonusAwarded);
         setStreakBonus(result.streakBonus);
-        if (result.newLevel > result.previousLevel) {
+        // Only when something unlocked just now — a level-up already shown
+        // elsewhere (see LevelUpCelebration) isn't shown again.
+        if (result.newlyUnlockedAccessories.length > 0) {
           setLevelUpInfo({
             newLevel: result.newLevel,
             newlyUnlockedAccessories: result.newlyUnlockedAccessories,
@@ -354,6 +357,9 @@ export const TestSession = ({
             equippedAccessory={equippedAccessory}
             onDone={(id) => {
               setEquippedAccessory(id);
+              markLevelUpSeen(levelUpInfo.newLevel).catch((error) =>
+                console.error("Couldn't record the level-up as seen:", error),
+              );
               setLevelUpInfo(null);
               refreshDashboardHeader();
             }}

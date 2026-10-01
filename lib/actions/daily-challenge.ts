@@ -584,7 +584,7 @@ export async function sendDailyChallengeMessage(
   }
 
   const enrollment = await prisma.courseEnrollment.findFirst({
-    where: { userId: user.id, course: { slug: courseSlug, active: true } },
+    where: { userId: user.id, unenrolledAt: null, course: { slug: courseSlug, active: true } },
     select: { courseId: true },
   });
 
@@ -834,7 +834,7 @@ export async function skipDailyChallenge(courseSlug: string): Promise<{ ok: bool
   const user = await requireSubscriber();
 
   const enrollment = await prisma.courseEnrollment.findFirst({
-    where: { userId: user.id, course: { slug: courseSlug, active: true } },
+    where: { userId: user.id, unenrolledAt: null, course: { slug: courseSlug, active: true } },
     select: { courseId: true },
   });
   if (!enrollment) return { ok: false };

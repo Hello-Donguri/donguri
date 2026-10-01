@@ -94,8 +94,25 @@ export type DonguriConfig = {
   // including "None," counts). Absent (older data, before this existed)
   // reads as unlocked, matching "no explicit lock means not locked."
   canChooseOutfit?: boolean;
+  // The highest level whose level-up modal the learner has dismissed (see
+  // markLevelUpSeen). Absent (older data) reads as the level their unlocked
+  // accessories add up to — see celebratedLevel below.
+  celebratedLevel?: number;
   [key: string]: unknown;
 };
+
+// The last level-up the learner has seen. Before this was tracked, a level's
+// accessories unlocked as its modal was shown, so for older data the
+// unlocked set stands in for it.
+export function celebratedLevel(config: DonguriConfig): number {
+  if (typeof config.celebratedLevel === "number") return config.celebratedLevel;
+  const unlocked = new Set(config.unlockedAccessories ?? []);
+  const highest = Math.max(
+    0,
+    ...ACCESSORIES.filter((accessory) => unlocked.has(accessory.id)).map((accessory) => accessory.threshold),
+  );
+  return levelForXp(highest);
+}
 
 export function parseDonguriConfig(value: unknown): DonguriConfig {
   return typeof value === "object" && value !== null && !Array.isArray(value)

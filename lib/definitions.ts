@@ -517,6 +517,10 @@ export type CourseSummary = {
   sourceLanguage: string;
 };
 
+// A course the learner isn't in — `previouslyEnrolled` when they left it,
+// so rejoining picks their progress back up.
+export type AvailableCourse = CourseSummary & { previouslyEnrolled: boolean };
+
 export type EnrolledCourseSummary = CourseSummary &
   CourseStreak & {
     totalWords: number;

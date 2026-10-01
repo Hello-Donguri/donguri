@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Award, Bug, ChevronDown, RotateCcw, CreditCard, Flame, GraduationCap, LogOut, Menu, Settings, User, Users, X } from "lucide-react";
+import { Award, BookOpen, Bug, ChevronDown, RotateCcw, CreditCard, Flame, GraduationCap, LogOut, Menu, Settings, User, Users, X } from "lucide-react";
 import { DonguriAvatar } from "@/components/icons/DonguriAvatar";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
@@ -308,6 +308,14 @@ function AccountLinks({
 
   return (
     <>
+      <Link
+        href="/dashboard/courses"
+        onClick={onNavigate}
+        className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-sumi transition hover:bg-sumi/5"
+      >
+        <BookOpen className="h-4 w-4 text-sumi-soft" aria-hidden="true" />
+        {t("dashboard_layout.courses", "Courses")}
+      </Link>
       <Link
         href="/dashboard/profile"
         onClick={onNavigate}
