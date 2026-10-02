@@ -20,6 +20,7 @@ import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 
 import { ActivityOverviewCard } from "@/components/vocab/activity-overview-card";
 import { Greeting } from "@/components/dashboard/greeting";
+import { getCourseGreeting } from "@/lib/course-greetings";
 import { LeaderboardTabs } from "@/components/leaderboard/leaderboard-tabs";
 import { DeckCompleteCelebration } from "@/components/vocab/deck-complete-celebration";
 import { BadgeCelebration } from "@/components/badges/badge-celebration";
@@ -138,7 +139,8 @@ export default async function CourseHomePage({ params }: PageProps) {
       weeklyBadges,
     },
     { t },
-  ] = await Promise.all([loadCourseHome(slug), getTranslator()]);
+    courseGreeting,
+  ] = await Promise.all([loadCourseHome(slug), getTranslator(), getCourseGreeting(slug)]);
 
   const hasReviews = reviewQueue.dueCount > 0;
   // Mirrors the learn queue: an active deck with any word not yet started.
@@ -365,7 +367,11 @@ export default async function CourseHomePage({ params }: PageProps) {
               ]}
             />
           )}
-          <Greeting firstName={profile.first_name ?? profile.email}>
+          <Greeting
+            firstName={profile.first_name ?? profile.email}
+            greetings={courseGreeting.greetings}
+            motivations={courseGreeting.motivations}
+          >
             <CourseBadges earned={badges.earned} locked={badges.locked} />
           </Greeting>
 

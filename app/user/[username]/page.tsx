@@ -9,6 +9,7 @@ import { formatXp, levelForXp } from "@/lib/levels";
 import { Button } from "@/components/ui/button";
 import { DonguriAvatar } from "@/components/icons/DonguriAvatar";
 import { BadgeTile } from "@/components/badges/badge-tile";
+import { StreakChart } from "@/components/vocab/streak-chart";
 import { levelRingClass } from "@/components/donguri/level-ring";
 import { getTranslator } from "@/lib/i18n/server";
 import type { TFunction } from "@/lib/i18n/translate";
@@ -155,36 +156,49 @@ export default async function UserProfilePage({ params }: PageProps) {
         </div>
       </section>
 
-      <dl className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <StatTile
-          icon={<Sparkles aria-hidden className="h-5 w-5 fill-sakura/20 text-sakura" />}
-          tileClass="bg-sakura-soft"
-          iconClass="bg-sakura/10"
-          label={t("user_profile.total_xp", "Total XP")}
-          value={formatXp(profile.xp)}
-        />
-        <StatTile
-          icon={<Flame aria-hidden className="h-5 w-5 fill-kin text-kin" />}
-          tileClass="bg-kin/15"
-          iconClass="bg-kin/20"
-          label={t("user_profile.weekly_xp", "XP this week")}
-          value={formatXp(profile.weeklyXp)}
-        />
-        <StatTile
-          icon={<BookOpen aria-hidden className="h-5 w-5 fill-ai/20 text-ai" />}
-          tileClass="bg-ai-soft"
-          iconClass="bg-ai/10"
-          label={t("user_profile.words_learnt", "Words learnt")}
-          value={String(profile.wordsLearnt)}
-        />
-        <StatTile
-          icon={<Award aria-hidden className="h-5 w-5 text-matcha-dark" />}
-          tileClass="bg-matcha-soft"
-          iconClass="bg-matcha/15"
-          label={t("user_profile.badges_earned", "Badges earned")}
-          value={String(badges.length)}
-        />
-      </dl>
+      {/* Stats on the left, two by two; their week beside them, in the same
+          chart and card as the course page's activity overview. */}
+      <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2">
+        <dl className="grid auto-rows-fr grid-cols-2 gap-3 sm:gap-4">
+          <StatTile
+            icon={<Sparkles aria-hidden className="h-5 w-5 fill-sakura/20 text-sakura" />}
+            tileClass="bg-sakura-soft"
+            iconClass="bg-sakura/10"
+            label={t("user_profile.total_xp", "Total XP")}
+            value={formatXp(profile.xp)}
+          />
+          <StatTile
+            icon={<Flame aria-hidden className="h-5 w-5 fill-kin text-kin" />}
+            tileClass="bg-kin/15"
+            iconClass="bg-kin/20"
+            label={t("user_profile.weekly_xp", "XP this week")}
+            value={formatXp(profile.weeklyXp)}
+          />
+          <StatTile
+            icon={<BookOpen aria-hidden className="h-5 w-5 fill-ai/20 text-ai" />}
+            tileClass="bg-ai-soft"
+            iconClass="bg-ai/10"
+            label={t("user_profile.words_learnt", "Words learnt")}
+            value={String(profile.wordsLearnt)}
+          />
+          <StatTile
+            icon={<Award aria-hidden className="h-5 w-5 text-matcha-dark" />}
+            tileClass="bg-matcha-soft"
+            iconClass="bg-matcha/15"
+            label={t("user_profile.badges_earned", "Badges earned")}
+            value={String(badges.length)}
+          />
+        </dl>
+
+        <div className="min-w-0 overflow-hidden rounded-2xl border border-card-border bg-washi-soft shadow-sm">
+          <StreakChart
+            data={profile.dailyActivity}
+            currentStreak={profile.currentStreak}
+            longestStreak={profile.longestStreak}
+            activeToday={profile.activeToday}
+          />
+        </div>
+      </div>
 
       <section className="rounded-3xl border border-card-border bg-washi-soft p-5 shadow-sm sm:p-6">
         <h2 className="mb-4 flex items-center gap-2 font-nunito text-xl font-extrabold text-sumi">

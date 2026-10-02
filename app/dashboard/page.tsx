@@ -8,6 +8,7 @@ import { BadgeCelebration } from "@/components/badges/badge-celebration";
 import { LevelUpCelebration } from "@/components/donguri/level-up-celebration";
 import { BadgeShelf } from "@/components/badges/badge-shelf";
 import { Greeting } from "@/components/dashboard/greeting";
+import { DEFAULT_MOTIVATIONS } from "@/lib/course-greetings";
 import { CourseCard } from "@/components/dashboard/course-card";
 
 export const metadata: Metadata = {
@@ -50,7 +51,12 @@ export default async function DashboardPage() {
       {/* After badges in the DOM, so a level-up shows on top, first. */}
       <LevelUpCelebration />
 
-      <Greeting firstName={profile.first_name ?? profile.email} />
+      {/* No one course here, so English greetings, with the line under them
+          in the learner's own language. */}
+      <Greeting
+        firstName={profile.first_name ?? profile.email}
+        motivations={DEFAULT_MOTIVATIONS[profile.native_language ?? "en"]}
+      />
 
       <section className="flex flex-col gap-4">
         {/* Finding more courses lives in the avatar menu. */}

@@ -15,7 +15,11 @@ import {
 } from "@/lib/daily-challenge";
 
 const MAX_OPENER_LENGTH = 200;
-const OPENER_TIMEOUT_MS = 8000;
+// The chat shows Charles typing while the opener is written, so there's
+// time to wait — but not forever. Generation was taking 15–20s at default
+// reasoning effort (past an earlier 8s limit, so learners only ever saw the
+// fixed fallback openers); at "low" it's well inside this.
+const OPENER_TIMEOUT_MS = 25_000;
 
 function describeItem(kind: string, item: ChallengeItem): string {
   const romanization = item.romanization ? ` [${item.romanization}]` : "";
@@ -73,12 +77,14 @@ function buildOpenerPrompt(target: ChallengeTarget, firstName: string | null): s
     : `- Only very common, everyday words a total beginner knows. No idioms, no slang, no phrasal verbs like "been up to", no hard grammar.`;
   const fields = cantonese
     ? `{
+	"plan": "Private notes, never shown, one short sentence: the question you'll ask and how its natural answer uses the target",
 	"text": "Charles Duck's opening message, in Cantonese characters",
 	"romanization": "The same message in Jyutping with tone numbers — exactly one syllable per Chinese character, keeping the punctuation",
 	"translation": "A natural, casual English translation of the same message",
 	${glossesPromptField(target.targetLanguage)}
 }`
     : `{
+	"plan": "Private notes, never shown, one short sentence: the question you'll ask and how its natural answer uses the target",
 	"text": "Charles Duck's opening message",
 	"translation": "A natural, casual Japanese translation of the same message",
 	${glossesPromptField(target.targetLanguage)}
@@ -93,8 +99,9 @@ How to write the opener:
 - A casual greeting plus ONE simple question. At most 2 short sentences and about 15 words.
 ${firstName ? `- Greet them by their first name, "${firstName}", in the greeting. Use it once only, and keep it exactly as written in the translation too.\n` : ""}${style}
 - It must sound natural — exactly how a friend would really text.
-- Pick an everyday topic that is loosely related to the target, so the chat can drift towards it later. Only loosely: never use the target word or pattern yourself, and don't ask a question whose obvious answer is just the target.
-- If the target doesn't point to a clear everyday topic (for example a small function word, or an abstract grammar pattern), don't force it. Instead use the topic of this general opener, reworded in your own way: "${target.fallbackOpener.text}" (${target.fallbackOpener.translation})
+- Ask a question whose most natural answer would use the target, so the learner can use it in their very first reply. Work it out in "plan" first. For example, for "from X to Y" (由 X 到 Y): "What time do you usually have dinner?" → "From six to seven"; for "X ago" (之前): "When did you last see your friend?" → "Two days ago"; for "this week": "When is your birthday?" → "This week".
+- Never use the target word or pattern yourself, and never quiz them ("How do you say…?") — it should just be the kind of question a friend asks, whose natural answer happens to use it.
+- Only if no everyday question could naturally lead to the target (for example a bare particle), use the topic of this general opener instead, reworded in your own way: "${target.fallbackOpener.text}" (${target.fallbackOpener.translation})
 ${friendsPromptRule(target)}
 ${knownWordsPromptRule(target)}
 
@@ -105,11 +112,14 @@ ${glossesPromptRule(target.targetLanguage)}`;
 
 // Cached per target (the fallback opener in it is seeded per user, day and
 // attempt — see pickChallengeTarget), so reloading the page doesn't pay for
-// a fresh generation or show a different opener. Throws on any failure
-// rather than returning the fallback, so a failed call is never cached.
+// a fresh generation or show a different opener. The prompt itself is an
+// argument so it's part of the cache key: changing how openers are written
+// takes effect straight away rather than once old ones expire. Throws on
+// any failure rather than returning the fallback, so a failed call is never
+// cached.
 async function generateOpener(
   target: ChallengeTarget,
-  firstName: string | null,
+  prompt: string,
 ): Promise<ChallengeOpener> {
   "use cache";
   cacheLife("days");
@@ -119,7 +129,10 @@ async function generateOpener(
     {
       model: process.env.OPENAI_MODEL ?? "gpt-5.6-luna",
       response_format: { type: "json_object" },
-      messages: [{ role: "system", content: buildOpenerPrompt(target, firstName) }],
+      // A two-sentence opener doesn't need long deliberation, and the
+      // learner is waiting on it.
+      reasoning_effort: "low",
+      messages: [{ role: "system", content: prompt }],
     },
     { signal: AbortSignal.timeout(OPENER_TIMEOUT_MS), maxRetries: 0 },
   );
@@ -164,7 +177,7 @@ export async function getChallengeOpener(
   if (!process.env.OPENAI_API_KEY) return personalise(target.fallbackOpener, firstName);
 
   try {
-    return await generateOpener(target, firstName);
+    return await generateOpener(target, buildOpenerPrompt(target, firstName));
   } catch (error) {
     console.error("Daily challenge opener generation failed:", error);
     return personalise(target.fallbackOpener, firstName);

@@ -84,6 +84,10 @@ model Course {
   position               Int
   createdAt              DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
   active                 Boolean                 @default(true)
+  // The course page's greeting in the target language, and the line under
+  // it in the audience's — see section 49 of supabase/schema.sql.
+  greetings              Json?
+  motivations            Json?
   enrollments            CourseEnrollment[]
   languageDecks          LanguageDeck[]
   dailyChallengeAttempts DailyChallengeAttempt[]

@@ -1841,3 +1841,53 @@ create table if not exists public.weekly_leader (
 );
 
 alter table public.weekly_leader enable row level security;
+
+-- 49. Course greetings and motivations -------------------------------------------------
+-- The course page's greeting, per course, in the language being learnt —
+-- with a romanization line where the course has one (Jyutping for
+-- Cantonese). Keys: hello, welcome, welcome_back, morning, afternoon,
+-- evening; "{name}" is replaced with the learner's first name. One is
+-- picked at random (the time-of-day one by the clock) — see
+-- components/dashboard/greeting.tsx.
+-- `motivations`: the line under it, in the course's audience language
+-- (source_language), one picked at random.
+
+alter table public.courses
+  add column if not exists greetings jsonb,
+  add column if not exists motivations jsonb;
+
+update public.courses set
+  greetings = '{
+    "hello":        {"text": "你好，{name}！",     "romanization": "nei5 hou2, {name}!"},
+    "welcome":      {"text": "歡迎你，{name}！",   "romanization": "fun1 jing4 nei5, {name}!"},
+    "welcome_back": {"text": "歡迎返嚟，{name}！", "romanization": "fun1 jing4 faan1 lai4, {name}!"},
+    "morning":      {"text": "早晨，{name}！",     "romanization": "zou2 san4, {name}!"},
+    "afternoon":    {"text": "午安，{name}！",     "romanization": "ng5 on1, {name}!"},
+    "evening":      {"text": "晚安，{name}！",     "romanization": "maan5 on1, {name}!"}
+  }'::jsonb,
+  motivations = '[
+    "Every small step is still an adventure.",
+    "Go at your own pace — it all adds up.",
+    "Today''s step leads to tomorrow''s.",
+    "Your goal is getting closer every day.",
+    "You''re doing brilliantly!"
+  ]'::jsonb
+where slug = 'yue-for-en';
+
+update public.courses set
+  greetings = '{
+    "hello":        {"text": "Hello, {name}"},
+    "welcome":      {"text": "Welcome, {name}"},
+    "welcome_back": {"text": "Welcome back, {name}"},
+    "morning":      {"text": "Good morning, {name}"},
+    "afternoon":    {"text": "Good afternoon, {name}"},
+    "evening":      {"text": "Good evening, {name}"}
+  }'::jsonb,
+  motivations = '[
+    "小さな一歩も、ちゃんと冒険だよ。",
+    "ゆっくり、自分のペースでやろう。",
+    "今日の一歩が、明日へつながるよ。",
+    "目標は、だんだん近づいてるよ。",
+    "君はすごい！"
+  ]'::jsonb
+where slug = 'en-for-ja';

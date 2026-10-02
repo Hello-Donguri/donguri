@@ -19,7 +19,10 @@ export type HintTurn = { role: "ai" | "user"; text: string };
 const HINT_COUNT = 4;
 const MAX_TURNS = 6;
 const MAX_TEXT = 500;
-const HINT_TIMEOUT_MS = 8000;
+// Generous, since the learner has already paused — but the hints should
+// arrive while they're still stuck. See the opener's note on reasoning
+// effort (lib/daily-challenge-opener.ts): at the default it took too long.
+const HINT_TIMEOUT_MS = 20_000;
 
 // The learnt vocab (not grammar patterns) behind the known-words lines, by
 // term — '今日 (gam1 jat6) — "today"' → 今日. Hints may only be these.
@@ -100,6 +103,7 @@ Return only a JSON object: {"words": [{"text": "the word exactly as in the list"
       {
         model: process.env.OPENAI_MODEL ?? "gpt-5.6-luna",
         response_format: { type: "json_object" },
+        reasoning_effort: "low",
         messages: [{ role: "system", content: prompt }],
       },
       { signal: AbortSignal.timeout(HINT_TIMEOUT_MS), maxRetries: 0 },

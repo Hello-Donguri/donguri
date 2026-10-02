@@ -1191,6 +1191,12 @@ export type PublicProfile = {
   lastActiveAt: Date | null;
   memberSince: Date;
   wordsLearnt: number;
+  // Their last 7 days across all courses, and their best current streak —
+  // for the profile page's activity chart.
+  dailyActivity: DailyActivityCount[];
+  currentStreak: number;
+  longestStreak: number;
+  activeToday: boolean;
   equippedAccessory: AccessoryId | null;
   // Only ever true when `isSelf` — nobody else can load a hidden profile.
   hidden: boolean;

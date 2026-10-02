@@ -1436,7 +1436,7 @@ export const getPublicProfile = cache(
     const isSelf = profile.id === user.id;
     if (profile.profileHidden && !isSelf) return null;
 
-    const [weeklyXp, lastActiveAt, wordsLearnt] = await Promise.all([
+    const [weeklyXp, lastActiveAt, wordsLearnt, dailyActivity, streak] = await Promise.all([
       getWeeklyXpByUser([profile.id]),
       getLastActiveAt(profile.id),
       // Across every course; "I already know this" skips don't count, as
@@ -1444,6 +1444,8 @@ export const getPublicProfile = cache(
       prisma.userWordProgress.count({
         where: { userId: profile.id, skipped: false },
       }),
+      getWeeklyActivity(profile.id),
+      getBestStreak(profile.id),
     ]);
 
     return {
@@ -1454,6 +1456,8 @@ export const getPublicProfile = cache(
       lastActiveAt,
       memberSince: profile.createdAt,
       wordsLearnt,
+      dailyActivity,
+      ...streak,
       equippedAccessory:
         (parseDonguriConfig(profile.donguriConfig).equippedAccessory as
           | AccessoryId
@@ -1463,6 +1467,76 @@ export const getPublicProfile = cache(
     };
   },
 );
+
+// The trailing 7 UTC days of a user's activity, today included, across all
+// their courses — the same counts as a course page's chart
+// (getDailyActivityCounts), for their profile page.
+async function getWeeklyActivity(userId: string): Promise<DailyActivityCount[]> {
+  const today = startOfUTCDay(new Date());
+  const rangeStart = addDays(today, -6);
+  const rangeEnd = addDays(today, 1);
+
+  const [progress, reviews, attempts] = await Promise.all([
+    prisma.userWordProgress.findMany({
+      where: { userId, skipped: false, introducedAt: { gte: rangeStart, lt: rangeEnd } },
+      select: { introducedAt: true, word: { select: { path: true } } },
+    }),
+    prisma.reviewEvent.findMany({
+      where: { userId, createdAt: { gte: rangeStart, lt: rangeEnd } },
+      select: { createdAt: true, wordId: true },
+    }),
+    prisma.dailyChallengeAttempt.findMany({
+      where: { userId, skipped: false, challengeDate: { gte: rangeStart, lt: rangeEnd } },
+      select: { challengeDate: true },
+    }),
+  ]);
+
+  const days = new Map<string, DailyActivityCount>();
+  for (let day = rangeStart; day < rangeEnd; day = addDays(day, 1)) {
+    const date = toUTCDateString(day);
+    days.set(date, { date, vocab: 0, grammar: 0, review: 0, challenge: 0 });
+  }
+  for (const { introducedAt, word } of progress) {
+    const day = days.get(toUTCDateString(introducedAt));
+    if (day) day[word.path === "grammar" ? "grammar" : "vocab"]++;
+  }
+  // Distinct words reviewed per day, as on the course chart.
+  const reviewed = new Map<string, Set<string>>();
+  for (const { createdAt, wordId } of reviews) {
+    const date = toUTCDateString(createdAt);
+    reviewed.set(date, (reviewed.get(date) ?? new Set()).add(wordId));
+  }
+  for (const [date, words] of reviewed) {
+    const day = days.get(date);
+    if (day) day.review = words.size;
+  }
+  for (const { challengeDate } of attempts) {
+    const day = days.get(toUTCDateString(challengeDate));
+    if (day) day.challenge++;
+  }
+  return [...days.values()];
+}
+
+// A user's streak for their profile: the best current streak among the
+// courses they're in (streaks are kept per course — see courseActiveDays).
+async function getBestStreak(
+  userId: string,
+): Promise<{ currentStreak: number; longestStreak: number; activeToday: boolean }> {
+  const enrollments = await prisma.courseEnrollment.findMany({
+    where: { userId, unenrolledAt: null, course: { active: true } },
+    select: { courseId: true },
+  });
+  const streaks = await Promise.all(
+    enrollments.map(async ({ courseId }) =>
+      computeStreakFromActiveDays(await courseActiveDays(userId, courseId)),
+    ),
+  );
+  return {
+    currentStreak: Math.max(0, ...streaks.map((streak) => streak.currentStreak)),
+    longestStreak: Math.max(0, ...streaks.map((streak) => streak.longestStreak)),
+    activeToday: streaks.some((streak) => streak.activeToday),
+  };
+}
 
 // The last time the user did anything that counts as studying — earned XP,
 // answered a review, or learnt or answered a word. Null if they never have.
