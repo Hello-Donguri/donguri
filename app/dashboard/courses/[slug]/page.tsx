@@ -16,7 +16,7 @@ import {
   requireProfile,
 } from "@/lib/dal";
 import { getTranslator } from "@/lib/i18n/server";
-import { Breadcrumbs } from "@/components/ui/breadcrumbs";
+import { ArrowLeft } from "lucide-react";
 
 import { ActivityOverviewCard } from "@/components/vocab/activity-overview-card";
 import { Greeting } from "@/components/dashboard/greeting";
@@ -357,15 +357,17 @@ export default async function CourseHomePage({ params }: PageProps) {
 
       <main className="flex min-w-0 flex-col gap-6 sm:gap-8">
         <div>
+          {/* In more than one course: the way back to the dashboard's course
+              cards — styled like the review page's back link. */}
           {enrolledCourseCount > 1 && (
-            <Breadcrumbs
-              items={[
-                {
-                  href: "/dashboard/courses",
-                  label: t("breadcrumbs.my_courses", "My courses"),
-                },
-              ]}
-            />
+            <Link
+              href="/dashboard"
+              prefetch
+              className="group inline-flex items-center gap-1.5 text-sm font-medium text-sumi-soft transition hover:text-sumi"
+            >
+              <ArrowLeft aria-hidden className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+              {t("course_home.back_to_my_courses", "Back to my courses")}
+            </Link>
           )}
           <Greeting
             firstName={profile.first_name ?? profile.email}

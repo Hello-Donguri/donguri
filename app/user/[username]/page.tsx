@@ -151,6 +151,14 @@ export default async function UserProfilePage({ params }: PageProps) {
                 <span className="text-sumi-soft">{t("user_profile.member_since", "Member since")}</span>
                 {memberSince}
               </span>
+
+              <span className="inline-flex items-center gap-2 rounded-full bg-washi/80 px-3 py-1.5 text-sm font-semibold text-sumi shadow-sm ring-1 ring-card-border">
+                <Flame aria-hidden className="h-4 w-4 fill-kin text-kin" />
+                <span className="text-sumi-soft">{t("user_profile.longest_streak", "Longest streak")}</span>
+                {profile.longestStreak === 1
+                  ? t("user_profile.streak_day", "1 day")
+                  : t("user_profile.streak_days", "{{count}} days", { count: profile.longestStreak })}
+              </span>
             </div>
           </div>
         </div>
