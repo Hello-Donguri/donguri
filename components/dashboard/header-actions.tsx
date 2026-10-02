@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Award, BookOpen, Bug, ChevronDown, RotateCcw, CreditCard, Flame, GraduationCap, LogOut, Menu, Settings, User, Users, X } from "lucide-react";
+import { Award, BookOpen, Bug, ChevronDown, RotateCcw, CreditCard, Flame, GraduationCap, LogOut, Mail, Menu, Settings, User, Users, X } from "lucide-react";
 import { DonguriAvatar } from "@/components/icons/DonguriAvatar";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
@@ -12,6 +12,7 @@ import { useTranslations } from "@/components/i18n/locale-provider";
 import { useDevMode } from "@/components/dashboard/dev-mode-context";
 import { logout } from "@/lib/actions/auth";
 import { resetDailyChallengeToday } from "@/lib/actions/daily-challenge";
+import { sendTestCrownEmail, type TestEmailResult } from "@/lib/actions/dev-emails";
 import { levelForXp, xpRangeForLevel, type AccessoryId } from "@/lib/levels";
 import type { UserRole } from "@/lib/definitions";
 import { cn } from "@/lib/utils";
@@ -169,8 +170,17 @@ function AdminMenu({ role, className }: { role: UserRole; className?: string }) 
   // or every course from anywhere else.
   const courseSlug = /^\/dashboard\/courses\/([^/]+)/.exec(usePathname())?.[1] ?? null;
   const [resetStatus, setResetStatus] = useState<"idle" | "resetting" | "done" | "failed">("idle");
+  const [emailStatus, setEmailStatus] = useState<"idle" | "sending" | TestEmailResult>("idle");
 
   if (role !== "admin") return null;
+
+  const sendTestEmail = () => {
+    if (emailStatus === "sending") return;
+    setEmailStatus("sending");
+    sendTestCrownEmail()
+      .then(setEmailStatus)
+      .catch(() => setEmailStatus({ ok: false, reason: "failed" }));
+  };
 
   const resetChallenges = () => {
     if (resetStatus === "resetting") return;
@@ -187,6 +197,7 @@ function AdminMenu({ role, className }: { role: UserRole; className?: string }) 
         onClick={() => {
           setOpen((current) => !current);
           setResetStatus("idle");
+          setEmailStatus("idle");
         }}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -260,6 +271,35 @@ function AdminMenu({ role, className }: { role: UserRole; className?: string }) 
                 </span>
               </span>
             </button>
+
+            {/* Dev mode only: the "regain your crown" email, to yourself,
+                with made-up numbers — to see it in a real inbox and check
+                the SMTP settings work. */}
+            {devModeEnabled && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={sendTestEmail}
+                disabled={emailStatus === "sending"}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-sumi transition hover:bg-sumi/5 disabled:opacity-60"
+              >
+                <Mail className="h-4 w-4 shrink-0 text-sumi-soft" aria-hidden="true" />
+                <span className="flex min-w-0 flex-col">
+                  {t("admin_menu.test_crown_email", "Send test crown email")}
+                  <span className="break-all text-xs font-normal text-sumi-soft">
+                    {emailStatus === "sending"
+                      ? t("admin_menu.test_email_sending", "Sending…")
+                      : emailStatus === "idle"
+                        ? t("admin_menu.test_email_hint", "\"Regain your crown\", to your email")
+                        : emailStatus.ok
+                          ? t("admin_menu.test_email_sent", "Sent to {{email}}", { email: emailStatus.to })
+                          : emailStatus.reason === "not_configured"
+                            ? t("admin_menu.test_email_not_configured", "Not sent — NO_REPLY_EMAIL_* isn't set.")
+                            : t("admin_menu.test_email_failed", "Failed — check the server log.")}
+                  </span>
+                </span>
+              </button>
+            )}
 
             <div className="my-1 border-t border-card-border" />
 

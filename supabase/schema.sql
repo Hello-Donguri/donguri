@@ -1761,3 +1761,83 @@ alter table public.badges
 
 alter table public.course_enrollments
   add column if not exists unenrolled_at timestamptz;
+
+-- 46. Badge XP rewards ------------------------------------------------------------------
+-- `xp_reward`: extra XP a learner gets when they earn the badge, set on the
+-- admin badges page (0 for none). Changing it only affects future awards.
+-- `xp_awarded` on user_badges: what that learner actually got, so the
+-- celebration shows the right amount even if the reward was changed since.
+-- The XP goes on the profile's total and into xp_events, like any other XP
+-- (see awardEarnedBadges in lib/badges.ts).
+
+alter table public.badges
+  add column if not exists xp_reward integer not null default 0;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'badges_xp_reward_check') then
+    alter table public.badges
+      add constraint badges_xp_reward_check check (xp_reward >= 0);
+  end if;
+end;
+$$;
+
+alter table public.user_badges
+  add column if not exists xp_awarded integer not null default 0;
+
+-- 47. Basic 1 review stage -------------------------------------------------------------
+-- A quick first review 15 minutes after a word is learnt ("Basic 1"), before
+-- the 4-hour one. It's the new stage 1, so every existing stage moves up one
+-- (Beginner 1 is now 2 … Mastered is now 8) and stored stages are shifted
+-- to keep their meaning — see STAGES in lib/srs.ts. Words already learnt
+-- keep their next review time; only new words get the 15-minute review.
+-- Runs once: the shift only happens while the old 1-7 check is in place.
+
+do $$
+begin
+  if exists (
+    select 1 from pg_constraint
+    where conname = 'user_word_progress_stage_check'
+      and pg_get_constraintdef(oid) like '%7%'
+  ) then
+    alter table public.user_word_progress drop constraint user_word_progress_stage_check;
+    update public.user_word_progress set stage = stage + 1;
+    alter table public.user_word_progress add constraint user_word_progress_stage_check
+      check (stage between 1 and 8);
+  end if;
+end;
+$$;
+
+-- 48. Native language, email preferences and the weekly crown -------------------------
+-- `native_language`: what the learner speaks ('en', 'ja' or 'other'), asked
+-- on sign-up/onboarding and editable in account settings. Null for accounts
+-- from before it was asked.
+-- `email_overtaken`: whether they get the "regain your crown" email when
+-- someone takes their #1 spot on the weekly XP leaderboard (on unless
+-- turned off in account settings). `overtaken_emailed_at` caps that email
+-- at one a day.
+-- `weekly_leader`: a single row remembering who was last #1 on the weekly
+-- leaderboard, so a change of leader can be spotted (see
+-- lib/weekly-crown.ts). Server-only — RLS on with no policies.
+
+alter table public.profiles
+  add column if not exists native_language text,
+  add column if not exists email_overtaken boolean not null default true,
+  add column if not exists overtaken_emailed_at timestamptz;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'profiles_native_language_check') then
+    alter table public.profiles
+      add constraint profiles_native_language_check check (native_language in ('en', 'ja', 'other'));
+  end if;
+end;
+$$;
+
+create table if not exists public.weekly_leader (
+  id integer primary key default 1 check (id = 1),
+  user_id uuid references public.profiles (id) on delete set null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.weekly_leader enable row level security;

@@ -6,6 +6,7 @@ type TextFieldProps = {
   autoComplete?: string;
   required?: boolean;
   defaultValue?: string;
+  hint?: string;
   errors?: string[];
 };
 
@@ -17,6 +18,7 @@ export function TextField({
   autoComplete,
   required = true,
   defaultValue,
+  hint,
   errors,
 }: TextFieldProps) {
   return (
@@ -38,6 +40,7 @@ export function TextField({
         aria-invalid={errors && errors.length > 0}
         className="rounded-lg border border-sumi/15 bg-washi px-4 py-2.5 text-sumi placeholder:text-sumi-soft/50 outline-none transition focus:border-ai focus:ring-2 focus:ring-ai-soft"
       />
+      {hint && <p className="text-xs text-sumi-soft">{hint}</p>}
       {errors?.map((error) => (
         <p key={error} className="text-sm text-shu">
           {error}

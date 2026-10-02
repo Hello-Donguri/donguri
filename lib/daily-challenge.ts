@@ -93,7 +93,29 @@ export type ChallengeTarget = {
   // Charles's friends for this attempt, one "he" and one "she" (see
   // friendsPromptRule) — who he talks about when a third person comes up.
   friends: ChallengeFriend[];
+  // What the learner has learnt in this course, newest first, one line each
+  // ('今日 (gam1 jat6) — "today"') — so Charles can ask things they can
+  // answer with words they know (see knownWordsPromptRule).
+  knownWords: string[];
 };
+
+// How many learnt words Charles is shown — the most recent, which are the
+// freshest in the learner's mind, and enough to build answers from without
+// bloating every prompt.
+const MAX_KNOWN_WORDS = 120;
+
+// The learner's learnt words, and how Charles should lean on them: every
+// question should be answerable with words they know, so the way towards
+// the target never needs vocabulary they haven't met — e.g. offer a choice
+// built from known words rather than ask "how will you celebrate?" when
+// they know no words for celebrating. Shared by his opener and his replies.
+export function knownWordsPromptRule(target: ChallengeTarget): string {
+  if (target.knownWords.length === 0) return "";
+  return `- The user is a beginner. These are the ${target.knownWords.length} words and patterns they've learnt most recently, newest first — they also know the very basics (I, you, yes, no, like, have, is):
+${target.knownWords.map((line) => `  ${line}`).join("\n")}
+- Phrase your questions so the user can answer with words from that list plus the target. This changes how you ask, never where you're heading: the steps toward the target should be things they can say — e.g. if they know 食, 飯 and 今日, "Did you eat rice today?" works; "How do you want to celebrate?" doesn't, if they know no words for celebrating.
+- If a step toward the target would need a word they haven't learnt, find another step toward the target that doesn't. Don't fall back on easy questions that lead nowhere (like "Do you like X or Y?" when neither leads to the target). Never quiz them or mention the list.`;
+}
 
 // One of Charles's animal friends: a traditional English first name and a
 // cute animal, e.g. "Christopher Mouse".
@@ -488,6 +510,20 @@ export async function pickChallengeTarget(
   // whose only grammar point came up in an earlier attempt gets a word.
   const mode = challengeModeFor(profile?.xp ?? 0, vocab.length > 0, grammar.length > 0);
 
+  const knownWords = [...words]
+    .sort(
+      (a, b) =>
+        Math.max(...b.progress.map((progress) => progress.introducedAt.getTime())) -
+        Math.max(...a.progress.map((progress) => progress.introducedAt.getTime())),
+    )
+    .slice(0, MAX_KNOWN_WORDS)
+    .map((word) => {
+      const reading = word.romanization ? ` (${word.romanization})` : "";
+      return word.path === "grammar"
+        ? `pattern ${word.term}${reading} — ${word.translation}`
+        : `${word.term}${reading} — "${word.translation}"`;
+    });
+
   const toItem = (word: (typeof words)[number]): ChallengeItem => ({
     term: word.term,
     translation: word.translation,
@@ -521,5 +557,6 @@ export async function pickChallengeTarget(
     grammar: mode === "vocab" ? null : toItem(pick(grammar)),
     fallbackOpener: openers[Math.floor(openerRandom() * openers.length)],
     friends,
+    knownWords,
   };
 }

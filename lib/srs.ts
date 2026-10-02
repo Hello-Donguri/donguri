@@ -6,25 +6,28 @@ const QUESTIONS_PER_LEARNT_WORD = 2;
 
 export { SET_SIZE, QUESTIONS_PER_LEARNT_WORD };
 
-// The 7-stage scheduled review model. A word starts at stage 1 the moment
-// it's learned (see `getLearnQueue`); every correct review answer — whether
-// from the initial post-learn quiz or a later review-queue session —
-// advances it one stage and pushes `nextReviewAt` out to `intervalHours`
-// from now. A wrong answer regresses it to `wrongGoesTo`, not always back to
-// stage 1 (e.g. a slip at Intermediate 1 only drops to Beginner 2, not to
-// square one). Stage 7 ("Mastered") has no interval — it's terminal, same
-// meaning as the old `status: "known"`.
+// The 8-stage scheduled review model. A word starts at stage 1 the moment
+// it's learned (see `getLearnQueue`); every correct review answer advances
+// it one stage and pushes `nextReviewAt` out to `intervalHours` from now
+// (the post-learn quiz never advances it — see `recordAnswer`). A wrong
+// answer regresses it to `wrongGoesTo`, not always back to stage 1 (e.g. a
+// slip at Intermediate 1 only drops to Beginner 2, not to square one).
+// Stage 1 ("Basic 1") is a quick first check 15 minutes after learning,
+// before the first longer gap. Stage 8 ("Mastered") has no interval — it's
+// terminal, same meaning as the old `status: "known"`. Stages were shifted
+// up by one when Basic 1 was added (section 47 of supabase/schema.sql).
 export const STAGES = [
-  { stage: 1, nameEn: "Beginner 1", nameJa: "初心者 1", intervalHours: 4, wrongGoesTo: 1 },
-  { stage: 2, nameEn: "Beginner 2", nameJa: "初心者 2", intervalHours: 24, wrongGoesTo: 1 },
-  { stage: 3, nameEn: "Beginner 3", nameJa: "初心者 3", intervalHours: 24 * 3, wrongGoesTo: 1 },
-  { stage: 4, nameEn: "Intermediate 1", nameJa: "中級者 1", intervalHours: 24 * 7, wrongGoesTo: 2 },
-  { stage: 5, nameEn: "Intermediate 2", nameJa: "中級者 2", intervalHours: 24 * 14, wrongGoesTo: 2 },
-  { stage: 6, nameEn: "Expert 1", nameJa: "上級者 1", intervalHours: 24 * 30, wrongGoesTo: 4 },
-  { stage: 7, nameEn: "Mastered", nameJa: "マスター", intervalHours: null, wrongGoesTo: null },
+  { stage: 1, nameEn: "Basic 1", nameJa: "基本 1", intervalHours: 0.25, wrongGoesTo: 1 },
+  { stage: 2, nameEn: "Beginner 1", nameJa: "初心者 1", intervalHours: 4, wrongGoesTo: 1 },
+  { stage: 3, nameEn: "Beginner 2", nameJa: "初心者 2", intervalHours: 24, wrongGoesTo: 2 },
+  { stage: 4, nameEn: "Beginner 3", nameJa: "初心者 3", intervalHours: 24 * 3, wrongGoesTo: 2 },
+  { stage: 5, nameEn: "Intermediate 1", nameJa: "中級者 1", intervalHours: 24 * 7, wrongGoesTo: 3 },
+  { stage: 6, nameEn: "Intermediate 2", nameJa: "中級者 2", intervalHours: 24 * 14, wrongGoesTo: 3 },
+  { stage: 7, nameEn: "Expert 1", nameJa: "上級者 1", intervalHours: 24 * 30, wrongGoesTo: 5 },
+  { stage: 8, nameEn: "Mastered", nameJa: "マスター", intervalHours: null, wrongGoesTo: null },
 ] as const;
 
-export const MAX_STAGE = 7;
+export const MAX_STAGE = 8;
 
 export function stageInfo(stage: number) {
   return STAGES[Math.min(Math.max(stage, 1), MAX_STAGE) - 1];

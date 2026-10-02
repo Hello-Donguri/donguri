@@ -8,7 +8,7 @@ import {
   awardEarnedBadges,
   recordUsersAlreadyQualifying,
   unseenBadges,
-  type BadgeView,
+  type UnseenBadge,
 } from "@/lib/badges";
 import {
   CreateBadgeFormSchema,
@@ -21,12 +21,17 @@ const NOT_ALLOWED = "You don't have permission to do that.";
 
 // Called by BadgeCelebration as the learner lands on the dashboard or a
 // course page — i.e. at the end of every learn, review and daily-challenge
-// session. Awards anything newly reached, then returns every awarded badge
-// not yet celebrated.
-export async function claimBadges(): Promise<(BadgeView & { awardId: string })[]> {
+// session. Awards anything newly reached (with its XP), then returns every
+// awarded badge not yet celebrated and the learner's XP total now, so the
+// celebration can count each badge's XP up to it.
+export async function claimBadges(): Promise<{ badges: UnseenBadge[]; xp: number }> {
   const profile = await requireProfile();
   await awardEarnedBadges(profile.id);
-  return unseenBadges(profile.id);
+  const [badges, { xp }] = await Promise.all([
+    unseenBadges(profile.id),
+    prisma.profile.findUniqueOrThrow({ where: { id: profile.id }, select: { xp: true } }),
+  ]);
+  return { badges, xp };
 }
 
 // Once a celebration's been shown, so it isn't shown again.
@@ -37,8 +42,9 @@ export async function markBadgesSeen(awardIds: string[]): Promise<void> {
     where: { id: { in: awardIds }, userId: profile.id, seenAt: null },
     data: { seenAt: new Date() },
   });
-  // The dashboard's badge shelf shows it as earned from now on.
-  revalidatePath("/dashboard");
+  // The dashboard's badge shelf shows it as earned from now on, and the
+  // header's XP counter ticks up to include its XP.
+  revalidatePath("/dashboard", "layout");
 }
 
 async function isAdmin(): Promise<boolean> {
@@ -60,11 +66,12 @@ export async function createBadge(_state: BadgeFormState, formData: FormData): P
     courseId: formData.get("courseId") ?? "",
     timescale: formData.get("timescale") ?? "",
     image: uploadedFile(formData.get("image")),
+    xpReward: formData.get("xpReward"),
     awardExisting: formData.get("awardExisting") === "on",
   });
   if (!validated.success) return { errors: validated.error.flatten().fieldErrors };
 
-  const { name, threshold, metric, courseId, image, awardExisting } = validated.data;
+  const { name, threshold, xpReward, metric, courseId, image, awardExisting } = validated.data;
   const timescale = fixedTimescale(metric) ?? validated.data.timescale;
   const imageKey = buildBadgeImageKey(image.type);
   try {
@@ -75,7 +82,7 @@ export async function createBadge(_state: BadgeFormState, formData: FormData): P
   }
 
   const badge = await prisma.badge.create({
-    data: { name, imageKey, metric, threshold, courseId, timescale, awardExisting },
+    data: { name, imageKey, metric, threshold, xpReward, courseId, timescale, awardExisting },
   });
 
   // Off: learners who already qualify are recorded as skipped, so only
@@ -103,11 +110,12 @@ export async function updateBadge(_state: BadgeFormState, formData: FormData): P
     badgeId: formData.get("badgeId"),
     name: formData.get("name"),
     threshold: formData.get("threshold"),
+    xpReward: formData.get("xpReward"),
     image: uploadedFile(formData.get("image")),
   });
   if (!validated.success) return { errors: validated.error.flatten().fieldErrors };
 
-  const { badgeId, name, threshold, image } = validated.data;
+  const { badgeId, name, threshold, xpReward, image } = validated.data;
   let imageKey: string | undefined;
   if (image) {
     imageKey = buildBadgeImageKey(image.type);
@@ -121,7 +129,7 @@ export async function updateBadge(_state: BadgeFormState, formData: FormData): P
 
   await prisma.badge.update({
     where: { id: badgeId },
-    data: { name, threshold, ...(imageKey ? { imageKey } : {}) },
+    data: { name, threshold, xpReward, ...(imageKey ? { imageKey } : {}) },
   });
 
   revalidatePath("/dashboard/admin/badges");

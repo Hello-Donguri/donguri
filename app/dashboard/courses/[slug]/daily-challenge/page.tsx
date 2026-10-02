@@ -11,8 +11,10 @@ import { DailyChallenge } from "@/components/vocab/daily-challenge-chat";
 import { firstNameOf, getChallengeOpener } from "@/lib/daily-challenge-opener";
 import { getDailyChallengeReview } from "@/lib/daily-challenge-review";
 import { DailyChallengeSummary } from "@/components/vocab/daily-challenge-summary";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import {
+  ChallengeBackLink,
+  ChallengeLeaveGuardProvider,
+} from "@/components/vocab/challenge-leave-guard";
 import { getTranslator } from "@/lib/i18n/server";
 import { Button } from "@/components/ui/button";
 import { parseDonguriConfig, type AccessoryId } from "@/lib/levels";
@@ -72,18 +74,13 @@ export default async function DailyChallengePage({ params }: PageProps) {
   const isDayComplete = challenge.attemptsToday >= challenge.maxAttemptsPerDay;
 
   return (
+    <ChallengeLeaveGuardProvider>
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       {/* No breadcrumb mid-challenge — just a quiet way back out, the same
-          as the review page's. */}
+          as the review page's. Mid-attempt it asks first, since leaving uses
+          the attempt up (see ChallengeBackLink). */}
       <div className="flex justify-start">
-        <Link
-          href={`/dashboard/courses/${slug}`}
-          prefetch
-          className="group inline-flex items-center gap-1.5 text-sm font-medium text-sumi-soft transition hover:text-sumi"
-        >
-          <ArrowLeft aria-hidden className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
-          {t("daily_challenge.back_to_course", "Back to course")}
-        </Link>
+        <ChallengeBackLink courseSlug={slug} />
       </div>
 
       <DailyChallenge
@@ -139,5 +136,6 @@ export default async function DailyChallengePage({ params }: PageProps) {
         }
       />
     </div>
+    </ChallengeLeaveGuardProvider>
   );
 }

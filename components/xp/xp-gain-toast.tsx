@@ -52,7 +52,15 @@ export function XpGainToast({ gain }: { gain: XpGain | null }) {
   );
 }
 
-function XpGainPill({ gain }: { gain: XpGain }) {
+// The pill itself, for places that show it in their own spot (the badge
+// celebration). `delay` is how long after mounting the count starts.
+export function XpGainPill({
+  gain,
+  delay = COUNT_DELAY_SECONDS,
+}: {
+  gain: Pick<XpGain, "from" | "to">;
+  delay?: number;
+}) {
   const t = useTranslations();
   const reduceMotion = useReducedMotion();
   const count = useMotionValue(gain.from);
@@ -70,12 +78,12 @@ function XpGainPill({ gain }: { gain: XpGain }) {
     // A short beat after it appears, so the count-up is seen.
     const controls = animate(count, gain.to, {
       duration: COUNT_SECONDS,
-      delay: COUNT_DELAY_SECONDS,
+      delay,
       ease: "easeOut",
       onUpdate: (latest) => setDisplay(Math.round(latest / step) * step),
     });
     return () => controls.stop();
-  }, [count, gain.to, reduceMotion, step]);
+  }, [count, delay, gain.to, reduceMotion, step]);
 
   return (
     <div className="inline-flex items-center gap-2 rounded-full bg-pill px-3 py-1.5 text-pill-foreground shadow-lg">

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
+import { scheduleWeeklyCrownCheck } from "@/lib/weekly-crown";
 import { Prisma } from "@/generated/prisma/client";
 import { imageUrl } from "@/lib/bunny";
 import { longestStreakForUser } from "@/lib/dal";
@@ -36,6 +37,8 @@ export type BadgeView = {
   threshold: number;
   timescale: BadgeTimescale | null;
   courseId: string | null;
+  // Extra XP for earning it (0 for none).
+  xpReward: number;
 };
 
 type BadgeRow = {
@@ -46,6 +49,7 @@ type BadgeRow = {
   threshold: number;
   timescale: string | null;
   courseId: string | null;
+  xpReward: number;
 };
 
 function toView(badge: BadgeRow): BadgeView | null {
@@ -58,6 +62,7 @@ function toView(badge: BadgeRow): BadgeView | null {
     threshold: badge.threshold,
     timescale: isBadgeTimescale(badge.timescale) ? badge.timescale : null,
     courseId: badge.courseId,
+    xpReward: badge.xpReward,
   };
 }
 
@@ -171,9 +176,10 @@ async function scopedValues(scope: BadgeScope, userId?: string): Promise<Map<str
 }
 
 // Gives the learner every active badge they've now reached and don't have
-// yet. Badges they were skipped for (see recordUsersAlreadyQualifying)
-// already have a row, so they're never awarded. Each distinct scope is
-// measured once, however many badges share it.
+// yet, along with each one's XP reward. Badges they were skipped for (see
+// recordUsersAlreadyQualifying) already have a row, so they're never
+// awarded. Each distinct scope is measured once, however many badges share
+// it.
 export async function awardEarnedBadges(userId: string): Promise<void> {
   const [badges, held] = await Promise.all([
     prisma.badge.findMany({ where: { active: true } }),
@@ -195,10 +201,25 @@ export async function awardEarnedBadges(userId: string): Promise<void> {
   );
   if (earned.length === 0) return;
 
-  await prisma.userBadge.createMany({
-    data: earned.map((badge) => ({ userId, badgeId: badge.id })),
-    skipDuplicates: true,
+  // One badge at a time, so XP is only given for a row this call actually
+  // created — a second tab claiming at the same moment skips the duplicate
+  // and gives nothing.
+  const rewarded = await prisma.$transaction(async (tx) => {
+    let xp = 0;
+    for (const badge of earned) {
+      const { count } = await tx.userBadge.createMany({
+        data: [{ userId, badgeId: badge.id, xpAwarded: badge.xpReward }],
+        skipDuplicates: true,
+      });
+      if (count > 0) xp += badge.xpReward;
+    }
+    if (xp === 0) return 0;
+    // Logged like any other XP, so it counts towards "XP this week".
+    await tx.profile.update({ where: { id: userId }, data: { xp: { increment: xp } } });
+    await tx.xpEvent.create({ data: { userId, amount: xp } });
+    return xp;
   });
+  if (rewarded > 0) scheduleWeeklyCrownCheck();
 }
 
 async function valuesByScope(scopes: BadgeScope[], userId: string) {
@@ -254,17 +275,20 @@ export async function adminBadgeList() {
   });
 }
 
+export type UnseenBadge = BadgeView & { awardId: string; xpAwarded: number };
+
 // Awarded badges whose celebration hasn't been shown yet, oldest first.
-// `awardId` is what markBadgesSeen takes.
-export async function unseenBadges(userId: string): Promise<(BadgeView & { awardId: string })[]> {
+// `awardId` is what markBadgesSeen takes; `xpAwarded` is the XP the learner
+// got for it, which may differ from the badge's current reward.
+export async function unseenBadges(userId: string): Promise<UnseenBadge[]> {
   const rows = await prisma.userBadge.findMany({
     where: { userId, status: "awarded", seenAt: null, badge: { active: true } },
     orderBy: { awardedAt: "asc" },
-    select: { id: true, badge: true },
+    select: { id: true, xpAwarded: true, badge: true },
   });
   return rows.flatMap((row) => {
     const view = toView(row.badge);
-    return view ? [{ ...view, awardId: row.id }] : [];
+    return view ? [{ ...view, awardId: row.id, xpAwarded: row.xpAwarded }] : [];
   });
 }
 

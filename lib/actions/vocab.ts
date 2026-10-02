@@ -17,6 +17,7 @@ import {
 } from "@/lib/srs";
 import { levelForXp, parseDonguriConfig, type AccessoryId } from "@/lib/levels";
 import { unlockEarnedAccessories } from "@/lib/accessory-unlocks";
+import { scheduleWeeklyCrownCheck } from "@/lib/weekly-crown";
 import type { OptionMeaning, QuizDirection } from "@/lib/definitions";
 import { isLatinTypeable } from "@/lib/language";
 
@@ -293,6 +294,8 @@ async function awardXp(userId: string, amount: number): Promise<number> {
     }),
     prisma.xpEvent.create({ data: { userId, amount } }),
   ]);
+  // Did this take someone's #1 spot? Checked after the response.
+  if (amount > 0) scheduleWeeklyCrownCheck();
 
   return profile.xp;
 }
@@ -302,7 +305,7 @@ async function awardXp(userId: string, amount: number): Promise<number> {
 // (see the STAGES table in lib/srs.ts) only happens when `advancesStage` is
 // true, i.e. only for an answer given in the *scheduled review queue*. The
 // post-learn quiz deliberately does NOT advance stage: a word's first
-// real review has to wait for its stage-1 `nextReviewAt` (set 4 hours out
+// real review has to wait for its stage-1 `nextReviewAt` (set 15 minutes out
 // the moment it's learned, in `getLearnQueue`) to actually pass — answering
 // it twice correctly thirty seconds after learning it isn't evidence of
 // retention over time, so it must not fast-forward the schedule. Without
@@ -501,7 +504,14 @@ export async function submitTypedAnswer(
       : useRomanizedAnswer
         ? word.romanization!
         : word.term;
-  const acceptedAnswers = [storedAnswer, ...word.alternateAnswers.map((alt) => alt.value)].join(",");
+  // Where the Jyutping is asked for, the characters themselves count too —
+  // a learner who can write 今日 shouldn't be marked wrong for not typing
+  // gam1 jat6. (Characters can't be a near miss, so no retry for them.)
+  const acceptedAnswers = [
+    storedAnswer,
+    ...(useRomanizedAnswer ? [word.term] : []),
+    ...word.alternateAnswers.map((alt) => alt.value),
+  ].join(",");
   const leniency = { vocab: word.path === "vocab" };
   const { correct, fullAnswer } = matchTypedAnswer(typedAnswer, acceptedAnswers, leniency);
   // A comma list shows just its first reading; slash alternatives

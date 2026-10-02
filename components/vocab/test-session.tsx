@@ -62,6 +62,10 @@ type LevelUpInfo = {
   unlockedAccessories: AccessoryId[];
 };
 
+// How many extra times a question answered wrong comes back at the end of
+// the test (so up to three tries in all).
+const MAX_REQUEUES = 2;
+
 export const TestSession = ({
   quiz: initialQuiz,
   courseSlug,
@@ -72,8 +76,10 @@ export const TestSession = ({
   // underneath it (e.g. the header refresh once it's finished), and the
   // queue it hands down is rebuilt — reshuffled, possibly longer — every
   // time; taking that mid-session swapped the current question and could
-  // turn "See my results" into yet another question.
-  const [quiz] = useState(initialQuiz);
+  // turn "See my results" into yet another question. The only change is
+  // the session's own: a question answered wrong goes back on the end (see
+  // recordResult).
+  const [quiz, setQuiz] = useState(initialQuiz);
   const t = useTranslations();
   const reduceMotion = useReducedMotion();
   const router = useRouter();
@@ -100,6 +106,17 @@ export const TestSession = ({
       correct: current.correct + (correct ? 1 : 0),
       incorrect: current.incorrect + (correct ? 0 : 1),
     }));
+    // Wrong: ask it again at the end of the test, so the word gets another
+    // go once the rest are done — up to MAX_REQUEUES extra times, so one
+    // word that won't stick can't keep the test going forever.
+    if (!correct) {
+      const asked = question;
+      setQuiz((current) =>
+        current.filter((item) => item === asked).length <= MAX_REQUEUES
+          ? [...current, asked]
+          : current,
+      );
+    }
   };
 
   const handleMultipleChoiceAnswer = async (option: QuizOption) => {
@@ -133,7 +150,7 @@ export const TestSession = ({
   // answer's result.
   const applyTypedResult = (result: TypedResult) => {
     if (result.retry) {
-      setRetry({ answer: result.correctAnswer, reason: result.retry });
+      setRetry({ answer: result.correctAnswer, reason: result.retry, typed: typedAnswer });
       setTypedAnswer("");
       return;
     }
@@ -426,7 +443,7 @@ export const TestSession = ({
           value={typedAnswer}
           onChange={setTypedAnswer}
           disabled={pending || Boolean(feedback)}
-          placeholder={t("test_session.type_jyutping_placeholder", "Type the Jyutping")}
+          placeholder={t("test_session.type_jyutping_placeholder", "Jyutping or characters")}
           className={inputClass}
         />
       ) : (
@@ -507,7 +524,7 @@ export const TestSession = ({
   } else {
     const promptLabel =
       question.kind === "type-answer" && question.answerRomanized
-        ? t("test_session.type_the_romanized_word", "Type the romanized word")
+        ? t("test_session.type_the_romanized_word", "Type the word in Jyutping or characters")
         : question.direction === "translation-to-term"
           ? t("test_session.what_does_this_mean", "What does this mean?")
           : question.kind === "type-answer"

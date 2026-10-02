@@ -41,10 +41,19 @@ export const UsernameSchema = z
       }),
   );
 
+// What a learner can say they speak natively — the two courses' audiences,
+// and everyone else. Kept in step with profiles_native_language_check
+// (section 48 of supabase/schema.sql).
+export const NATIVE_LANGUAGES = ["en", "ja", "other"] as const;
+export type NativeLanguage = (typeof NATIVE_LANGUAGES)[number];
+
+const NativeLanguageSchema = z.enum(NATIVE_LANGUAGES, { error: "Choose your native language." });
+
 export const SignupFormSchema = z.object({
   firstName: FirstNameSchema,
   lastName: LastNameSchema,
   username: UsernameSchema,
+  nativeLanguage: NativeLanguageSchema,
   email: z.email({ error: "Please enter a valid email." }).trim(),
   password: z
     .string()
@@ -83,6 +92,7 @@ export type SignupFormState =
         firstName?: string[];
         lastName?: string[];
         username?: string[];
+        nativeLanguage?: string[];
         email?: string[];
         password?: string[];
       };
@@ -96,6 +106,7 @@ export const OnboardingFormSchema = z.object({
   firstName: FirstNameSchema,
   lastName: LastNameSchema,
   username: UsernameSchema,
+  nativeLanguage: NativeLanguageSchema,
 });
 
 export type OnboardingFormState =
@@ -104,6 +115,7 @@ export type OnboardingFormState =
         firstName?: string[];
         lastName?: string[];
         username?: string[];
+        nativeLanguage?: string[];
       };
       message?: string;
     }
@@ -178,6 +190,9 @@ export type Profile = {
   // Whether their profile page is kept to themselves (see
   // app/user/[username]).
   profile_hidden: boolean;
+  native_language: NativeLanguage | null;
+  // Whether they get the "regain your crown" email (lib/weekly-crown.ts).
+  email_overtaken: boolean;
   // Synced copy of their Stripe subscription (see lib/billing.ts), null if
   // they've never started Checkout.
   subscription: ProfileSubscription | null;
@@ -659,6 +674,12 @@ const BadgeFieldsSchema = {
     .int({ error: "Use a whole number." })
     .min(1, { error: "At least 1." })
     .max(1_000_000, { error: "That's too high." }),
+  // Extra XP for earning it. Left empty, it's 0.
+  xpReward: z.coerce
+    .number({ error: "Enter a number." })
+    .int({ error: "Use a whole number." })
+    .min(0, { error: "Can't be negative." })
+    .max(10_000, { error: "That's too high." }),
 };
 
 export const CreateBadgeFormSchema = z
@@ -711,6 +732,7 @@ export type BadgeFormState =
       errors?: {
         name?: string[];
         threshold?: string[];
+        xpReward?: string[];
         metric?: string[];
         courseId?: string[];
         timescale?: string[];

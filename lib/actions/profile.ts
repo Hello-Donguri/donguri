@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import {
+  NATIVE_LANGUAGES,
+  type NativeLanguage,
   UpdateNameFormSchema,
   UpdateProfileFormSchema,
   type UpdateNameFormState,
@@ -83,4 +85,29 @@ export async function updateProfile(
   revalidatePath("/dashboard");
 
   return { success: true, message: "Profile updated." };
+}
+
+// Account settings' native language picker — saved as soon as it changes.
+export async function setNativeLanguage(language: NativeLanguage): Promise<void> {
+  const user = await requireUser();
+  if (!(NATIVE_LANGUAGES as readonly string[]).includes(language)) {
+    throw new Error("Unknown language.");
+  }
+
+  await prisma.profile.update({
+    where: { id: user.id },
+    data: { nativeLanguage: language },
+  });
+  revalidatePath("/dashboard/settings");
+}
+
+// Account settings' switch for the "regain your crown" email (see
+// lib/weekly-crown.ts).
+export async function setOvertakenEmails(enabled: boolean): Promise<void> {
+  const user = await requireUser();
+  await prisma.profile.update({
+    where: { id: user.id },
+    data: { emailOvertaken: enabled },
+  });
+  revalidatePath("/dashboard/settings");
 }

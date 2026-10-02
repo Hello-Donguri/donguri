@@ -9,6 +9,8 @@ import {
   bumpStreak,
 } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
+import { scheduleWeeklyCrownCheck } from "@/lib/weekly-crown";
+import { jyutpingDictionary, standardiseGlosses, standardiseJyutping } from "@/lib/jyutping-standard";
 import { startOfUTCDay, dailyChallengeXp } from "@/lib/srs";
 import { isLatinTypeable } from "@/lib/language";
 import {
@@ -16,6 +18,7 @@ import {
   JAPANESE_FEEDBACK_RULE,
   challengeLanguage,
   friendsPromptRule,
+  knownWordsPromptRule,
   glossesPromptField,
   glossesPromptRule,
   parseGlosses,
@@ -344,6 +347,7 @@ function promptLanguage(target: ChallengeTarget) {
     return {
       intro: `You are Charles Duck, the user's kind Cantonese-speaking friend. The user is an English speaker who is a beginner in Cantonese.`,
       writing: `- Write in natural, colloquial Hong Kong Cantonese as people really text it, in traditional characters (係, 唔, 嘅, 咗, 喺, 佢, 乜嘢 — never Mandarin forms like 是, 不, 的, 了, 在, 他, 什麼).
+- In all your Jyutping, use the everyday Hong Kong spoken readings, not formal reading-aloud ones — e.g. 生日 is saang1 jat6, not sang1 jat6.
 - The user may write in Chinese characters, in Jyutping (with or without tone numbers), or a mix — all are equally fine. Read their Jyutping as the Cantonese it spells. Never mark them down for writing Jyutping instead of characters, or for missing tone numbers or spacing. A WRONG tone number is different — see the scoring rules below.
 - If the user writes in English instead of Cantonese, gently keep chatting in Cantonese; an English reply scores low on grammar and naturalness.`,
       replyFields: `	"text": "Charles Duck's simple, casual chat reply, in Cantonese characters",
@@ -387,6 +391,9 @@ function buildSystemPrompt(
   target: ChallengeTarget,
   state: TargetState,
   toneMismatch: { wrote: string; correct: string } | null,
+  // How many messages Charles has sent so far, his opener included — so he
+  // knows when it's time to ask the question the target answers.
+  charlesMessagesSoFar: number,
 ): string {
   const goal = describeTarget(target);
   const language = promptLanguage(target);
@@ -410,17 +417,20 @@ How to chat:
 - Use very simple, short sentences, like you are talking to a total beginner. Only common, everyday words — no idioms, no rare or advanced vocabulary, no hard grammar. 1-3 short sentences per reply.
 ${language.writing ? `${language.writing}\n` : ""}- Never use the target word or grammar pattern yourself, in any language. Leave it for the user. Instead, ask simple questions whose most natural answer would use it.
 - Every question must follow on from what the user just said, the way a friend's next question would. Before asking, check: would a real person ask this right after hearing the user's message? If not, it's too sharp a turn — don't ask it. For example, if the user says they saw people playing football, "Where were they playing? Was it far from your house?" follows on; "What is farther away?" does not.
-- Steer toward the target gradually, one small step per reply: pick the part of the user's message that sits closest to the target and ask about that. It can take a couple of replies to get there — that's fine, as long as each step makes sense.
+- Have a destination: the one simple question whose most natural answer would use the target — e.g. for "X ago" (之前): "When did you last see him?" → "Three days ago"; for "this week": "When is your birthday?" → "This week". Work it out in "plan" before every reply.
+- Every reply must get closer to that destination: pick the part of the user's message that sits closest to it and ask about that, or bridge to it in one natural step. Never ask a question that leads somewhere else, however natural it sounds.
+- You've sent ${charlesMessagesSoFar} message${charlesMessagesSoFar === 1 ? "" : "s"} so far. ${charlesMessagesSoFar >= 2 ? "That's enough build-up: this reply must ask the destination question (after a brief, natural reaction to what they said)." : "By your second reply at the latest, ask the destination question itself."}
 - If nothing in the conversation leads toward the target, change topic the way a friend would — briefly react to what the user said, then signal the switch ("Oh nice! By the way, ...", "That sounds fun. Hey, ..."), and make the new question complete and clear on its own. Never ask a bare question that only makes sense if the user can guess what you're getting at.
-- Keep every question something the user can easily understand and answer. A vague or abstract question that just happens to invite the target is worse than a clear one that takes one more turn to get there.
+- Keep every question something the user can easily understand and answer — the destination question included: make it clear and concrete, not vague or abstract.
 - If the user's latest message is only one or two words, or is vague and doesn't really answer what you just asked, warmly ask them to say a little more.
 - If the user tries to end the chat early, kindly keep it going with a new simple, friendly question.
-${friendsPromptRule(target) ? `${friendsPromptRule(target)} If you already mentioned one of them earlier in this chat, keep talking about the same friend.\n` : ""}- Never break character or mention that this is a language exercise, scoring, or practice.
+${friendsPromptRule(target) ? `${friendsPromptRule(target)} If you already mentioned one of them earlier in this chat, keep talking about the same friend.\n` : ""}${knownWordsPromptRule(target) ? `${knownWordsPromptRule(target)}\n` : ""}- Never break character or mention that this is a language exercise, scoring, or practice.
 
 Return only a JSON object with exactly these fields, in this order:
 {
 	"assessment": "Private notes for scoring, never shown to the user, 1-2 short sentences: what did you last say or ask, what would a real answer tell you (e.g. which one they like, where they went), and does the user's latest message actually tell you that?",
 	"respondedToYou": true,
+	"plan": "Private notes, never shown, 1-2 short sentences: your destination question for the target, and how this reply's question gets there (or that it asks it now).",
 ${language.replyFields}
 	${glossesPromptField(target.targetLanguage)},
 	"grammarScore": 0,
@@ -656,6 +666,7 @@ export async function sendDailyChallengeMessage(
           target,
           state,
           target.vocab ? vocabToneMismatch(trimmedMessage, target.vocab) : null,
+          history.filter((turn) => turn.role === "assistant").length,
         ),
       },
       ...history.slice(-MAX_HISTORY_TURNS).map((turn) => ({
@@ -759,6 +770,29 @@ export async function sendDailyChallengeMessage(
     if (reply.summary) {
       reply = await checkTips(openai, target, scoredMessages.join("\n"), reply);
     }
+
+    // Course words back to the readings the course teaches, so the same
+    // word never shows up in two different readings (see standardiseJyutping).
+    if (target.targetLanguage === "yue") {
+      const dictionary = await jyutpingDictionary();
+      const summary = reply.summary;
+      reply = {
+        ...reply,
+        romanization: reply.romanization && standardiseJyutping(reply.text, reply.romanization, dictionary),
+        glosses: standardiseGlosses(reply.glosses, dictionary),
+        summary:
+          summary?.betterVersion && summary.betterVersionRomanization
+            ? {
+                ...summary,
+                betterVersionRomanization: standardiseJyutping(
+                  summary.betterVersion,
+                  summary.betterVersionRomanization,
+                  dictionary,
+                ),
+              }
+            : summary,
+      };
+    }
   } catch (error) {
     console.error("OpenAI daily challenge request failed:", error);
     return {
@@ -804,6 +838,7 @@ export async function sendDailyChallengeMessage(
         data: { userId: user.id, amount: xpEarned },
       }),
     ]);
+    scheduleWeeklyCrownCheck();
   }
 
   revalidateChallengePaths(courseSlug);

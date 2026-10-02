@@ -2,10 +2,11 @@ import { Award, Clock, Undo2 } from "lucide-react";
 import { Section, SectionHeading } from "@/components/landing/section";
 import type { TFunction } from "@/lib/i18n/translate";
 
-// The seven review stages and the wait after reaching each one — kept in
-// step with STAGES in lib/srs.ts.
+// The review stages before Mastered and the wait after reaching each one —
+// kept in step with STAGES in lib/srs.ts.
 export function ReviewSchedule({ t }: { t: TFunction }) {
   const stages = [
+    { name: t("home.review.stage_basic", "Basic 1"), wait: t("home.review.wait_15m", "15 minutes") },
     { name: t("home.review.stage_1", "Beginner 1"), wait: t("home.review.wait_4h", "4 hours") },
     { name: t("home.review.stage_2", "Beginner 2"), wait: t("home.review.wait_1d", "1 day") },
     { name: t("home.review.stage_3", "Beginner 3"), wait: t("home.review.wait_3d", "3 days") },
@@ -22,11 +23,11 @@ export function ReviewSchedule({ t }: { t: TFunction }) {
         heading={t("home.review.heading", "Each word comes back just before you'd forget it.")}
         subtext={t(
           "home.review.subtext",
-          "Answer correctly and the next review moves further away. Seven stages later, the word is yours.",
+          "Answer correctly and the next review moves further away. Eight stages later, the word is yours.",
         )}
       />
 
-      <ol className="mt-12 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+      <ol className="mt-12 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
         {stages.map((stage, index) => (
           <li
             key={stage.name}
@@ -42,7 +43,7 @@ export function ReviewSchedule({ t }: { t: TFunction }) {
             </span>
           </li>
         ))}
-        <li className="col-span-2 flex flex-col justify-center rounded-2xl bg-kin/20 px-4 py-4 sm:col-span-2 lg:col-span-1">
+        <li className="flex flex-col justify-center rounded-2xl bg-kin/20 px-4 py-4">
           <Award aria-hidden className="h-6 w-6 text-sumi" />
           <span className="mt-2 font-bold text-sumi">{t("home.review.mastered", "Mastered")}</span>
           <span className="mt-1 text-sm text-sumi-soft">

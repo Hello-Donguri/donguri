@@ -1,9 +1,11 @@
 import "server-only";
 import OpenAI from "openai";
 import { cacheLife } from "next/cache";
+import { jyutpingDictionary, standardiseGlosses, standardiseJyutping } from "@/lib/jyutping-standard";
 import {
   challengeLanguage,
   friendsPromptRule,
+  knownWordsPromptRule,
   glossesPromptField,
   glossesPromptRule,
   parseGlosses,
@@ -66,7 +68,8 @@ function buildOpenerPrompt(target: ChallengeTarget, firstName: string | null): s
   const cantonese = target.targetLanguage === "yue";
   const style = cantonese
     ? `- Write in natural, colloquial Hong Kong Cantonese as people really text it, in traditional characters (係, 唔, 嘅, 咗, 喺, 佢, 乜嘢 — not Mandarin forms like 是, 不, 的, 了, 在, 他, 什麼).
-- Only very common, everyday words a total beginner knows. No slang, no idioms, no hard grammar.`
+- Only very common, everyday words a total beginner knows. No slang, no idioms, no hard grammar.
+- In the Jyutping, use the everyday Hong Kong spoken readings, not formal reading-aloud ones — e.g. 生日 is saang1 jat6, not sang1 jat6.`
     : `- Only very common, everyday words a total beginner knows. No idioms, no slang, no phrasal verbs like "been up to", no hard grammar.`;
   const fields = cantonese
     ? `{
@@ -93,6 +96,7 @@ ${firstName ? `- Greet them by their first name, "${firstName}", in the greeting
 - Pick an everyday topic that is loosely related to the target, so the chat can drift towards it later. Only loosely: never use the target word or pattern yourself, and don't ask a question whose obvious answer is just the target.
 - If the target doesn't point to a clear everyday topic (for example a small function word, or an abstract grammar pattern), don't force it. Instead use the topic of this general opener, reworded in your own way: "${target.fallbackOpener.text}" (${target.fallbackOpener.translation})
 ${friendsPromptRule(target)}
+${knownWordsPromptRule(target)}
 
 Return only a JSON object:
 ${fields}
@@ -133,14 +137,18 @@ async function generateOpener(
     throw new Error("Invalid opener from model");
   }
 
+  const text = opener.text.trim();
+  const romanization = needsRomanization ? (opener.romanization as string).trim() : null;
+  const glosses = parseGlosses((parsed as { words?: unknown } | null)?.words, needsRomanization);
+  // Course words back to the readings the course teaches (see
+  // standardiseJyutping).
+  const dictionary = needsRomanization ? await jyutpingDictionary() : [];
+
   return {
-    text: opener.text.trim(),
-    romanization: needsRomanization ? (opener.romanization as string).trim() : null,
+    text,
+    romanization: romanization && standardiseJyutping(text, romanization, dictionary),
     translation: opener.translation.trim(),
-    glosses: parseGlosses(
-      (parsed as { words?: unknown } | null)?.words,
-      needsRomanization,
-    ),
+    glosses: standardiseGlosses(glosses, dictionary),
   };
 }
 

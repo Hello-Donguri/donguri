@@ -35,6 +35,7 @@ import { ReviewQueueDevPanel } from "@/components/vocab/review-queue-dev-panel";
 import { DailyChallengeDevReset } from "@/components/vocab/daily-challenge-dev-reset";
 import ReadingRabbit from "@/components/icons/ReadingRabbit";
 import { FakeButton } from "@/components/ui/fake-button";
+import { NextReviewCountdown } from "@/components/vocab/next-review-countdown";
 import { SleepingDuck } from "@/components/icons/SleepingDuck";
 
 type PageProps = {
@@ -188,6 +189,11 @@ export default async function CourseHomePage({ params }: PageProps) {
                 "Keep it fresh. Strengthen your memory with a quick review.",
               )}
         </p>
+
+        {/* Caught up: when the next word comes due, counting down. */}
+        {!hasReviews && reviewQueue.nextDueAt && (
+          <NextReviewCountdown nextDueAt={reviewQueue.nextDueAt} />
+        )}
       </div>
 
       {hasReviews && (
@@ -315,7 +321,7 @@ export default async function CourseHomePage({ params }: PageProps) {
 
       {/* Charles is asleep once today's challenges are used up. */}
       {challengesDone ? (
-        <SleepingDuck className="pointer-events-none absolute bottom-2 right-20 z-0 h-[92%] w-auto select-none sm:right-56" />
+        <SleepingDuck className="pointer-events-none absolute bottom-2 right-5 z-0 h-[92%] w-auto select-none" />
       ) : (
         <img
           src="/images/charles.webp"

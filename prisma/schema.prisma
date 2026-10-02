@@ -23,6 +23,13 @@ model Profile {
   // Keeps /dashboard/users/<username> to its owner — see section 43 of
   // supabase/schema.sql.
   profileHidden          Boolean                 @default(false) @map("profile_hidden")
+  // 'en', 'ja' or 'other'; null for accounts from before it was asked.
+  // See section 48 of supabase/schema.sql.
+  nativeLanguage         String?                 @map("native_language")
+  // The "regain your crown" email (lib/weekly-crown.ts) — on unless turned
+  // off in account settings; at most one a day.
+  emailOvertaken         Boolean                 @default(true) @map("email_overtaken")
+  overtakenEmailedAt     DateTime?               @map("overtaken_emailed_at") @db.Timestamptz(6)
   role                  String                  @default("user")
   createdAt              DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime                @default(now()) @map("updated_at") @db.Timestamptz(6)
@@ -45,6 +52,7 @@ model Profile {
   reviewEvents           ReviewEvent[]
   subscription           Subscription?
   badges                 UserBadge[]
+  weeklyLeader           WeeklyLeader[]
 
   @@map("profiles")
 }
@@ -278,8 +286,8 @@ model UserWordProgress {
   userId         String    @map("user_id") @db.Uuid
   wordId         String    @map("word_id") @db.Uuid
   status         String    @default("learning")
-  // 1-7, see the STAGES table in lib/srs.ts — replaces the old 1-5 "box".
-  // Stage 7 is "Mastered" (status flips to 'known', nextReviewAt cleared).
+  // 1-8, see the STAGES table in lib/srs.ts — replaces the old 1-5 "box".
+  // Stage 8 is "Mastered" (status flips to 'known', nextReviewAt cleared).
   stage          Int       @default(1)
   correctCount   Int       @default(0) @map("correct_count")
   incorrectCount Int       @default(0) @map("incorrect_count")
@@ -288,9 +296,9 @@ model UserWordProgress {
   lastSeenAt     DateTime? @map("last_seen_at") @db.Timestamptz(6)
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
-  // When this word is next due in the review queue — set 4 hours out the
+  // When this word is next due in the review queue — set 15 minutes out the
   // moment it's learnt (whether or not its post-learn quiz is ever taken),
-  // and null once it reaches stage 7 (mastered, no more reviews).
+  // and null once it reaches stage 8 (mastered, no more reviews).
   nextReviewAt   DateTime? @map("next_review_at") @db.Timestamptz(6)
   profile        Profile   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   word           Word      @relation(fields: [wordId], references: [id], onDelete: Cascade, onUpdate: NoAction)
@@ -420,6 +428,8 @@ model Badge {
   courseId      String?     @map("course_id") @db.Uuid
   // Null: all time; "day" or "week": within one UTC day / week.
   timescale     String?
+  // Extra XP for earning it. See section 46 of supabase/schema.sql.
+  xpReward      Int         @default(0) @map("xp_reward")
   course        Course?     @relation(fields: [courseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   userBadges    UserBadge[]
 
@@ -438,9 +448,23 @@ model UserBadge {
   status    String    @default("awarded")
   awardedAt DateTime  @default(now()) @map("awarded_at") @db.Timestamptz(6)
   seenAt    DateTime? @map("seen_at") @db.Timestamptz(6)
+  // The badge's XP reward when it was awarded (0 when skipped).
+  xpAwarded Int       @default(0) @map("xp_awarded")
   badge     Badge     @relation(fields: [badgeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   profile   Profile   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([userId, badgeId], map: "user_badges_user_badge_key")
   @@map("user_badges")
+}
+
+// Who was last #1 on the weekly XP leaderboard — one row, so a change of
+// leader can be spotted after each XP award (see lib/weekly-crown.ts).
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model WeeklyLeader {
+  id        Int      @id @default(1)
+  userId    String?  @map("user_id") @db.Uuid
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  profile   Profile? @relation(fields: [userId], references: [id], onUpdate: NoAction)
+
+  @@map("weekly_leader")
 }

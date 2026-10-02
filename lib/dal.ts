@@ -34,7 +34,7 @@ import type {
   WordCategoryOption,
   WordType,
 } from "@/lib/definitions";
-import { WORD_TYPES } from "@/lib/definitions";
+import { NATIVE_LANGUAGES, WORD_TYPES, type NativeLanguage } from "@/lib/definitions";
 import {
   addDays,
   applyDailyActivity,
@@ -131,6 +131,8 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
       lastName: true,
       username: true,
       profileHidden: true,
+      nativeLanguage: true,
+      emailOvertaken: true,
       subscription: {
         select: {
           status: true,
@@ -158,6 +160,8 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
     last_name: profile.lastName,
     username: profile.username,
     profile_hidden: profile.profileHidden,
+    native_language: isNativeLanguage(profile.nativeLanguage) ? profile.nativeLanguage : null,
+    email_overtaken: profile.emailOvertaken,
     subscription: profile.subscription,
     hasAccess: hasActiveAccess(profile.role, profile.subscription),
   };
@@ -181,6 +185,10 @@ export const requireProfile = cache(async (): Promise<Profile> => {
 
   return profile;
 });
+
+function isNativeLanguage(value: string | null): value is NativeLanguage {
+  return (NATIVE_LANGUAGES as readonly (string | null)[]).includes(value);
+}
 
 export function isProfileComplete(
   profile: Pick<Profile, "username" | "first_name" | "last_name">,
@@ -1575,7 +1583,7 @@ export async function getLessonWord(
 
 // Marks words from a batch handed out by `getLearnQueueForCourse` as
 // learnt: creates their `UserWordProgress` rows (stage 1, first review due
-// 4 hours out) and bumps the streak. Called one word at a time, as the
+// 15 minutes out) and bumps the streak. Called one word at a time, as the
 // learner clicks "Got it" on each (see `learnWord` in lib/actions/vocab.ts)
 // — never for the whole batch up front, so a word only counts once it's
 // actually been read. The ids come from the client, so they're re-checked
@@ -1609,7 +1617,7 @@ export async function introduceLearnWords(courseSlug: string, wordIds: string[])
       wordId: word.id,
       stage: 1,
       // Set immediately, not deferred to the first quiz answer — a word's
-      // stage-1 review is due 4 hours after it's *learned*, regardless of
+      // stage-1 review is due 15 minutes after it's *learned*, regardless of
       // when (or how well) its post-learn quiz goes; the quiz never advances
       // stage (see `recordAnswer` in lib/actions/vocab.ts).
       nextReviewAt: nextReviewAtForStage(1),
@@ -1749,7 +1757,7 @@ export const getTestQueueForCourse = cache(
 // A user's words that are in a course's review queue at all — shared by
 // the review session, the course-home summary and the "words ready to
 // review" notifier, so they always agree. Every learnt, not-yet-mastered
-// word: its first review is due 4 hours after it's learnt whether or not
+// word: its first review is due 15 minutes after it's learnt whether or not
 // its post-learn quiz was ever taken (see `introduceLearnWords`) — a word
 // whose quiz was skipped mustn't drop out of the schedule for good.
 // Answering it in review marks it seen, which also takes it out of the

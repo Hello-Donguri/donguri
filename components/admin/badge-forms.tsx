@@ -117,6 +117,16 @@ export function CreateBadgeForm({ courses }: { courses: { id: string; title: str
         />
       </div>
 
+      <TextField
+        label={t("admin_badges.xp_reward", "XP reward")}
+        name="xpReward"
+        type="number"
+        required={false}
+        placeholder="0"
+        hint={t("admin_badges.xp_reward_hint", "Extra XP learners get when they earn it. Leave empty for none.")}
+        errors={state?.errors?.xpReward}
+      />
+
       <div className="grid gap-4 sm:grid-cols-2">
         <SelectField
           label={t("admin_badges.course", "Course")}
@@ -185,6 +195,7 @@ type EditBadgeFormProps = {
     imageUrl: string;
     metric: BadgeMetric;
     threshold: number;
+    xpReward: number;
     timescale: BadgeTimescale | null;
     courseTitle: string | null;
     active: boolean;
@@ -193,8 +204,8 @@ type EditBadgeFormProps = {
   };
 };
 
-// One existing badge: rename, change its target or image, hide or delete
-// it. Its milestone, course, timescale and "existing users" choice are
+// One existing badge: rename, change its target, XP reward or image, hide
+// or delete it. A new XP reward only applies to awards from then on. Its milestone, course, timescale and "existing users" choice are
 // fixed once made.
 export function EditBadgeForm({ badge }: EditBadgeFormProps) {
   const t = useTranslations();
@@ -233,6 +244,9 @@ export function EditBadgeForm({ badge }: EditBadgeFormProps) {
               {badgeGoal(badge.metric, badge.threshold, t, badge.timescale)}
             </span>{" "}
             · {badge.courseTitle ?? t("admin_badges.all_courses", "All courses")} ·{" "}
+            {badge.xpReward > 0 && (
+              <>{t("admin_badges.xp_reward_summary", "+{{amount}} XP", { amount: badge.xpReward })} · </>
+            )}
             {t("admin_badges.earned_count", "{{count}} earned", { count: badge.earnedCount })} ·{" "}
             {badge.awardExisting
               ? t("admin_badges.existing_on", "given to existing users")
@@ -245,7 +259,7 @@ export function EditBadgeForm({ badge }: EditBadgeFormProps) {
           />
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-[1fr_8rem]">
+        <div className="grid gap-3 sm:grid-cols-[1fr_7rem_7rem]">
           <input
             type="text"
             name="name"
@@ -261,6 +275,22 @@ export function EditBadgeForm({ badge }: EditBadgeFormProps) {
             aria-label={t("admin_badges.threshold", "Target")}
             className="min-w-0 rounded-lg border border-sumi/15 bg-washi px-4 py-2.5 text-sumi outline-none transition focus:border-ai focus:ring-2 focus:ring-ai-soft"
           />
+          <label className="relative min-w-0">
+            <span className="sr-only">{t("admin_badges.xp_reward", "XP reward")}</span>
+            <input
+              type="number"
+              name="xpReward"
+              min={0}
+              defaultValue={badge.xpReward}
+              className="w-full rounded-lg border border-sumi/15 bg-washi py-2.5 pl-4 pr-10 text-sumi outline-none transition focus:border-ai focus:ring-2 focus:ring-ai-soft"
+            />
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-sumi-soft"
+            >
+              {t("xp_counter.xp", "XP")}
+            </span>
+          </label>
         </div>
         <FileField
           label={t("admin_badges.replace_image", "Replace image (optional)")}
@@ -273,7 +303,12 @@ export function EditBadgeForm({ badge }: EditBadgeFormProps) {
 
         {(state?.message || state?.errors) && (
           <p className={`text-sm ${state.success ? "text-matcha-dark" : "text-shu"}`}>
-            {state.message ?? [...(state.errors?.name ?? []), ...(state.errors?.threshold ?? [])].join(" ")}
+            {state.message ??
+              [
+                ...(state.errors?.name ?? []),
+                ...(state.errors?.threshold ?? []),
+                ...(state.errors?.xpReward ?? []),
+              ].join(" ")}
           </p>
         )}
         <div className="flex gap-2">

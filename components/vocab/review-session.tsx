@@ -181,7 +181,7 @@ const ReviewSessionQuestions = ({
 
       // Nearly right: show the answer and let them type it again.
       if (result.retry) {
-        setRetry({ answer: result.correctAnswer, reason: result.retry });
+        setRetry({ answer: result.correctAnswer, reason: result.retry, typed: typedAnswer });
         setTypedAnswer("");
         return;
       }
@@ -419,7 +419,7 @@ const ReviewSessionQuestions = ({
                     ? t("test_session.what_does_this_mean", "What does this mean?")
                     : t("test_session.find_the_right_word", "Can you find the right word?")
                   : question.answerRomanized
-                    ? t("test_session.type_the_romanized_word", "Type the romanized word")
+                    ? t("test_session.type_the_romanized_word", "Type the word in Jyutping or characters")
                     : question.direction === "translation-to-term"
                       ? t("test_session.what_does_this_mean", "What does this mean?")
                       : t("test_session.type_the_word", "Type the word")}
@@ -472,7 +472,7 @@ const ReviewSessionQuestions = ({
                     value={typedAnswer}
                     onChange={setTypedAnswer}
                     disabled={pending || Boolean(feedback)}
-                    placeholder={t("test_session.type_jyutping_placeholder", "Type the Jyutping")}
+                    placeholder={t("test_session.type_jyutping_placeholder", "Jyutping or characters")}
                     className={ANSWER_FIELD_CLASS}
                   />
                 ) : (

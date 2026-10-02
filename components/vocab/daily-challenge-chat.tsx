@@ -37,7 +37,9 @@ import {
   type DailyChallengeXpBand,
 } from "@/lib/srs";
 import { Button } from "@/components/ui/button";
-import { SkipForward } from "lucide-react";
+import { Languages, SkipForward } from "lucide-react";
+import { WordHints, WordHintsToggle, useWordHintsSetting } from "@/components/vocab/word-hints";
+import { useChallengeInProgress } from "@/components/vocab/challenge-leave-guard";
 import { useLocale, useTranslations } from "@/components/i18n/locale-provider";
 import { cn } from "@/lib/utils";
 import { scoreTone } from "@/components/vocab/challenge-score";
@@ -178,6 +180,7 @@ function DailyChallengeChat({
   // his typing indicator showing until it lands.
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
+  const [hintsOn, setHintsOn] = useWordHintsSetting();
   const [error, setError] = useState<string | null>(null);
   const [completion, setCompletion] = useState<ChallengeCompletion | null>(
     null,
@@ -220,6 +223,9 @@ function DailyChallengeChat({
   }
 
   const isComplete = completion !== null;
+  // Until this attempt is finished, the page's "Back to course" warns that
+  // leaving uses it up (see ChallengeBackLink).
+  useChallengeInProgress(!isComplete);
   const isOpening = messages.length === 0;
   // A word + grammar chat: which targets are used so far, from Charles's
   // latest reply (see ChatReply.targets). Null before any reply, and for a
@@ -387,6 +393,9 @@ function DailyChallengeChat({
       else next.add(id);
       return next;
     });
+    // Straight back to replying — a translation is a quick look, not a
+    // detour. Without scrolling, so the message stays where they read it.
+    inputRef.current?.focus({ preventScroll: true });
   }
 
   function showFeedback(id: number) {
@@ -518,6 +527,7 @@ function DailyChallengeChat({
                     : t("daily_challenge.online", "Online now")}
                 </p>
               </div>
+              {!isComplete && <WordHintsToggle enabled={hintsOn} onChange={setHintsOn} />}
             </header>
 
             <TargetBanner
@@ -616,8 +626,17 @@ function DailyChallengeChat({
                             <button
                               type="button"
                               onClick={() => toggleTranslation(message.id)}
-                              className="rounded-full px-1.5 py-0.5 font-medium transition hover:bg-washi hover:text-sumi"
+                              aria-pressed={showTranslation}
+                              className={cn(
+                                "inline-flex cursor-pointer items-center gap-1 rounded-full font-semibold transition",
+                                // Easy to spot until it's been used; quieter
+                                // once the translation is showing.
+                                showTranslation
+                                  ? "px-1.5 py-0.5 text-sumi-soft hover:bg-washi hover:text-sumi"
+                                  : "border border-ai/30 bg-ai-soft px-2 py-0.5 text-ai-dark shadow-sm hover:border-ai/50",
+                              )}
                             >
+                              {!showTranslation && <Languages aria-hidden className="h-3 w-3" />}
                               {showTranslation
                                 ? t(
                                     "daily_challenge.hide_translation",
@@ -701,6 +720,13 @@ function DailyChallengeChat({
                 {error}
               </p>
             )}
+
+            <WordHints
+              courseSlug={courseSlug}
+              turns={messages.map((message) => ({ role: message.role, text: message.text }))}
+              draft={draft}
+              active={hintsOn && !isCharlesTyping && !isComplete}
+            />
 
             <form
               onSubmit={handleSubmit}

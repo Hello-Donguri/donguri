@@ -7,10 +7,25 @@ import { Button } from "@/components/ui/button";
 import { ShareButton } from "@/components/ui/share-button";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
 import { useTranslations } from "@/components/i18n/locale-provider";
+import { XpGainPill } from "@/components/xp/xp-gain-toast";
 import { badgeGoal } from "@/lib/badge-metrics";
-import type { BadgeView } from "@/lib/badges";
+import type { UnseenBadge } from "@/lib/badges";
 
-type NewBadge = BadgeView & { awardId: string };
+// `xpFrom`/`xpTo`: the learner's XP total before and after this badge's XP,
+// for the count-up in its modal.
+type NewBadge = UnseenBadge & { xpFrom: number; xpTo: number };
+
+// Badges come oldest first and their XP is already in `xp`, so working back
+// from it gives each one's before-and-after, as if they'd been earned one
+// after another.
+function withXpSteps(badges: UnseenBadge[], xp: number): NewBadge[] {
+  let running = xp - badges.reduce((sum, badge) => sum + badge.xpAwarded, 0);
+  return badges.map((badge) => {
+    const xpFrom = running;
+    running += badge.xpAwarded;
+    return { ...badge, xpFrom, xpTo: running };
+  });
+}
 
 const CONFETTI_COLORS = ["#3b6444", "#e0a92e", "#3d7dc4", "#b5548f", "#7d5733"];
 
@@ -32,7 +47,9 @@ function randomConfetti(count: number): ConfettiPiece[] {
 // award anything newly reached (see claimBadges), then celebrates each new
 // badge in turn, the same way a level-up is celebrated: a burst of
 // confetti, the badge spinning in on a ray of light, and a way to share it.
-// Each one is marked seen as it's dismissed, so it's only ever shown once.
+// Each one is marked seen as it's dismissed, so it's only ever shown once —
+// which also refreshes the header, so its XP counter ticks up to include any
+// badge XP.
 export function BadgeCelebration() {
   const [queue, setQueue] = useState<NewBadge[]>([]);
   const [total, setTotal] = useState(0);
@@ -40,9 +57,9 @@ export function BadgeCelebration() {
   useEffect(() => {
     let active = true;
     claimBadges()
-      .then((badges) => {
+      .then(({ badges, xp }) => {
         if (!active || badges.length === 0) return;
-        setQueue(badges);
+        setQueue(withXpSteps(badges, xp));
         setTotal(badges.length);
       })
       .catch((error) => console.error("Couldn't check for new badges:", error));
@@ -196,6 +213,18 @@ function BadgeModal({
           <p className="mt-2 font-nunito text-2xl font-extrabold text-matcha-dark">{badge.name}</p>
           <PageSubtitle className="mt-1">{badgeGoal(badge.metric, badge.threshold, t, badge.timescale)}</PageSubtitle>
         </motion.div>
+
+        {badge.xpAwarded > 0 && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.8, duration: 0.3, ease: "easeOut" }}
+            className="mt-5 flex justify-center"
+          >
+            {/* Counts up once it's in view. */}
+            <XpGainPill gain={{ from: badge.xpFrom, to: badge.xpTo }} delay={1.2} />
+          </motion.div>
+        )}
 
         <div className="mt-7 flex flex-col gap-3">
           <ShareButton

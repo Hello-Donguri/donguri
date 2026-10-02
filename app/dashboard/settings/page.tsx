@@ -6,7 +6,8 @@ import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
 import { Button } from "@/components/ui/button";
 import { NameForm } from "@/components/settings/name-form";
 import { VisibilityToggle } from "@/components/ui/visibility-toggle";
-import { setProfileVisible } from "@/lib/actions/profile";
+import { setOvertakenEmails, setProfileVisible } from "@/lib/actions/profile";
+import { NativeLanguageSetting } from "@/components/settings/native-language-field";
 import { getTranslator } from "@/lib/i18n/server";
 
 export const metadata: Metadata = {
@@ -92,6 +93,44 @@ export default async function SettingsPage() {
         >
           {t("settings_page.view_profile", "View your profile")}
         </Button>
+      </div>
+
+      <div className="max-w-lg rounded-2xl border border-card-border bg-washi-soft p-6">
+        <h2 className="font-semibold text-sumi">
+          {t("settings_page.native_language_title", "Native language")}
+        </h2>
+        <p className="mt-1 mb-4 text-sm text-sumi-soft">
+          {t("settings_page.native_language_description", "The language you grew up speaking.")}
+        </p>
+        <NativeLanguageSetting initial={profile.native_language} />
+      </div>
+
+      <div className="max-w-lg rounded-2xl border border-card-border bg-washi-soft p-6">
+        <h2 className="font-semibold text-sumi">
+          {t("settings_page.notifications_title", "Email notifications")}
+        </h2>
+        <div className="mt-3 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-sumi">
+              {t("settings_page.overtaken_title", "Leaderboard crown")}
+            </p>
+            <p className="mt-0.5 text-sm text-sumi-soft">
+              {t(
+                "settings_page.overtaken_description",
+                "Email me when someone takes my #1 spot on the weekly leaderboard. At most once a day.",
+              )}
+            </p>
+          </div>
+          <VisibilityToggle
+            active={profile.email_overtaken}
+            toggleAction={setOvertakenEmails}
+            label={t("settings_page.overtaken_label", "leaderboard crown emails")}
+            statusLabels={{
+              on: t("settings_page.on", "On"),
+              off: t("settings_page.off", "Off"),
+            }}
+          />
+        </div>
       </div>
 
       <div className="max-w-lg rounded-2xl border border-card-border bg-washi-soft p-6">

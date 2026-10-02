@@ -141,7 +141,35 @@ export type ChoiceFeedback = {
 
 // A nearly-right answer waiting to be typed again (see submitTypedAnswer's
 // `retry` in lib/actions/vocab.ts): the right answer and why.
-export type PendingRetry = { answer: string; reason: RetryReason };
+// `typed` is what the learner put, shown beside the answer to compare.
+export type PendingRetry = { answer: string; reason: RetryReason; typed: string };
+
+// What the learner typed, word by word (Jyutping syllable by syllable),
+// with each one that doesn't match the answer in the same place marked.
+function TypedComparison({ typed, answer }: { typed: string; answer: string }) {
+  const answerWords = answer.trim().toLowerCase().split(/\s+/);
+  return (
+    <>
+      {typed
+        .trim()
+        .split(/\s+/)
+        .map((word, index) => (
+          <span key={index}>
+            {index > 0 && " "}
+            <span
+              className={
+                word.toLowerCase() === answerWords[index]
+                  ? undefined
+                  : "text-shu-dark underline decoration-shu/60 decoration-wavy underline-offset-4"
+              }
+            >
+              {word}
+            </span>
+          </span>
+        ))}
+    </>
+  );
+}
 
 // Pops in when a typed answer was nearly right — a Jyutping answer with a
 // tone wrong, or an English answer with a small spelling slip: the correct
@@ -179,7 +207,15 @@ export const RetryNote = ({ retry }: { retry: PendingRetry }) => {
           </strong>
         </p>
       )}
-      <p className="mt-1 text-sm text-sumi-soft">
+      {retry.typed.trim() && (
+        <p className="mt-1 text-sm text-sumi-soft">
+          {t("test_session.you_typed", "You typed")}{" "}
+          <span className="font-semibold">
+            <TypedComparison typed={retry.typed} answer={retry.answer} />
+          </span>
+        </p>
+      )}
+      <p className="mt-2 text-sm text-sumi-soft">
         {retry.reason === "tone"
           ? t("test_session.tone_retry", "Type it again with the right tones for half XP.")
           : t("test_session.spelling_retry", "Type it in correctly for half XP.")}
