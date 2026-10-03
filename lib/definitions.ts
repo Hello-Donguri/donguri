@@ -463,6 +463,9 @@ export type QuizQuestion =
 export type ReviewQueueSummary = {
   dueCount: number;
   nextDueAt: Date | null;
+  // When more words come due over the next day (see upcomingDueTimes in
+  // lib/dal.ts), for the course page's live count.
+  upcomingDue: Date[];
 };
 
 // Admin-only "dev mode" debug view on the deck page — every word in this

@@ -102,29 +102,53 @@ export const Jyutping = ({
       ({ first, length }) => position >= first && position < first + length,
     );
 
+  // Which segments are emphasised: each highlighted syllable, plus the
+  // spacing between two of them, so a word of several syllables sits in one
+  // box rather than a box per syllable.
   let syllable = 0;
-  const coloured = (
-    <span>
-      {segments.map((segment, index) => {
-        if (!segment.tone) return segment.text;
-        const emphasised = isHighlighted(syllable++);
-        return (
-          <span key={index} className="inline-flex flex-col items-center align-baseline">
-            <span
-              className={`${TONE_TEXT[segment.tone]} ${
-                emphasised
-                  ? "font-bold underline decoration-2 underline-offset-4"
-                  : "font-medium"
-              }`}
-            >
-              {segment.text}
-            </span>
-            <SyllableContour tone={segment.tone} />
-          </span>
-        );
-      })}
-    </span>
-  );
+  const marked = segments.map((segment) => (segment.tone ? isHighlighted(syllable++) : false));
+  const inBox = marked.map((isMarked, index) => {
+    if (isMarked) return true;
+    if (segments[index].tone) return false;
+    const before = marked.slice(0, index).lastIndexOf(true);
+    const after = marked.indexOf(true, index + 1);
+    const tonedBetween = (from: number, to: number) => segments.slice(from + 1, to).some((part) => part.tone);
+    return before !== -1 && after !== -1 && !tonedBetween(before, index) && !tonedBetween(index, after);
+  });
+
+  const renderSegment = (segment: Segment, index: number) =>
+    segment.tone ? (
+      <span key={index} className="inline-flex flex-col items-center align-baseline">
+        <span className={`${TONE_TEXT[segment.tone]} ${marked[index] ? "font-bold" : "font-medium"}`}>
+          {segment.text}
+        </span>
+        <SyllableContour tone={segment.tone} />
+      </span>
+    ) : (
+      <span key={index}>{segment.text}</span>
+    );
+
+  // Runs of boxed segments become one bordered span — the highlight,
+  // instead of an underline (which doubled up with the tone contours).
+  const parts: React.ReactNode[] = [];
+  for (let index = 0; index < segments.length; index++) {
+    if (!inBox[index]) {
+      parts.push(renderSegment(segments[index], index));
+      continue;
+    }
+    const start = index;
+    while (index + 1 < segments.length && inBox[index + 1]) index++;
+    parts.push(
+      <span
+        key={`box-${start}`}
+        className="inline-block whitespace-pre rounded-md px-1 pb-0.5 ring-1 ring-sumi/30"
+      >
+        {segments.slice(start, index + 1).map((segment, offset) => renderSegment(segment, start + offset))}
+      </span>,
+    );
+  }
+
+  const coloured = <span>{parts}</span>;
 
   if (!explain || !hasTones) return coloured;
 

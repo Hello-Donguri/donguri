@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { learnWord, skipWord } from "@/lib/actions/vocab";
+import { announceReviewQueueChanged } from "@/lib/review-sync";
 import type { RevealWord } from "@/lib/definitions";
 import { ArrowRight } from "lucide-react";
 import {
@@ -66,9 +67,10 @@ export const LearnSession = ({ words, courseSlug }: LearnSessionProps) => {
 
   const handleGotIt = () => {
     saves.current.push(
-      learnWord(courseSlug, words[index].id).catch((error) =>
-        console.error("Failed to save learnt word:", error),
-      ),
+      learnWord(courseSlug, words[index].id)
+        // Its first review is now scheduled — other tabs' counts catch up.
+        .then(() => announceReviewQueueChanged(courseSlug))
+        .catch((error) => console.error("Failed to save learnt word:", error)),
     );
     advance();
   };

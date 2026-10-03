@@ -1847,6 +1847,22 @@ function reviewableWhere(userId: string, courseId: string) {
   } as const;
 }
 
+// Once a word is due, words coming due within this long after it are
+// reviewed with it — so a run of words learnt a minute apart arrives as one
+// review, not one word now and another a minute later. Kept in step with
+// DUE_GRACE_MS in components/vocab/review-card.tsx.
+const DUE_GRACE_MS = 5 * 60 * 1000;
+
+// The latest `nextReviewAt` that counts as due right now: `now`, or — when
+// at least one word is already due — `now` plus DUE_GRACE_MS (see above).
+async function dueCutoff(reviewable: ReturnType<typeof reviewableWhere>, now: Date): Promise<Date> {
+  const anyDue = await prisma.userWordProgress.findFirst({
+    where: { ...reviewable, nextReviewAt: { lte: now } },
+    select: { id: true },
+  });
+  return anyDue ? new Date(now.getTime() + DUE_GRACE_MS) : now;
+}
+
 // One review queue per *course* — combining every deck's vocab and grammar
 // together, not scoped to currently-active decks (an already-learned word
 // stays reviewable even if its deck is later deactivated). Course-home-page
@@ -1860,25 +1876,52 @@ export const getReviewQueueSummary = cache(
     const now = new Date();
     const reviewable = reviewableWhere(user.id, course.id);
 
-    const [dueCount, next] = await Promise.all([
+    const cutoff = await dueCutoff(reviewable, now);
+    const [dueCount, next, upcomingDue] = await Promise.all([
       prisma.userWordProgress.count({
-        where: { ...reviewable, nextReviewAt: { lte: now } },
+        where: { ...reviewable, nextReviewAt: { lte: cutoff } },
       }),
       prisma.userWordProgress.findFirst({
         where: { ...reviewable, nextReviewAt: { not: null } },
         orderBy: { nextReviewAt: "asc" },
         select: { nextReviewAt: true },
       }),
+      upcomingDueTimes(reviewable, cutoff),
     ]);
 
-    return { dueCount, nextDueAt: next?.nextReviewAt ?? null };
+    return { dueCount, nextDueAt: next?.nextReviewAt ?? null, upcomingDue };
   },
 );
+
+// When words in the review queue come due over the next day, soonest first
+// — so the page can bump its "words due" count at exactly those moments
+// rather than polling (see useLiveDueCount). Capped: past a day, or a few
+// hundred words, a fresh page load is soon enough.
+const UPCOMING_WINDOW_MS = 24 * 60 * 60 * 1000;
+const MAX_UPCOMING = 300;
+
+async function upcomingDueTimes(
+  reviewable: ReturnType<typeof reviewableWhere>,
+  now: Date,
+): Promise<Date[]> {
+  const rows = await prisma.userWordProgress.findMany({
+    where: {
+      ...reviewable,
+      nextReviewAt: { gt: now, lte: new Date(now.getTime() + UPCOMING_WINDOW_MS) },
+    },
+    orderBy: { nextReviewAt: "asc" },
+    select: { nextReviewAt: true },
+    take: MAX_UPCOMING,
+  });
+  return rows.flatMap((row) => (row.nextReviewAt ? [row.nextReviewAt] : []));
+}
 
 export type ReviewDueStatus = {
   slug: string;
   title: string;
   dueCount: number;
+  // Due times over the next day (see upcomingDueTimes).
+  upcomingDue: Date[];
   // The next time a word *becomes* due (strictly in the future), so the
   // notifier knows when to check again; null when nothing's scheduled.
   nextUpcomingAt: Date | null;
@@ -1902,18 +1945,21 @@ export async function getReviewDueStatus(): Promise<ReviewDueStatus[]> {
   return Promise.all(
     enrollments.map(async ({ course }) => {
       const reviewable = reviewableWhere(profile.id, course.id);
-      const [dueCount, upcoming] = await Promise.all([
-        prisma.userWordProgress.count({ where: { ...reviewable, nextReviewAt: { lte: now } } }),
+      const cutoff = await dueCutoff(reviewable, now);
+      const [dueCount, upcoming, upcomingDue] = await Promise.all([
+        prisma.userWordProgress.count({ where: { ...reviewable, nextReviewAt: { lte: cutoff } } }),
         prisma.userWordProgress.findFirst({
-          where: { ...reviewable, nextReviewAt: { gt: now } },
+          where: { ...reviewable, nextReviewAt: { gt: cutoff } },
           orderBy: { nextReviewAt: "asc" },
           select: { nextReviewAt: true },
         }),
+        upcomingDueTimes(reviewable, cutoff),
       ]);
       return {
         slug: course.slug,
         title: course.title,
         dueCount,
+        upcomingDue,
         nextUpcomingAt: upcoming?.nextReviewAt ?? null,
       };
     }),
@@ -1972,10 +2018,11 @@ export const getReviewQueue = cache(
   async (courseSlug: string): Promise<QuizQuestion[]> => {
     const { user, course } = await requireEnrolledCourse(courseSlug);
 
+    const reviewable = reviewableWhere(user.id, course.id);
     const dueProgress = await prisma.userWordProgress.findMany({
       where: {
-        ...reviewableWhere(user.id, course.id),
-        nextReviewAt: { lte: new Date() },
+        ...reviewable,
+        nextReviewAt: { lte: await dueCutoff(reviewable, new Date()) },
       },
       include: {
         word: {

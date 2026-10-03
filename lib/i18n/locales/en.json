@@ -696,6 +696,7 @@
   "level_up.share_text": "I just reached Level {{level}} in Donguri! 🌰",
   "level_up.share_title": "Donguri",
   "level_up.title": "Level up!",
+  "live_score.correct": "{{correct}} / {{answered}} correct",
   "native_language.en": "English",
   "native_language.ja": "Japanese (日本語)",
   "native_language.label": "Native language",

@@ -696,6 +696,7 @@
   "level_up.share_text": "",
   "level_up.share_title": "",
   "level_up.title": "",
+  "live_score.correct": "{{answered}}問中 {{correct}}問正解",
   "native_language.en": "英語 (English)",
   "native_language.ja": "日本語",
   "native_language.label": "母語",

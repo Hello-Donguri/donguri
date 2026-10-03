@@ -29,6 +29,8 @@ import {
 import { WordImage } from "@/components/ui/word-image";
 import { XpCounter } from "@/components/xp/xp-counter";
 import { XpGainToast, type XpGain } from "@/components/xp/xp-gain-toast";
+import { LiveScore } from "@/components/vocab/live-score";
+import { announceReviewQueueChanged } from "@/lib/review-sync";
 import { LevelUpModal } from "@/components/donguri/level-up-modal";
 import { markLevelUpSeen } from "@/lib/actions/donguri";
 import { Button } from "@/components/ui/button";
@@ -151,6 +153,9 @@ const ReviewSessionQuestions = ({
       correct: current.correct + (correct ? 1 : 0),
       incorrect: current.incorrect + (correct ? 0 : 1),
     }));
+    // The answer moved this word's next review — let other open tabs'
+    // "words due" counts catch up (see ReviewCard).
+    announceReviewQueueChanged(courseSlug);
   };
 
   const handleSubmit = async () => {
@@ -372,8 +377,14 @@ const ReviewSessionQuestions = ({
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col items-center">
+    <section className="relative mx-auto flex w-full max-w-4xl flex-col items-center">
       <XpGainToast gain={xpGain} />
+
+      {/* The running score, top right — above the header on small screens,
+          where there's no room beside it. */}
+      <div className="flex w-full justify-end sm:absolute sm:right-0 sm:top-0 sm:w-auto">
+        <LiveScore correct={score.correct} answered={score.correct + score.incorrect} />
+      </div>
 
       <div className="mb-7 flex flex-col items-center gap-3 text-center">
         <span className="rounded-full bg-matcha-soft px-4 py-1.5 text-sm font-medium text-matcha-dark">

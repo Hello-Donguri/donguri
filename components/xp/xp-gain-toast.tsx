@@ -68,10 +68,14 @@ export function XpGainPill({
   // Count in halves only when a half is involved — a whole gain (41 → 42)
   // never passes through "41.5" on the way.
   const step = Number.isInteger(gain.from) && Number.isInteger(gain.to) ? 1 : 0.5;
-  // The widest the number gets ("100" after "99", "41.5" when there's a
-  // half), reserved up front so the pill never grows or shrinks as it
-  // counts. Monospace digits, so character widths are exact.
-  const numberWidth = `${String(Math.trunc(gain.to)).length + (step < 1 ? 2 : 0)}ch`;
+  // The whole number gets a fixed box as wide as it'll get ("100" after
+  // "99"), so it never shifts. When a half is involved, a slot for ".5"
+  // sits after it, always taking its space and only shown when the count
+  // is on a half — so the whole number stays put as it toggles. Monospace
+  // digits, so character widths are exact.
+  const wholeWidth = `${String(Math.trunc(gain.to)).length}ch`;
+  const whole = Math.trunc(display);
+  const onHalf = display - whole >= 0.25;
 
   useEffect(() => {
     if (reduceMotion) return;
@@ -90,11 +94,15 @@ export function XpGainPill({
       <span className="rounded-full bg-pill-accent px-1.5 py-0.5 text-[10px] font-bold text-pill-accent-foreground">
         {t("xp_counter.level", "Lv {{level}}", { level: levelForXp(display) })}
       </span>
-      <span
-        className="inline-block text-right font-mono text-sm font-bold tabular-nums"
-        style={{ minWidth: numberWidth }}
-      >
-        {formatXp(display)}
+      <span className="inline-flex font-mono text-sm font-bold tabular-nums">
+        <span className="inline-block text-right" style={{ minWidth: wholeWidth }}>
+          {whole}
+        </span>
+        {step < 1 && (
+          <span aria-hidden={!onHalf} className={onHalf ? undefined : "invisible"}>
+            .5
+          </span>
+        )}
       </span>
       <span className="text-[10px] font-semibold uppercase tracking-wide text-pill-foreground/70">
         {t("xp_counter.xp", "XP")}

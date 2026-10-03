@@ -36,7 +36,8 @@ import { ReviewQueueDevPanel } from "@/components/vocab/review-queue-dev-panel";
 import { DailyChallengeDevReset } from "@/components/vocab/daily-challenge-dev-reset";
 import ReadingRabbit from "@/components/icons/ReadingRabbit";
 import { FakeButton } from "@/components/ui/fake-button";
-import { NextReviewCountdown } from "@/components/vocab/next-review-countdown";
+import { ReviewCard } from "@/components/vocab/review-card";
+import { CountBadge } from "@/components/ui/count-badge";
 import { SleepingDuck } from "@/components/icons/SleepingDuck";
 
 type PageProps = {
@@ -142,7 +143,6 @@ export default async function CourseHomePage({ params }: PageProps) {
     courseGreeting,
   ] = await Promise.all([loadCourseHome(slug), getTranslator(), getCourseGreeting(slug)]);
 
-  const hasReviews = reviewQueue.dueCount > 0;
   // Mirrors the learn queue: an active deck with any word not yet started.
   // No active decks at all counts as nothing to learn too.
   const activeDeckSet = new Set(activeDeckIds);
@@ -153,72 +153,6 @@ export default async function CourseHomePage({ params }: PageProps) {
   const challengesLeft = Math.max(
     challengeStatus.maxAttemptsPerDay - challengeStatus.attemptsToday,
     0,
-  );
-  const reviewCardContent = (
-    <>
-      <div className="relative z-10">
-        <div className="flex items-center gap-3">
-          <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-100/95 text-2xl font-bold leading-none text-red-600 shadow-sm backdrop-blur-sm">
-            復
-            <CountBadge count={reviewQueue.dueCount} />
-          </div>
-
-          <span className="text-sm font-bold uppercase tracking-[0.2em] text-ink-on-dark/90">
-            {t("course_home.review_label", "Review")}
-          </span>
-        </div>
-
-        <h2 className="mt-4 text-2xl font-extrabold leading-tight sm:text-3xl text-ink-on-dark">
-          {!hasReviews
-            ? t("course_home.review_empty_title", "You're all caught up!")
-            : reviewQueue.dueCount === 1
-              ? t("course_home.review_title_singular", "{{count}} word due", {
-                  count: reviewQueue.dueCount,
-                })
-              : t("course_home.review_title", "{{count}} words due", {
-                  count: reviewQueue.dueCount,
-                })}
-        </h2>
-
-        <p className="mt-2 max-w-[65%] text-sm leading-relaxed sm:max-w-[60%] text-ink-on-dark/85">
-          {!hasReviews
-            ? t(
-                "course_home.review_empty_subtitle",
-                "Come back soon to review what you've learned, or learn new words to add to your review queue.",
-              )
-            : t(
-                "course_home.review_subtitle",
-                "Keep it fresh. Strengthen your memory with a quick review.",
-              )}
-        </p>
-
-        {/* Caught up: when the next word comes due, counting down. */}
-        {!hasReviews && reviewQueue.nextDueAt && (
-          <NextReviewCountdown nextDueAt={reviewQueue.nextDueAt} />
-        )}
-      </div>
-
-      {hasReviews && (
-        <div className="relative z-10 mt-auto pt-5">
-          <FakeButton className="bg-red-100/95 text-red-700">
-            {reviewQueue.dueCount === 1
-              ? t("course_home.review_cta_singular", "Review {{count}} word", {
-                  count: reviewQueue.dueCount,
-                })
-              : t("course_home.review_cta", "Review {{count}} words", {
-                  count: reviewQueue.dueCount,
-                })}
-          </FakeButton>
-        </div>
-      )}
-
-      <img
-        src="/images/rabbit-flash.webp"
-        alt=""
-        aria-hidden="true"
-        className="pointer-events-none absolute bottom-3 right-2 z-0 h-28 select-none object-contain transition-transform duration-300 group-hover:-translate-y-1"
-      />
-    </>
   );
 
   const learnCardClassName =
@@ -397,22 +331,15 @@ export default async function CourseHomePage({ params }: PageProps) {
         <section className="rounded-3xl border border-card-border bg-washi-soft p-4 sm:p-5">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {/* REVIEW */}
-            {hasReviews ? (
-              <Link
-                href={`/dashboard/courses/${slug}/review`}
-                className="group relative flex min-h-[220px] flex-col overflow-hidden rounded-2xl border border-card-border bg-cover bg-center p-5 sm:min-h-[240px] sm:p-6 shadow-sm transition duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.015] hover:brightness-105 hover:shadow-md"
-                style={{ backgroundImage: "url(/images/red-bg.webp)" }}
-              >
-                {reviewCardContent}
-              </Link>
-            ) : (
-              <div
-                className="pointer-events-none relative flex min-h-[220px] select-none flex-col overflow-hidden rounded-2xl border border-card-border bg-cover bg-center p-5 sm:min-h-[240px] sm:p-6 shadow-sm saturate-75"
-                style={{ backgroundImage: "url(/images/red-bg.webp)" }}
-              >
-                {reviewCardContent}
-              </div>
-            )}
+            {/* Live: the count goes up the moment each word comes due
+                (see ReviewCard). Re-keyed so a fresh server count resets it. */}
+            <ReviewCard
+              key={`${reviewQueue.dueCount}:${reviewQueue.upcomingDue[0]?.getTime() ?? 0}`}
+              courseSlug={slug}
+              dueCount={reviewQueue.dueCount}
+              upcomingDue={reviewQueue.upcomingDue}
+              nextDueAt={reviewQueue.nextDueAt}
+            />
 
             {/* LEARN — turns into a browse-decks prompt once the active
                 decks have nothing new left (or none are active). */}
@@ -498,15 +425,3 @@ export default async function CourseHomePage({ params }: PageProps) {
   );
 }
 
-// Button-styled label inside a card link. Rendered as a span because the
-// whole card is already the link, and nesting a real <button> in an <a> is invalid.
-// Notification-style count bubble pinned to the corner of a card's icon chip.
-function CountBadge({ count }: { count: number }) {
-  if (count <= 0) return null;
-
-  return (
-    <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-600 px-1.5 text-xs font-bold leading-none text-white shadow-sm ring-2 ring-white">
-      {count > 99 ? "99+" : count}
-    </span>
-  );
-}
