@@ -14,10 +14,15 @@ export function Hero({ t }: { t: TFunction }) {
   return (
     <section className="mx-auto grid max-w-5xl grid-cols-1 items-center gap-14 px-6 py-16 sm:py-20 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] md:py-24">
       <div className="flex flex-col items-center text-center md:items-start md:text-left">
-        <Eyebrow>{t("home.hero.eyebrow", "English for Japanese speakers")}</Eyebrow>
+        <Eyebrow>
+          {t("home.hero.eyebrow", "English for Japanese speakers")}
+        </Eyebrow>
 
         <h1 className="mt-6 max-w-xl font-nunito text-4xl font-extrabold tracking-tight text-sumi text-balance sm:text-5xl">
-          {t("home.hero.headline", "English that sticks, five minutes at a time.")}
+          {t(
+            "home.hero.headline",
+            "TEST TEST English that sticks, five minutes at a time.",
+          )}
         </h1>
 
         <p className="mt-5 max-w-lg text-lg text-sumi-soft text-pretty">
@@ -31,7 +36,12 @@ export function Hero({ t }: { t: TFunction }) {
           <Button href="/signup" size="lg" className="h-14 px-8 text-base">
             {t("home.hero.cta_primary", "Start your free trial")}
           </Button>
-          <Button href="#how-it-works" variant="outline" size="lg" className="h-14 px-8 text-base">
+          <Button
+            href="#how-it-works"
+            variant="outline"
+            size="lg"
+            className="h-14 px-8 text-base"
+          >
             {t("home.hero.cta_secondary", "See how it works")}
           </Button>
         </div>
@@ -39,7 +49,11 @@ export function Hero({ t }: { t: TFunction }) {
         <ul className="mt-6 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-sumi-soft md:justify-start">
           {points.map((point) => (
             <li key={point} className="inline-flex items-center gap-1.5">
-              <Check aria-hidden className="h-4 w-4 text-matcha" strokeWidth={3} />
+              <Check
+                aria-hidden
+                className="h-4 w-4 text-matcha"
+                strokeWidth={3}
+              />
               {point}
             </li>
           ))}
