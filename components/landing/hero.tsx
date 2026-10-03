@@ -19,9 +19,10 @@ export function Hero({ t }: { t: TFunction }) {
         </Eyebrow>
 
         <h1 className="mt-6 max-w-xl font-nunito text-4xl font-extrabold tracking-tight text-sumi text-balance sm:text-5xl">
+          TESTINGGGGGGGGG{" "}
           {t(
             "home.hero.headline",
-            "TEST TEST English that sticks, five minutes at a time.",
+            "English that sticks, five minutes at a time.",
           )}
         </h1>
 
