@@ -443,7 +443,7 @@ const ReviewSessionQuestions = ({
               </div>
               {question.promptRomanization && (
                 <p className="mt-2 text-sm text-sumi-soft">
-                  <Jyutping text={question.promptRomanization} chart />
+                  <Jyutping text={question.promptRomanization} />
                 </p>
               )}
             </div>

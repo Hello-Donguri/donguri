@@ -37,7 +37,7 @@ export function LanguageDeckWords({ words }: { words: LanguageDeckWordSummary[] 
               {word.romanization && (
                 <span className="opacity-70">
                   {" ("}
-                  <Jyutping text={word.romanization} />)
+                  <Jyutping text={word.romanization} explain={false} />)
                 </span>
               )}
               <span className="opacity-70"> — {word.translation}</span>

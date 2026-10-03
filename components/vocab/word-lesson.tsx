@@ -101,7 +101,7 @@ export const WordLesson = ({ word, header }: { word: RevealWord; header?: ReactN
     );
     const romanization = example.romanization && (
       <p className={`mt-0.5 text-sumi-soft ${featured ? "text-sm" : "text-xs"}`}>
-        <Jyutping text={example.romanization} highlight={syllableHighlights(example)} />
+        <Jyutping text={example.romanization} highlight={syllableHighlights(example)} explain={false} />
       </p>
     );
 
@@ -163,7 +163,7 @@ export const WordLesson = ({ word, header }: { word: RevealWord; header?: ReactN
 
       {word.romanization && (
         <p className="mt-2 text-lg text-sumi-soft">
-          <Jyutping text={word.romanization} chart={!isGrammar} />
+          <Jyutping text={word.romanization} />
         </p>
       )}
 

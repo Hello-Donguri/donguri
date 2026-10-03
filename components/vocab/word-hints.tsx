@@ -209,7 +209,7 @@ export function WordHints({
                 {word.text}
                 {word.romanization && (
                   <span className="ml-1.5 text-xs font-normal">
-                    <Jyutping text={word.romanization} />
+                    <Jyutping text={word.romanization} explain={false} />
                   </span>
                 )}
               </li>

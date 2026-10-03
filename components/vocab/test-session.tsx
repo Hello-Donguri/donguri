@@ -566,7 +566,7 @@ export const TestSession = ({
           </div>
           {question.promptRomanization && (
             <p className="mt-2 text-lg text-sumi-soft">
-              <Jyutping text={question.promptRomanization} chart />
+              <Jyutping text={question.promptRomanization} />
             </p>
           )}
         </div>

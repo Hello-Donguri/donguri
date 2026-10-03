@@ -78,24 +78,25 @@ export function jyutpingTones(text: string): Tone[] {
 
 export type SyllableRange = { first: number; length: number };
 
-// Each syllable in its tone's colour. With `chart`, the word's tone
-// contours are drawn after it (see ToneContour) — meant for a single
-// word, not a whole sentence. `highlight` picks out syllables by position
-// (see syllableRange in lib/cloze.ts) — e.g. the word being taught, inside
-// an example sentence — keeping their tone colour.
+// Each syllable in its tone's colour, with its pitch contour drawn small
+// underneath (see SyllableContour) — so the tones read the same in a single
+// word and in a whole sentence. `explain` adds the "?" that says what the
+// numbers, colours and lines mean (see ToneHelp); turn it off where it would
+// repeat (each piece of a longer line) or sit inside a button. `highlight`
+// picks out syllables by position (see syllableRange in lib/cloze.ts) —
+// e.g. the word being taught, inside an example sentence — keeping their
+// tone colour.
 export const Jyutping = ({
   text,
-  chart = false,
+  explain = true,
   highlight = [],
 }: {
   text: string;
-  chart?: boolean;
+  explain?: boolean;
   highlight?: SyllableRange[];
 }) => {
   const segments = parseJyutping(text);
-  const tones = segments.flatMap((segment) =>
-    segment.tone ? [segment.tone] : [],
-  );
+  const hasTones = segments.some((segment) => segment.tone);
   const isHighlighted = (position: number) =>
     highlight.some(
       ({ first, length }) => position >= first && position < first + length,
@@ -108,30 +109,127 @@ export const Jyutping = ({
         if (!segment.tone) return segment.text;
         const emphasised = isHighlighted(syllable++);
         return (
-          <span
-            key={index}
-            className={`${TONE_TEXT[segment.tone]} ${
-              emphasised
-                ? "font-bold underline decoration-2 underline-offset-4"
-                : "font-medium"
-            }`}
-          >
-            {segment.text}
+          <span key={index} className="inline-flex flex-col items-center align-baseline">
+            <span
+              className={`${TONE_TEXT[segment.tone]} ${
+                emphasised
+                  ? "font-bold underline decoration-2 underline-offset-4"
+                  : "font-medium"
+              }`}
+            >
+              {segment.text}
+            </span>
+            <SyllableContour tone={segment.tone} />
           </span>
         );
       })}
     </span>
   );
 
-  if (!chart || tones.length === 0) return coloured;
+  if (!explain || !hasTones) return coloured;
 
   return (
-    <span className="inline-flex flex-wrap items-center justify-center gap-x-2">
+    <span>
       {coloured}
-      <ToneContour tones={tones} />
+      <ToneHelp />
     </span>
   );
 };
+
+// One syllable's pitch, as a short line over faint top/middle/bottom guides
+// — high level, rising, falling — sized to sit under the syllable.
+const SyllableContour = ({ tone }: { tone: Tone }) => {
+  const [from, to] = TONES[tone - 1].contour;
+  const y = (level: number) => 9 - (level - 1) * 2;
+  return (
+    <svg aria-hidden viewBox="0 0 18 10" width={18} height={10} className="mt-0.5 shrink-0 overflow-visible">
+      {[5, 3, 1].map((level) => (
+        <line key={level} x1={0} x2={18} y1={y(level)} y2={y(level)} className="stroke-sumi/10" strokeWidth={1} />
+      ))}
+      <line
+        x1={2}
+        x2={16}
+        y1={y(from)}
+        y2={y(to)}
+        className={TONE_STROKE[tone]}
+        strokeWidth={2.5}
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+};
+
+// The "?" beside Jyutping: what the tone numbers, colours and lines mean,
+// with a key to all six. Click to toggle (works on touch), dismissed by
+// clicking anywhere else; clicks don't reach the card or link around it.
+export function ToneHelp() {
+  const t = useTranslations();
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLSpanElement>(null);
+  const tooltipId = useId();
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+
+  const names: Record<Tone, string> = {
+    1: t("tone_help.tone_1", "high level"),
+    2: t("tone_help.tone_2", "high rising"),
+    3: t("tone_help.tone_3", "mid level"),
+    4: t("tone_help.tone_4", "low falling"),
+    5: t("tone_help.tone_5", "low rising"),
+    6: t("tone_help.tone_6", "low level"),
+  };
+
+  return (
+    <span ref={containerRef} className="relative ml-1.5 inline-block align-middle">
+      <button
+        type="button"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          setOpen((current) => !current);
+        }}
+        aria-label={t("tone_help.aria_label", "What do the tone numbers mean?")}
+        aria-expanded={open}
+        aria-describedby={open ? tooltipId : undefined}
+        className="flex h-4 w-4 cursor-pointer items-center justify-center rounded-full bg-sumi/10 text-[10px] font-bold leading-none text-sumi-soft transition hover:bg-sumi/20 hover:text-sumi"
+      >
+        ?
+      </button>
+
+      {open && (
+        <span
+          id={tooltipId}
+          role="tooltip"
+          className="absolute left-1/2 top-full z-30 mt-2 block w-64 -translate-x-1/2 rounded-xl border border-sumi/10 bg-washi p-3 text-left text-xs font-normal leading-relaxed text-sumi normal-case shadow-lg"
+        >
+          <span className="block font-semibold">{t("tone_help.title", "Cantonese tones")}</span>
+          <span className="mt-1 block text-sumi-soft">
+            {t(
+              "tone_help.body",
+              "Cantonese has six tones, and changing the tone changes the word. The number after each syllable is its tone; the colour and the little line under it show how your voice moves.",
+            )}
+          </span>
+          <span className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+            {TONES.map(({ tone }) => (
+              <span key={tone} className="flex items-center gap-1.5">
+                <SyllableContour tone={tone} />
+                <span className={`font-semibold ${TONE_TEXT[tone]}`}>{tone}</span>
+                <span className="text-sumi-soft">{names[tone]}</span>
+              </span>
+            ))}
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
 
 // Typed Jyutping with each toned syllable in its tone's colour, and
 // nothing else changed — no weight or spacing, unlike Jyutping above — so

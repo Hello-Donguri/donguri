@@ -101,7 +101,7 @@ export function DeckPreview({
                 {word.romanization && (
                   <span className="text-sumi-soft">
                     {" ("}
-                    <Jyutping text={word.romanization} />)
+                    <Jyutping text={word.romanization} explain={false} />)
                   </span>
                 )}
               </span>

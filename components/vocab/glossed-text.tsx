@@ -2,7 +2,7 @@
 
 import { useId, type ReactNode } from "react";
 import type { WordGloss } from "@/lib/daily-challenge";
-import { Jyutping } from "@/components/vocab/jyutping";
+import { Jyutping, ToneHelp } from "@/components/vocab/jyutping";
 
 // Charles's message with each word hoverable (or tappable — the words are
 // focusable) for its meaning, and its Jyutping for Cantonese. The glosses
@@ -47,11 +47,12 @@ export function GlossedJyutping({
               </>
             }
           >
-            <Jyutping text={word} />
+            <Jyutping text={word} explain={false} />
           </GlossWord>
         ),
-        (plain, key) => <Jyutping key={key} text={plain} />,
+        (plain, key) => <Jyutping key={key} text={plain} explain={false} />,
       )}
+      <ToneHelp />
     </>
   );
 }
@@ -92,7 +93,7 @@ function GlossTooltip({ gloss }: { gloss: WordGloss }) {
     <>
       {gloss.romanization && (
         <span className="font-medium">
-          <Jyutping text={gloss.romanization} />
+          <Jyutping text={gloss.romanization} explain={false} />
         </span>
       )}
       <span>{gloss.meaning}</span>

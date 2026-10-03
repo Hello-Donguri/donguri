@@ -5,7 +5,7 @@ import { Check, Volume2, X } from "lucide-react";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { useSpeech } from "@/lib/speech";
 import { useTranslations } from "@/components/i18n/locale-provider";
-import { Jyutping } from "@/components/vocab/jyutping";
+import { Jyutping, ToneHelp } from "@/components/vocab/jyutping";
 import type { MultipleChoiceQuestion, OptionMeaning, QuizOption } from "@/lib/definitions";
 import type { RetryReason } from "@/lib/actions/vocab";
 
@@ -195,7 +195,7 @@ export const RetryNote = ({ retry }: { retry: PendingRetry }) => {
         <p className="mt-1 font-semibold">
           {t("test_session.tone_miss", "So close — just the tones! It's")}{" "}
           <strong className="text-lg">
-            <Jyutping text={retry.answer} chart />
+            <Jyutping text={retry.answer} />
           </strong>
         </p>
       ) : (
@@ -203,7 +203,7 @@ export const RetryNote = ({ retry }: { retry: PendingRetry }) => {
           {t("test_session.spelling_miss", "The correct spelling is")}{" "}
           <strong className="text-lg">
             {/* A Jyutping answer (tone numbers) gets its tone colours. */}
-            {/[a-z][1-6]\b/i.test(retry.answer) ? <Jyutping text={retry.answer} chart /> : retry.answer}
+            {/[a-z][1-6]\b/i.test(retry.answer) ? <Jyutping text={retry.answer} /> : retry.answer}
           </strong>
         </p>
       )}
@@ -388,7 +388,7 @@ export const FormChoiceOptions = ({
             {option.text}
             {option.romanization && (
               <span className="mt-0.5 text-sm font-normal">
-                <Jyutping text={option.romanization} />
+                <Jyutping text={option.romanization} explain={false} />
               </span>
             )}
             {/* Once answered: what every option means, not just the right one. */}
@@ -457,7 +457,7 @@ export const MultipleChoiceOptions = ({
                 {option.text}
                 {option.romanization && (
                   <span className="mt-0.5 block text-sm font-normal lowercase">
-                    <Jyutping text={option.romanization} />
+                    <Jyutping text={option.romanization} explain={false} />
                   </span>
                 )}
                 {meaning && (
@@ -466,7 +466,7 @@ export const MultipleChoiceOptions = ({
                     {meaning.romanization && (
                       <span className="lowercase">
                         {" "}
-                        (<Jyutping text={meaning.romanization} />)
+                        (<Jyutping text={meaning.romanization} explain={false} />)
                       </span>
                     )}
                   </span>
@@ -569,7 +569,8 @@ export const ClozeCard = ({
             >
               {" "}
             </span>
-          ), (part, key) => <Jyutping key={`part-${key}`} text={part} />)}
+          ), (part, key) => <Jyutping key={`part-${key}`} text={part} explain={false} />)}
+          <ToneHelp />
         </p>
       )}
     </div>
