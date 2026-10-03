@@ -555,6 +555,9 @@ export async function submitFormAnswer(
   typedAnswer: string,
   advancesStage: boolean,
   isRetry = false,
+  // A multiple-choice cloze's options, so what each one means can be shown
+  // once it's answered (see formOptionMeanings). Empty for a typed one.
+  optionTexts: string[] = [],
 ): Promise<{
   correct: boolean;
   retry: RetryReason | null;
@@ -562,9 +565,12 @@ export async function submitFormAnswer(
   xp: number;
   alternatives?: string[];
   fullAnswer?: string | null;
+  meanings?: Record<string, OptionMeaning>;
 }> {
   const user = await requireSubscriber();
-  const courseSelect = { languageDeck: { select: { course: { select: { targetLanguage: true } } } } };
+  const courseSelect = {
+    languageDeck: { select: { course: { select: { id: true, targetLanguage: true } } } },
+  };
 
   if (formId === null) {
     const word = await prisma.word.findUniqueOrThrow({
@@ -593,6 +599,7 @@ export async function submitFormAnswer(
       xp,
       alternatives: alternativeReadings(word.term, leniency),
       fullAnswer,
+      meanings: await formOptionMeanings(word.languageDeck.course.id, optionTexts),
     };
   }
 
@@ -617,7 +624,43 @@ export async function submitFormAnswer(
 
   const { xp } = await recordAnswer(user.id, wordId, correct, advancesStage, isRetry ? RETRY_XP : 1);
 
-  return { correct, retry: null, correctAnswer: form.value, xp };
+  return {
+    correct,
+    retry: null,
+    correctAnswer: form.value,
+    xp,
+    meanings: await formOptionMeanings(form.word.languageDeck.course.id, optionTexts),
+  };
+}
+
+// What each of a multiple-choice cloze's options means, for showing under
+// them once it's answered — so the wrong ones teach something too. An
+// option is a word (打 → "to hit") or a grammar pattern's form (之前 → the
+// pattern's meaning); a word with exactly that text wins. Options with no
+// match are left out.
+async function formOptionMeanings(
+  courseId: string,
+  optionTexts: string[],
+): Promise<Record<string, OptionMeaning>> {
+  const texts = [...new Set(optionTexts.map((text) => text.trim()).filter(Boolean))].slice(0, 8);
+  if (texts.length === 0) return {};
+
+  const inCourse = { active: true, languageDeck: { courseId, active: true } };
+  const [words, forms] = await Promise.all([
+    prisma.word.findMany({
+      where: { ...inCourse, term: { in: texts } },
+      select: { term: true, translation: true },
+    }),
+    prisma.wordForm.findMany({
+      where: { value: { in: texts }, word: inCourse },
+      select: { value: true, word: { select: { translation: true } } },
+    }),
+  ]);
+
+  const meanings: Record<string, OptionMeaning> = {};
+  for (const form of forms) meanings[form.value] = { text: form.word.translation, romanization: null };
+  for (const word of words) meanings[word.term] = { text: word.translation, romanization: null };
+  return meanings;
 }
 
 // Checks a selected option against a hand-authored question's correct index.

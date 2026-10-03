@@ -210,7 +210,14 @@ const ReviewSessionQuestions = ({
     try {
       const result =
         question.kind === "form-choice"
-          ? await submitFormAnswer(question.wordId, question.formId, option, true)
+          ? await submitFormAnswer(
+              question.wordId,
+              question.formId,
+              option,
+              true,
+              false,
+              question.options.map((choice) => choice.text),
+            )
           : question.kind === "multiple-choice"
             ? await submitAnswer(
                 question.wordId,
@@ -406,7 +413,10 @@ const ReviewSessionQuestions = ({
             />
           ) : (
             <div className="w-full rounded-3xl border border-card-border bg-washi-soft p-7 text-center shadow-sm sm:p-9">
-              {question.direction === "translation-to-term" ? null : (
+              {/* Only when the prompt is the meaning (type the Cantonese for
+                  "sorry"): there the picture adds nothing the prompt doesn't
+                  say. Asked for the meaning of 對唔住, it would give it away. */}
+              {question.direction === "term-to-translation" ? null : (
                 <WordImage
                   src={question.image}
                   alt={question.prompt}

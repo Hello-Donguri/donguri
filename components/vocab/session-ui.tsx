@@ -391,6 +391,12 @@ export const FormChoiceOptions = ({
                 <Jyutping text={option.romanization} />
               </span>
             )}
+            {/* Once answered: what every option means, not just the right one. */}
+            {feedback?.meanings?.[option.text] && (
+              <span className="mt-1 text-sm font-normal opacity-75">
+                {feedback.meanings[option.text].text}
+              </span>
+            )}
           </span>
         </button>
       ))}

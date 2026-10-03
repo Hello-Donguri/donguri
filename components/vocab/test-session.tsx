@@ -187,8 +187,20 @@ export const TestSession = ({
     setPending(true);
 
     try {
-      const result = await submitFormAnswer(question.wordId, question.formId, optionValue, false);
-      setFeedback({ selected: optionValue, correct: result.correct, correctAnswer: result.correctAnswer });
+      const result = await submitFormAnswer(
+        question.wordId,
+        question.formId,
+        optionValue,
+        false,
+        false,
+        question.options.map((choice) => choice.text),
+      );
+      setFeedback({
+        selected: optionValue,
+        correct: result.correct,
+        correctAnswer: result.correctAnswer,
+        meanings: result.meanings,
+      });
       recordResult(result.correct);
       setXp(result.xp);
     } finally {
