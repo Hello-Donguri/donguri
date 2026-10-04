@@ -6,6 +6,19 @@ const AUTH_ROUTES = ["/login", "/signup"];
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
+
+  // An OAuth code that landed on the home page instead of /auth/callback:
+  // Supabase sends people to its Site URL when the redirect it was asked
+  // for isn't on its allowed list (e.g. right after a domain change). Pass
+  // it on so the sign-in still completes — the PKCE verifier cookie was set
+  // on this same site, so the exchange works there.
+  if (path === "/" && request.nextUrl.searchParams.has("code")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/callback";
+    if (!url.searchParams.has("next")) url.searchParams.set("next", "/dashboard");
+    return NextResponse.redirect(url);
+  }
+
   const isProtectedRoute = PROTECTED_ROUTES.some((route) =>
     path.startsWith(route),
   );
@@ -71,5 +84,14 @@ export async function proxy(request: NextRequest) {
 // is a pure latency win, not a security trade-off — that route tree simply
 // isn't session-gated.
 export const config = {
-  matcher: ["/dashboard/:path*", "/onboarding", "/login", "/signup"],
+  matcher: [
+    "/dashboard/:path*",
+    "/user/:path*",
+    "/onboarding",
+    "/login",
+    "/signup",
+    // The home page only when it's carrying an OAuth code (see above), so
+    // ordinary visits still skip the proxy.
+    { source: "/", has: [{ type: "query", key: "code" }] },
+  ],
 };

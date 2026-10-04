@@ -209,7 +209,7 @@ function addInstructionsSheet(workbook: ExcelJS.Workbook, cleanCategoryNames: st
     ["Word type", `Optional. One of: ${WORD_TYPES.join(", ")}.`],
     [
       "Alternative spellings",
-      'Optional. Other answers that should also count as correct when a learner types this word — e.g. "3; three" for a word whose Term is "三". Separate multiple alternatives with a semicolon ( ; ). Checked regardless of which side (Term or Translation) the learner is typing.',
+      'Optional. Other answers that should also count as correct when a learner types this word — e.g. "3; three" for a word whose Term is "三". Separate multiple alternatives with a semicolon ( ; ) or a pipe ( | ). Checked regardless of which side (Term or Translation) the learner is typing.',
     ],
     [
       "Forms",

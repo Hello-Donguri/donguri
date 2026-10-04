@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { Check, Star } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   submitAnswer,
@@ -30,6 +31,7 @@ import { WordImage } from "@/components/ui/word-image";
 import { XpCounter } from "@/components/xp/xp-counter";
 import { XpGainToast, type XpGain } from "@/components/xp/xp-gain-toast";
 import { LiveScore } from "@/components/vocab/live-score";
+import { XpEarned } from "@/components/xp/xp-earned";
 import { announceReviewQueueChanged } from "@/lib/review-sync";
 import { LevelUpModal } from "@/components/donguri/level-up-modal";
 import { markLevelUpSeen } from "@/lib/actions/donguri";
@@ -48,6 +50,10 @@ type ReviewSessionProps = {
 };
 
 type Feedback = ChoiceFeedback;
+
+// The results screen's mascots — swap these for the final artwork.
+const CORRECT_MASCOT = "/images/mascot.png";
+const QUEUE_MASCOT = "/images/rabbit-reading.webp";
 
 // The answer box: a blue-tinted border on a lighter background, and a clear
 // focus ring, so where to type stands out from the card above it.
@@ -110,6 +116,10 @@ const ReviewSessionQuestions = ({
   const [retry, setRetry] = useState<PendingRetry | null>(null);
   const [score, setScore] = useState({ correct: 0, incorrect: 0 });
   const [finished, setFinished] = useState(false);
+  // XP when the session began, fixed: the page re-renders once it's over
+  // (the header refresh) and hands down the new total as `initialXp`, which
+  // made "XP earned" drop to zero.
+  const [startXp] = useState(initialXp);
   const [xp, setXp] = useState(initialXp);
   // The last XP earned mid-session, for the pop-up that replaces an
   // always-visible counter.
@@ -255,7 +265,7 @@ const ReviewSessionQuestions = ({
       setQuizIndex((current) => current + 1);
     } else {
       setFinished(true);
-      completeQuiz(courseSlug, initialXp, quiz.length, score.correct).then((result) => {
+      completeQuiz(courseSlug, startXp, quiz.length, score.correct).then((result) => {
         setXp(result.xp);
         setBonusAwarded(result.bonusAwarded);
         setStreakBonus(result.streakBonus);
@@ -297,9 +307,18 @@ const ReviewSessionQuestions = ({
 
     return (
       <section className="mx-auto flex w-full max-w-lg flex-col items-center rounded-3xl border border-card-border bg-washi-soft px-6 py-14 text-center shadow-sm sm:px-10">
-        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-matcha-soft text-3xl text-matcha-dark">
-          {perfectScore ? "★" : "✓"}
-        </span>
+        <motion.span
+          initial={reduceMotion ? false : { scale: 0.6, rotate: -12 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 14 }}
+          className="flex h-16 w-16 items-center justify-center rounded-full bg-matcha-soft text-matcha-dark"
+        >
+          {perfectScore ? (
+            <Star aria-hidden className="h-8 w-8 fill-kin text-kin" />
+          ) : (
+            <Check aria-hidden className="h-8 w-8" strokeWidth={3} />
+          )}
+        </motion.span>
 
         <PageTitle className="mt-5">
           {perfectScore
@@ -314,8 +333,13 @@ const ReviewSessionQuestions = ({
           )}
         </PageSubtitle>
 
+        {/* What this review earned, counting up — then the running total. */}
         <div className="mt-6 flex flex-col items-center gap-2">
-          <XpCounter value={xp} />
+          <XpEarned value={Math.max(0, xp - startXp)} />
+          <p className="text-sm font-medium text-sumi-soft">
+            {t("review_session.xp_earned", "earned this review")}
+          </p>
+          <XpCounter value={xp} className="mt-2" />
           {bonusAwarded && (
             <span className="text-sm font-medium text-matcha-dark">
               {t("review_session.perfect_bonus", "+5 bonus for a perfect review!")}
@@ -330,20 +354,37 @@ const ReviewSessionQuestions = ({
           )}
         </div>
 
+        {/* Each tile pops in with its mascot, just after the XP count. */}
         <div className="mt-7 grid w-full grid-cols-2 gap-3">
-          <div className="rounded-2xl bg-matcha-soft px-4 py-5">
-            <p className="text-2xl font-semibold text-matcha-dark">{score.correct}</p>
-            <p className="mt-1 text-sm text-matcha-dark/80">
-              {t("test_session.correct", "Correct")}
-            </p>
-          </div>
-
-          <div className="rounded-2xl bg-ai-soft px-4 py-5">
-            <p className="text-2xl font-semibold text-ai-dark">{score.incorrect}</p>
-            <p className="mt-1 text-sm text-ai-dark/80">
-              {t("test_session.to_practise_again", "To practise again")}
-            </p>
-          </div>
+          {[
+            {
+              image: CORRECT_MASCOT,
+              count: score.correct,
+              label: t("test_session.correct", "Correct"),
+              tile: "bg-matcha-soft",
+              text: "text-matcha-dark",
+            },
+            {
+              image: QUEUE_MASCOT,
+              count: score.incorrect,
+              label: t("review_session.back_in_queue", "Back in your queue soon"),
+              tile: "bg-ai-soft",
+              text: "text-ai-dark",
+            },
+          ].map((item, index) => (
+            <motion.div
+              key={item.label}
+              initial={reduceMotion ? false : { opacity: 0, scale: 0.85, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 320, damping: 18, delay: 0.9 + index * 0.15 }}
+              className={`flex flex-col items-center rounded-2xl px-4 pb-5 pt-4 ${item.tile}`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- a decorative mascot, sized by CSS. */}
+              <img src={item.image} alt="" aria-hidden className="h-20 w-auto object-contain drop-shadow-sm" />
+              <p className={`mt-2 font-nunito text-3xl font-extrabold ${item.text}`}>{item.count}</p>
+              <p className={`mt-0.5 text-sm font-medium ${item.text} opacity-80`}>{item.label}</p>
+            </motion.div>
+          ))}
         </div>
 
         <Button

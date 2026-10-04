@@ -955,7 +955,7 @@ function processWordSheet(
   const rowErrors: string[] = [];
   const warnings: string[] = [];
   const validRows: ImportedWordRow[] = [];
-  // Semicolon-separated within the "Alternative spellings" cell — split out
+  // Semicolon- or pipe-separated within the "Alternative spellings" cell — split out
   // here per word id, same shape as formsByWordId/examplesByWordId below.
   const alternateAnswersByWordId = new Map<string, string[]>();
   const formsByWordId = new Map<string, ImportedFormRow[]>();
@@ -1059,7 +1059,7 @@ function processWordSheet(
 
     if (data.alternateSpellings) {
       const values = data.alternateSpellings
-        .split(";")
+        .split(/[;|]/)
         .map((value) => value.trim())
         .filter((value) => value !== "");
       if (values.length > 0) alternateAnswersByWordId.set(id, values);
