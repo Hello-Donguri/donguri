@@ -19,8 +19,8 @@ import { hasActiveAccess } from "@/lib/billing-status";
 export type AccessTier = "guest" | "free" | "member";
 
 export const GUEST_ITEM_LIMIT = 9;
-export const FREE_VOCAB_LIMIT = 12;
-export const FREE_GRAMMAR_LIMIT = 0;
+export const FREE_VOCAB_LIMIT = 40;
+export const FREE_GRAMMAR_LIMIT = 20;
 
 export function accessTier(
   role: string,
