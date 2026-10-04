@@ -274,6 +274,13 @@ model WordExample {
   // Pronunciation aid for the non-English sentence (e.g. Jyutping for a
   // Cantonese example) — optional, like `Word.romanization`.
   romanization String?
+  // The part of each sentence that is the word itself, when an admin has
+  // marked it (bold in the import spreadsheet, or typed in the word
+  // editor). Takes priority over the automatic highlighting, for sentences
+  // that use a different form than the stored term/translation. Null means
+  // "not marked" — fall back to the automatic match.
+  enHighlight  String?   @map("en_highlight")
+  jaHighlight  String?   @map("ja_highlight")
   position     Int
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   form         WordForm? @relation(fields: [formId], references: [id], onUpdate: NoAction)

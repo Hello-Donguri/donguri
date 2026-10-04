@@ -480,6 +480,8 @@ function toAdminWordSummary(word: {
     en: string;
     ja: string;
     romanization: string | null;
+    enHighlight: string | null;
+    jaHighlight: string | null;
   }[];
   alternateAnswers: { id: string; value: string }[];
 }): AdminWordSummary {
@@ -509,6 +511,8 @@ function toAdminWordSummary(word: {
       en: example.en,
       ja: example.ja,
       romanization: example.romanization,
+      enHighlight: example.enHighlight,
+      jaHighlight: example.jaHighlight,
     })),
     alternateAnswers: word.alternateAnswers.map((alt) => ({ id: alt.id, value: alt.value })),
   };
@@ -1632,6 +1636,8 @@ function toRevealWord(
       en: example.en,
       ja: example.ja,
       romanization: example.romanization,
+      enHighlight: example.enHighlight,
+      jaHighlight: example.jaHighlight,
     })),
     image: wordImagePath(word),
     targetLanguage: course.targetLanguage,
@@ -2100,7 +2106,13 @@ type QuestionWord = {
   // candidates) — cross-referenced against `examples` to build fill-in-the-
   // blank "cloze" questions.
   forms?: { id: string; value: string }[];
-  examples?: { en: string; ja: string; romanization: string | null }[];
+  examples?: {
+    en: string;
+    ja: string;
+    romanization: string | null;
+    enHighlight?: string | null;
+    jaHighlight?: string | null;
+  }[];
 };
 
 // Distractors lean heavily toward the word's own category: 2 of the 3 come
@@ -2263,7 +2275,8 @@ function buildClozeQuestion(
     formId: match.formId,
     clozeSentence: match.sentence,
     clozeSentenceJa: match.translation,
-    clozeHighlightJa: findTranslationSpan(word.translation, match.translation),
+    clozeHighlightJa:
+      match.translationHighlight ?? findTranslationSpan(word.translation, match.translation),
     clozeRomanization: match.romanization,
     targetLanguage: course.targetLanguage,
   };

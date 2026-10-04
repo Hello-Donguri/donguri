@@ -287,6 +287,10 @@ export type WordExampleSummary = {
   // Pronunciation aid for the `ja`-side sentence (e.g. Jyutping) — see
   // WordExample.romanization.
   romanization: string | null;
+  // The admin-marked part of each sentence to highlight — see
+  // WordExample.enHighlight.
+  enHighlight: string | null;
+  jaHighlight: string | null;
 };
 
 // An extra accepted spelling/answer for a word's typed-answer questions —
@@ -850,6 +854,9 @@ export const WordExampleInputSchema = z.object({
     .min(1, { error: "Japanese sentence is required." })
     .max(500),
   romanization: z.string().trim().max(500).optional(),
+  // Blank means "highlight automatically" — see WordExample.enHighlight.
+  enHighlight: z.string().trim().max(200).optional(),
+  jaHighlight: z.string().trim().max(200).optional(),
   // Empty string means "not tied to a form" — the browser <select> submits
   // "" for its blank option, so this stays a string rather than an optional.
   formClientId: z.string(),

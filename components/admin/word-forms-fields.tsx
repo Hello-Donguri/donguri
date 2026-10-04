@@ -19,6 +19,8 @@ type ExampleRow = {
   en: string;
   ja: string;
   romanization: string;
+  enHighlight: string;
+  jaHighlight: string;
   formClientId: string;
 };
 
@@ -29,6 +31,8 @@ export type WordFormsFieldsInitialExample = {
   en: string;
   ja: string;
   romanization: string | null;
+  enHighlight: string | null;
+  jaHighlight: string | null;
 };
 
 type WordFormsFieldsProps = {
@@ -59,6 +63,8 @@ export function WordFormsFields({
       en: example.en,
       ja: example.ja,
       romanization: example.romanization ?? "",
+      enHighlight: example.enHighlight ?? "",
+      jaHighlight: example.jaHighlight ?? "",
       formClientId: example.formId ?? "",
     })),
   );
@@ -84,7 +90,15 @@ export function WordFormsFields({
   const addExample = () =>
     setExamples((current) => [
       ...current,
-      { clientId: newClientId(), en: "", ja: "", romanization: "", formClientId: "" },
+      {
+        clientId: newClientId(),
+        en: "",
+        ja: "",
+        romanization: "",
+        enHighlight: "",
+        jaHighlight: "",
+        formClientId: "",
+      },
     ]);
 
   const removeExample = (clientId: string) =>
@@ -200,6 +214,36 @@ export function WordFormsFields({
                   value={example.ja}
                   onChange={(event) => updateExample(example.clientId, "ja", event.target.value)}
                   placeholder="彼女はバスで行きます。"
+                  className={inputClass}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-sumi-soft">
+                <span>
+                  {t("admin_word_forms.english_highlight", "Highlight in English sentence")}{" "}
+                  <span className="opacity-70">{t("common.optional_paren", "(optional)")}</span>
+                </span>
+                <input
+                  name={`examples.${index}.enHighlight`}
+                  value={example.enHighlight}
+                  onChange={(event) =>
+                    updateExample(example.clientId, "enHighlight", event.target.value)
+                  }
+                  placeholder="goes"
+                  className={inputClass}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-sumi-soft">
+                <span>
+                  {t("admin_word_forms.japanese_highlight", "Highlight in Japanese sentence")}{" "}
+                  <span className="opacity-70">{t("common.optional_paren", "(optional)")}</span>
+                </span>
+                <input
+                  name={`examples.${index}.jaHighlight`}
+                  value={example.jaHighlight}
+                  onChange={(event) =>
+                    updateExample(example.clientId, "jaHighlight", event.target.value)
+                  }
+                  placeholder="行きます"
                   className={inputClass}
                 />
               </label>

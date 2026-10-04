@@ -117,6 +117,8 @@ async function replaceWordFormsAndExamples(wordId: string, formData: FormData): 
     en: example.en,
     ja: example.ja,
     romanization: example.romanization || null,
+    enHighlight: example.enHighlight || null,
+    jaHighlight: example.jaHighlight || null,
     position: index + 1,
   }));
 
@@ -874,6 +876,8 @@ export async function importWords(
                   en: example.en,
                   ja: example.ja,
                   romanization: example.romanization,
+                  enHighlight: example.enHighlight,
+                  jaHighlight: example.jaHighlight,
                   position: example.position,
                 })),
               }),
@@ -908,6 +912,8 @@ type ImportedExampleRow = {
   en: string;
   ja: string;
   romanization: string | null;
+  enHighlight: string | null;
+  jaHighlight: string | null;
 };
 type ImportedQuizRow = { wordId: string; prompt: string; promptJa: string | null; options: string[]; correctIndex: number };
 
@@ -1090,6 +1096,8 @@ function processWordSheet(
           en: example.en,
           ja: example.ja,
           romanization: example.romanization,
+          enHighlight: example.enHighlight,
+          jaHighlight: example.jaHighlight,
         })),
       );
     }

@@ -73,3 +73,12 @@ export function highlightJapanese(text: string, candidates: string[]): Highlight
 
   return segment(text, new RegExp(`(${[...new Set(matched)].sort(byLengthDesc).map(escapeRegExp).join("|")})`, "g"));
 }
+
+// The part of a sentence an admin marked as the word (see
+// WordExample.enHighlight) — every place it appears. Null when nothing is
+// marked or the mark isn't in the sentence (e.g. edited since), so the
+// caller can fall back to the automatic highlightEnglish/highlightJapanese.
+export function highlightMarked(text: string, highlight: string | null): HighlightSegment[] | null {
+  if (!highlight || !text.includes(highlight)) return null;
+  return segment(text, new RegExp(`(${escapeRegExp(highlight)})`, "g"));
+}

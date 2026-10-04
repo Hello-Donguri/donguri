@@ -14,15 +14,24 @@ import { isLatinTypeable } from "@/lib/language";
 // on the course (see exampleSides). `romanization` is the sentence's
 // romanization with the answer's syllables blanked the same way — null
 // when the example has none or it can't be lined up (see
-// blankRomanization).
+// blankRomanization). `translationHighlight` is the part of `translation`
+// an admin marked as the word (see WordExample.enHighlight), when it's
+// really in there — preferred over findTranslationSpan's guess.
 export type ClozeMatch = {
   formId: string | null;
   sentence: string;
   translation: string;
   romanization: string | null;
+  translationHighlight: string | null;
 };
 
-type Example = { en: string; ja: string; romanization?: string | null };
+type Example = {
+  en: string;
+  ja: string;
+  romanization?: string | null;
+  enHighlight?: string | null;
+  jaHighlight?: string | null;
+};
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -33,8 +42,8 @@ function escapeRegExp(value: string): string {
 // for any other (e.g. Cantonese for English speakers).
 function exampleSides(example: Example, targetLanguage: string) {
   return targetLanguage === "en"
-    ? { target: example.en, translation: example.ja }
-    : { target: example.ja, translation: example.en };
+    ? { target: example.en, translation: example.ja, translationHighlight: example.jaHighlight }
+    : { target: example.ja, translation: example.en, translationHighlight: example.enHighlight };
 }
 
 // Blanks `value` out of `sentence`, or null if it isn't there. Latin text
@@ -170,7 +179,7 @@ function buildMatch(
   formId: string | null,
   targetLanguage: string,
 ): ClozeMatch | null {
-  const { target, translation } = exampleSides(example, targetLanguage);
+  const { target, translation, translationHighlight } = exampleSides(example, targetLanguage);
   const sentence = blankOut(target, value);
   if (sentence === null) return null;
 
@@ -178,7 +187,14 @@ function buildMatch(
     targetLanguage !== "en" && example.romanization
       ? blankRomanization(target, value, example.romanization)
       : null;
-  return { formId, sentence, translation, romanization };
+  return {
+    formId,
+    sentence,
+    translation,
+    romanization,
+    translationHighlight:
+      translationHighlight && translation.includes(translationHighlight) ? translationHighlight : null,
+  };
 }
 
 // Grouped by form (not a flat list) so a random pick can treat every

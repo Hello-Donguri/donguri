@@ -869,6 +869,11 @@ create table if not exists public.word_examples (
 
 alter table public.word_examples enable row level security;
 
+-- The admin-marked part of each sentence to highlight (bold in the import
+-- spreadsheet) — null falls back to automatic matching.
+alter table public.word_examples add column if not exists en_highlight text;
+alter table public.word_examples add column if not exists ja_highlight text;
+
 drop policy if exists "Authenticated users can view word examples" on public.word_examples;
 create policy "Authenticated users can view word examples"
   on public.word_examples for select

@@ -10,6 +10,7 @@ import { syllableRanges } from "@/lib/cloze";
 import {
   highlightEnglish,
   highlightJapanese,
+  highlightMarked,
   type HighlightSegment,
 } from "@/lib/highlight-term";
 import { WordImage } from "@/components/ui/word-image";
@@ -65,11 +66,14 @@ export const WordLesson = ({ word, header }: { word: RevealWord; header?: ReactN
     : [word.term, word.translation, ...formValues];
   // The same words' syllables in each example's romanization.
   const targetValues = isGrammar ? formValues : [word.term, ...formValues];
+  // An admin-marked part of the sentence (see WordExample.jaHighlight)
+  // replaces the automatic guess, when it's really in there.
   const syllableHighlights = (example: RevealWord["examples"][number]) =>
     example.romanization
-      ? targetValues.flatMap(
-          (value) => syllableRanges(example.ja, value, example.romanization!),
-        )
+      ? (example.jaHighlight && example.ja.includes(example.jaHighlight)
+          ? [example.jaHighlight]
+          : targetValues
+        ).flatMap((value) => syllableRanges(example.ja, value, example.romanization!))
       : [];
 
   // `en` is always the English sentence and `ja` the other language's —
@@ -86,7 +90,10 @@ export const WordLesson = ({ word, header }: { word: RevealWord; header?: ReactN
     const english = (className: string) => (
       <p lang="en" className={className}>
         <Highlighted
-          segments={highlightEnglish(example.en, highlightCandidates)}
+          segments={
+            highlightMarked(example.en, example.enHighlight) ??
+            highlightEnglish(example.en, highlightCandidates)
+          }
           className={accent.highlight}
         />
       </p>
@@ -94,7 +101,10 @@ export const WordLesson = ({ word, header }: { word: RevealWord; header?: ReactN
     const other = (className: string) => (
       <p lang={otherLang} className={className}>
         <Highlighted
-          segments={highlightJapanese(example.ja, highlightCandidates)}
+          segments={
+            highlightMarked(example.ja, example.jaHighlight) ??
+            highlightJapanese(example.ja, highlightCandidates)
+          }
           className={accent.highlight}
         />
       </p>

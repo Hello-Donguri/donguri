@@ -84,6 +84,17 @@ const GRAMMAR_QUIZ_SHEET_NAME = "Grammar quiz questions";
 const ENTRY_SEPARATOR = ";";
 const FIELD_SEPARATOR = "|";
 
+// Bold text in an "Examples (English)"/"Examples (Japanese)" cell marks the
+// part of that sentence to highlight in reviews, quizzes and the learn card
+// — for a sentence that uses a different form than the word's stored
+// term/translation, which the automatic matching wouldn't find. The parser
+// wraps each bold run in these (never-typed) control characters so the
+// marking survives the cell's "|" split, and parseExamplesColumns pulls it
+// back out per sentence.
+const BOLD_START = "\u0001";
+const BOLD_END = "\u0002";
+const BOLD_AWARE_KEYS = new Set(["examplesEn", "examplesJa"]);
+
 // How far down to extend the Word type / Category dropdown validation —
 // generous enough for a large deck without making the file huge.
 const VALIDATED_ROW_COUNT = 500;
@@ -217,7 +228,7 @@ function addInstructionsSheet(workbook: ExcelJS.Workbook, cleanCategoryNames: st
     ],
     [
       "Examples (English) / Examples (Japanese)",
-      'Optional. Example sentences using this word — one "|"-separated list per language, e.g. "Yesterday I ate an apple.| I eat every day." in the English column and "昨日私はりんごを食べた。| 私は毎日食べます。" in the Japanese column. The two lists must have the same number of entries (checked on upload) — the Nth entry in each is paired up as one example.',
+      'Optional. Example sentences using this word — one "|"-separated list per language, e.g. "Yesterday I ate an apple.| I eat every day." in the English column and "昨日私はりんごを食べた。| 私は毎日食べます。" in the Japanese column. The two lists must have the same number of entries (checked on upload) — the Nth entry in each is paired up as one example. To choose which part of a sentence is highlighted as this word (e.g. when the sentence uses "ate" but the word is "to eat"), make just that part bold — one bold part per sentence. Sentences with nothing bold are highlighted automatically, as before.',
     ],
     [
       "Examples (Romanization)",
@@ -354,7 +365,13 @@ export async function buildWordImportTemplate(categoryNames: string[]): Promise<
 // `buildWordImportTemplate` above. `forms`/`examples`/`quizQuestions` are
 // each already in the order they should appear in their cell/sheet.
 export type WordExportForm = { labelEn: string; labelJa: string; value: string };
-export type WordExportExample = { en: string; ja: string; romanization: string | null };
+export type WordExportExample = {
+  en: string;
+  ja: string;
+  romanization: string | null;
+  enHighlight: string | null;
+  jaHighlight: string | null;
+};
 export type WordExportQuizQuestion = {
   prompt: string;
   promptJa: string | null;
@@ -393,6 +410,34 @@ function serializeExamplesColumn(sentences: string[]): string {
   return sentences.join(`${FIELD_SEPARATOR} `);
 }
 
+// Same as serializeExamplesColumn, but with each sentence's highlight
+// written back as bold — so an exported file re-imports with the same
+// highlights instead of dropping them. Plain text when nothing's marked.
+function serializeHighlightedExamplesColumn(
+  entries: { text: string; highlight: string | null }[],
+): ExcelJS.CellValue {
+  const marked = (entry: { text: string; highlight: string | null }) =>
+    entry.highlight ? entry.text.indexOf(entry.highlight) : -1;
+  if (entries.every((entry) => marked(entry) === -1)) {
+    return serializeExamplesColumn(entries.map((entry) => entry.text));
+  }
+
+  const richText: ExcelJS.RichText[] = [];
+  entries.forEach((entry, index) => {
+    if (index > 0) richText.push({ text: `${FIELD_SEPARATOR} ` });
+    const start = marked(entry);
+    if (start === -1) {
+      richText.push({ text: entry.text });
+      return;
+    }
+    const end = start + entry.highlight!.length;
+    if (start > 0) richText.push({ text: entry.text.slice(0, start) });
+    richText.push({ text: entry.highlight!, font: { bold: true } });
+    if (end < entry.text.length) richText.push({ text: entry.text.slice(end) });
+  });
+  return { richText };
+}
+
 // Writes one sheet pair's worth of words — shared by the vocab and grammar
 // halves of `buildWordExportWorkbook` below, which differ only in which
 // sheet names and word pool they use. Word #s are assigned sequentially
@@ -424,8 +469,12 @@ function writeWordsAndQuizSheets(
       wordType: word.wordType ?? "",
       alternateSpellings: word.alternateSpellings.join("; "),
       forms: serializeFormsCell(word.forms),
-      examplesEn: serializeExamplesColumn(word.examples.map((example) => example.en)),
-      examplesJa: serializeExamplesColumn(word.examples.map((example) => example.ja)),
+      examplesEn: serializeHighlightedExamplesColumn(
+        word.examples.map((example) => ({ text: example.en, highlight: example.enHighlight })),
+      ),
+      examplesJa: serializeHighlightedExamplesColumn(
+        word.examples.map((example) => ({ text: example.ja, highlight: example.jaHighlight })),
+      ),
       // All-blank stays blank rather than a row of bare "|" separators.
       examplesRomanization: word.examples.some((example) => example.romanization)
         ? serializeExamplesColumn(word.examples.map((example) => example.romanization ?? ""))
@@ -539,7 +588,40 @@ export function parseFormsCell(text: string): ParsedFormsCell {
 
 // One example, paired up from the same-position entries of the "Examples
 // (English)"/"Examples (Japanese)"/"Examples (Romanization)" columns.
-export type ParsedExampleEntry = { en: string; ja: string; romanization: string | null };
+// `enHighlight`/`jaHighlight` are the sentence's bold part, if any (see
+// BOLD_START).
+export type ParsedExampleEntry = {
+  en: string;
+  ja: string;
+  romanization: string | null;
+  enHighlight: string | null;
+  jaHighlight: string | null;
+};
+
+type MarkedSentence = { text: string; highlight: string | null };
+
+// One "|"-separated entry with its bold markers taken out: the plain
+// sentence, plus its first bold run as the highlight. A run left open (bold
+// carried across a "|") ends with the sentence. A fully bold sentence marks
+// nothing in particular, so it counts as unmarked.
+function splitMarkedSentence(entry: string): MarkedSentence {
+  const stripMarkers = (value: string) => value.replaceAll(BOLD_START, "").replaceAll(BOLD_END, "");
+  const text = stripMarkers(entry).trim();
+
+  const start = entry.indexOf(BOLD_START);
+  if (start === -1) return { text, highlight: null };
+  const end = entry.indexOf(BOLD_END, start);
+  const highlight = stripMarkers(entry.slice(start + 1, end === -1 ? undefined : end)).trim();
+
+  return { text, highlight: highlight && highlight !== text ? highlight : null };
+}
+
+function splitMarkedColumn(text: string): MarkedSentence[] {
+  return text
+    .split(FIELD_SEPARATOR)
+    .map(splitMarkedSentence)
+    .filter((entry) => entry.text !== "");
+}
 
 export type ParsedExamplesColumns = { ok: true; examples: ParsedExampleEntry[] } | { ok: false; error: string };
 
@@ -556,14 +638,8 @@ export function parseExamplesColumns(
   jaText: string,
   romanizationText = "",
 ): ParsedExamplesColumns {
-  const enEntries = enText
-    .split(FIELD_SEPARATOR)
-    .map((entry) => entry.trim())
-    .filter((entry) => entry !== "");
-  const jaEntries = jaText
-    .split(FIELD_SEPARATOR)
-    .map((entry) => entry.trim())
-    .filter((entry) => entry !== "");
+  const enEntries = splitMarkedColumn(enText);
+  const jaEntries = splitMarkedColumn(jaText);
 
   if (enEntries.length !== jaEntries.length) {
     return {
@@ -586,9 +662,11 @@ export function parseExamplesColumns(
   return {
     ok: true,
     examples: enEntries.map((en, index) => ({
-      en,
-      ja: jaEntries[index],
+      en: en.text,
+      ja: jaEntries[index].text,
       romanization: romanizationEntries[index] || null,
+      enHighlight: en.highlight,
+      jaHighlight: jaEntries[index].highlight,
     })),
   };
 }
@@ -608,7 +686,8 @@ function parseSheetRows(sheet: ExcelJS.Worksheet, columns: readonly { header: st
 
     const values: Record<string, string> = {};
     for (const [key, colNumber] of columnIndexByKey) {
-      const raw = cellText(row.getCell(colNumber).value);
+      const value = row.getCell(colNumber).value;
+      const raw = BOLD_AWARE_KEYS.has(key) ? cellTextWithBold(value) : cellText(value);
       if (raw) values[key] = raw;
     }
 
@@ -665,6 +744,20 @@ export async function parseWordImportWorkbook(buffer: Buffer): Promise<ParsedWor
     grammarRows: grammarSheet ? parseSheetRows(grammarSheet, WORD_COLUMNS) : [],
     grammarQuizRows: grammarQuizSheet ? parseSheetRows(grammarQuizSheet, QUIZ_COLUMNS) : [],
   };
+}
+
+// cellText, but with each bold run of a rich-text cell wrapped in
+// BOLD_START/BOLD_END (see BOLD_START). Excel often splits one bold stretch
+// into several runs, so back-to-back runs are merged into one.
+function cellTextWithBold(value: ExcelJS.CellValue): string {
+  if (value && typeof value === "object" && "richText" in value) {
+    return value.richText
+      .map((part) => (part.font?.bold ? `${BOLD_START}${part.text}${BOLD_END}` : part.text))
+      .join("")
+      .replaceAll(`${BOLD_END}${BOLD_START}`, "")
+      .trim();
+  }
+  return cellText(value);
 }
 
 // ExcelJS cell values can be a plain string/number, a rich-text run, a

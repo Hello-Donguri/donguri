@@ -54,7 +54,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
         // carry a form reference (see WORD_COLUMNS' comment in
         // lib/word-import.ts), so an example tied to a form loses that tie
         // on export.
-        examples: { orderBy: { position: "asc" }, select: { en: true, ja: true, romanization: true } },
+        examples: {
+          orderBy: { position: "asc" },
+          select: { en: true, ja: true, romanization: true, enHighlight: true, jaHighlight: true },
+        },
         quizQuestions: {
           orderBy: { position: "asc" },
           select: { prompt: true, promptJa: true, options: true, correctIndex: true },
@@ -80,6 +83,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
       en: example.en,
       ja: example.ja,
       romanization: example.romanization,
+      enHighlight: example.enHighlight,
+      jaHighlight: example.jaHighlight,
     })),
     quizQuestions: word.quizQuestions.map((quiz) => ({
       prompt: quiz.prompt,
