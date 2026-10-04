@@ -19,6 +19,13 @@ export async function GET(request: NextRequest) {
     if (!error) {
       return NextResponse.redirect(`${origin}${next}`);
     }
+
+    // A `code` means Supabase has already checked the link — the email is
+    // confirmed. Signing in from it needs a cookie from the browser they
+    // signed up in, so opened anywhere else (another device, an email app's
+    // browser) it can't; they just need to log in.
+    console.error("Email confirmation code exchange failed:", error);
+    return NextResponse.redirect(`${origin}/login?notice=confirmed`);
   } else if (tokenHash && type) {
     const supabase = await createClient();
     const { error } = await supabase.auth.verifyOtp({
@@ -31,7 +38,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(
-    `${origin}/login?error=Link expired or invalid, please try again.`,
-  );
+  // No code, or a token that wouldn't verify: Supabase sends an expired or
+  // already-used link here with an error instead.
+  return NextResponse.redirect(`${origin}/login?notice=link_invalid`);
 }

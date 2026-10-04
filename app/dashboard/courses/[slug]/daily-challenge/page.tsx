@@ -5,7 +5,7 @@ import {
   getCourseTitle,
   getDailyChallenge,
   getDailyChallengeResults,
-  requireProfile,
+  requireMember,
 } from "@/lib/dal";
 import { DailyChallenge } from "@/components/vocab/daily-challenge-chat";
 import { firstNameOf, getChallengeOpener } from "@/lib/daily-challenge-opener";
@@ -41,7 +41,9 @@ async function loadDailyChallenge(slug: string) {
     getCourseHome(slug),
     getDailyChallenge(slug),
     getDailyChallengeResults(slug),
-    requireProfile(),
+    // Members only — guests are sent to sign up, free accounts to the
+    // membership page.
+    requireMember(),
   ]);
   const equippedAccessory = (parseDonguriConfig(profile.donguriConfig)
     .equippedAccessory ?? null) as AccessoryId | null;

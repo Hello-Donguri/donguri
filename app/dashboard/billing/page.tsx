@@ -1,15 +1,17 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import Image from "next/image";
+import { BookOpen, CalendarDays, Check, Languages, MessageCircle, Repeat2 } from "lucide-react";
 import { cacheLife } from "next/cache";
-import { requireProfile } from "@/lib/dal";
+import { requireRegisteredProfile } from "@/lib/dal";
 import { getMembershipDisplayPrice } from "@/lib/billing";
 import { openBillingPortal, startCheckout } from "@/lib/actions/billing";
-import { TRIAL_PERIOD_DAYS } from "@/lib/stripe";
 import { getTranslator } from "@/lib/i18n/server";
-import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
 import { Button } from "@/components/ui/button";
 import { BillingActionButton } from "@/components/billing/billing-action-button";
+import DonguriMascot from "@/components/icons/DonguriMascot";
+import { Eyebrow } from "@/components/landing/section";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -29,13 +31,17 @@ async function loadBilling() {
   "use cache: private";
   cacheLife({ stale: 30, revalidate: 60, expire: 300 });
 
-  const [profile, price] = await Promise.all([requireProfile(), getMembershipDisplayPrice()]);
+  const [profile, price] = await Promise.all([
+    requireRegisteredProfile(),
+    getMembershipDisplayPrice(),
+  ]);
   return { profile, price };
 }
 
-// Where everyone without an active trial/subscription lands (see
-// requireSubscriber in lib/dal.ts), and where members manage billing.
-// Reachable without a subscription, like profile and settings.
+// Where free accounts come to become members (see lib/access.ts — the
+// learn page's limit screen and the locked daily challenge link here), and
+// where members manage billing. Reachable without a subscription, like
+// profile and settings; guests are sent to sign up first.
 export default async function BillingPage({ searchParams }: PageProps) {
   const [{ profile, price }, { t, locale }] = await Promise.all([
     loadBilling(),
@@ -50,22 +56,48 @@ export default async function BillingPage({ searchParams }: PageProps) {
   }).format(price.amount)}/${price.interval === "month" ? t("billing.per_month", "month") : price.interval}`;
   const formatDate = (date: Date | null) =>
     date ? new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(date) : "";
-  const trialEligible = !subscription?.trialUsed;
+  // Had a membership before (now ended) — welcomed back rather than
+  // pitched to.
+  const returning = Boolean(subscription?.status);
+
+  // Tile and chip classes written out in full so Tailwind finds them.
+  const features = [
+    {
+      icon: BookOpen,
+      title: t("billing.feature_courses", "Every course, deck and lesson"),
+      tile: "border-ai/20 bg-ai-soft/50",
+      chip: "bg-ai text-washi",
+    },
+    {
+      icon: MessageCircle,
+      title: t("billing.feature_challenge", "Daily chat challenges with Charles Duck"),
+      tile: "border-matcha/20 bg-matcha-soft/50",
+      chip: "bg-matcha text-washi",
+    },
+    {
+      icon: Languages,
+      title: t("billing.feature_feedback", "Feedback on your English in Japanese and English"),
+      tile: "border-sakura/20 bg-sakura-soft/50",
+      chip: "bg-sakura text-washi",
+    },
+    {
+      icon: Repeat2,
+      title: t("billing.feature_reviews", "Spaced-repetition reviews so words stick"),
+      tile: "border-kin/30 bg-kin/10",
+      chip: "bg-kin text-ink-on-light",
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-8">
-      <div>
-        <Breadcrumbs
-          items={[
-            { href: "/dashboard", label: t("breadcrumbs.dashboard", "Dashboard") },
-            { label: t("billing.title", "Membership") },
-          ]}
-        />
-        <PageTitle>{t("billing.heading", "Membership")}</PageTitle>
-        <PageSubtitle>
-          {t("billing.subtitle", "Your Donguri membership, payment details and invoices.")}
-        </PageSubtitle>
-      </div>
+      {profile.hasAccess && (
+        <div>
+          <PageTitle>{t("billing.heading", "Membership")}</PageTitle>
+          <PageSubtitle>
+            {t("billing.subtitle", "Your Donguri membership, payment details and invoices.")}
+          </PageSubtitle>
+        </div>
+      )}
 
       <Suspense fallback={null}>
         <CheckoutNotice
@@ -76,113 +108,165 @@ export default async function BillingPage({ searchParams }: PageProps) {
       </Suspense>
 
       {profile.hasAccess && subscription ? (
-        <section className="flex max-w-2xl flex-col gap-5 rounded-3xl border border-card-border bg-washi p-6 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-sumi">
-                {t("billing.plan_name", "Donguri Membership")}
-              </h2>
-              <p className="text-sm text-sumi-soft">{priceLabel}</p>
+        <section className="relative max-w-2xl">
+          <div aria-hidden className="absolute -inset-2 -z-10 -rotate-1 rounded-[2.25rem] bg-matcha-soft" />
+          <div className="flex flex-col gap-5 rounded-4xl border border-card-border bg-raised p-6 shadow-lg sm:p-7">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-acorn-soft p-2">
+                  <DonguriMascot className="profile-bob h-full w-auto" aria-hidden />
+                </span>
+                <div>
+                  <h2 className="text-xl font-extrabold text-sumi">
+                    {t("billing.plan_name", "Donguri Membership")}
+                  </h2>
+                  <p className="font-nunito text-sm font-bold text-matcha-dark">{priceLabel}</p>
+                </div>
+              </div>
+              <StatusBadge status={status} cancelling={subscription.cancelAtPeriodEnd} t={t} />
             </div>
-            <StatusBadge status={status} cancelling={subscription.cancelAtPeriodEnd} t={t} />
-          </div>
 
-          <p className="text-sm text-sumi">
-            {status === "trialing"
-              ? subscription.cancelAtPeriodEnd
-                ? t("billing.trial_cancelling", "Your free trial ends on {{date}} and won't renew. You won't be charged.", {
-                    date: formatDate(subscription.trialEnd),
-                  })
-                : t("billing.trial_active", "Your free trial ends on {{date}}. After that you'll be charged {{price}} unless you cancel before then.", {
-                    date: formatDate(subscription.trialEnd),
-                    price: priceLabel,
-                  })
-              : status === "past_due"
-                ? t("billing.past_due", "Your last payment didn't go through. Please update your payment method to keep your access.")
-                : subscription.cancelAtPeriodEnd
-                  ? t("billing.cancelling", "Your membership ends on {{date}} and won't renew.", {
-                      date: formatDate(subscription.currentPeriodEnd),
-                    })
-                  : t("billing.renews", "Your membership renews on {{date}}.", {
-                      date: formatDate(subscription.currentPeriodEnd),
-                    })}
-          </p>
-
-          <div className="flex flex-col gap-2 border-t border-card-border pt-5 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-sumi-soft">
-              {t("billing.portal_hint", "Update your card, download invoices or cancel on Stripe's secure page.")}
-            </p>
-            <BillingActionButton
-              action={openBillingPortal}
-              variant={status === "past_due" ? "primary" : "outline"}
-              pendingText={t("billing.opening", "Opening…")}
+            <div
+              className={cn(
+                "flex items-start gap-3 rounded-2xl px-4 py-3.5 text-sm text-sumi",
+                status === "past_due" ? "bg-shu/10" : "bg-washi-soft",
+              )}
             >
-              {status === "past_due"
-                ? t("billing.update_payment", "Update payment method")
-                : t("billing.manage", "Manage billing")}
-            </BillingActionButton>
+              <CalendarDays
+                aria-hidden
+                className={cn("mt-0.5 h-4 w-4 shrink-0", status === "past_due" ? "text-shu" : "text-acorn")}
+                strokeWidth={2.25}
+              />
+              <p>
+                {status === "trialing"
+                  ? subscription.cancelAtPeriodEnd
+                    ? t("billing.trial_cancelling", "Your free trial ends on {{date}} and won't renew. You won't be charged.", {
+                        date: formatDate(subscription.trialEnd),
+                      })
+                    : t("billing.trial_active", "Your free trial ends on {{date}}. After that you'll be charged {{price}} unless you cancel before then.", {
+                        date: formatDate(subscription.trialEnd),
+                        price: priceLabel,
+                      })
+                  : status === "past_due"
+                    ? t("billing.past_due", "Your last payment didn't go through. Please update your payment method to keep your access.")
+                    : subscription.cancelAtPeriodEnd
+                      ? t("billing.cancelling", "Your membership ends on {{date}} and won't renew.", {
+                          date: formatDate(subscription.currentPeriodEnd),
+                        })
+                      : t("billing.renews", "Your membership renews on {{date}}.", {
+                          date: formatDate(subscription.currentPeriodEnd),
+                        })}
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3 border-t border-dashed border-card-border pt-5 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-sumi-soft">
+                {t("billing.portal_hint", "Update your card, download invoices or cancel on Stripe's secure page.")}
+              </p>
+              <BillingActionButton
+                action={openBillingPortal}
+                variant={status === "past_due" ? "primary" : "outline"}
+                pendingText={t("billing.opening", "Opening…")}
+              >
+                {status === "past_due"
+                  ? t("billing.update_payment", "Update payment method")
+                  : t("billing.manage", "Manage billing")}
+              </BillingActionButton>
+            </div>
           </div>
         </section>
       ) : profile.hasAccess ? (
-        <p className="max-w-2xl rounded-2xl bg-washi-soft px-5 py-4 text-sm text-sumi-soft">
+        <p className="flex max-w-2xl items-center gap-3 rounded-2xl border border-card-border bg-acorn-soft px-5 py-4 text-sm text-sumi">
+          <span className="text-2xl" aria-hidden>
+            🌰
+          </span>
           {t("billing.admin_access", "You have full access as an admin — no membership needed.")}
         </p>
       ) : (
-        <section className="flex max-w-2xl flex-col gap-6 overflow-hidden rounded-3xl border border-card-border bg-washi shadow-sm">
-          <div className="flex flex-col gap-2 bg-matcha-soft/60 px-6 pb-6 pt-8">
-            <span className="text-4xl" aria-hidden>
-              🌰
-            </span>
-            <h2 className="text-2xl font-bold text-sumi">
-              {subscription?.status && !trialEligible
-                ? t("billing.resubscribe_title", "Pick up where you left off")
-                : t("billing.trial_title", "Start your {{days}}-day free trial", {
-                    days: TRIAL_PERIOD_DAYS,
-                  })}
-            </h2>
-            <p className="text-sm text-sumi-soft">
-              {subscription?.status && !trialEligible
-                ? t("billing.resubscribe_body", "Your membership has ended. Resubscribe to get back to your courses — your progress is saved.")
-                : t("billing.trial_body", "Full access to every course for {{days}} days, free. Then {{price}} — cancel any time before the trial ends and you won't be charged.", {
-                    days: TRIAL_PERIOD_DAYS,
-                    price: priceLabel,
-                  })}
-            </p>
-          </div>
+        <section className="relative mx-auto w-full max-w-4xl">
+          <div aria-hidden className="absolute -inset-2 -z-10 rotate-1 rounded-[2.25rem] bg-acorn-soft" />
+          <div className="overflow-hidden rounded-4xl border border-card-border bg-raised shadow-lg">
+            <div className="relative bg-matcha-soft px-6 pt-10 pb-10 sm:px-10">
+              <div className="relative z-10 mx-auto flex max-w-xl flex-col items-center text-center">
+                <DonguriMascot className="profile-bob mb-4 h-24 w-auto sm:h-28" aria-hidden />
+                <Eyebrow accent="matcha">{t("billing.plan_name", "Donguri Membership")}</Eyebrow>
 
-          <ul className="flex flex-col gap-3 px-6 text-sm text-sumi">
-            {[
-              t("billing.feature_courses", "Every course, deck and lesson"),
-              t("billing.feature_challenge", "Daily chat challenges with Charles Duck"),
-              t("billing.feature_feedback", "Feedback on your English in Japanese and English"),
-              t("billing.feature_reviews", "Spaced-repetition reviews so words stick"),
-            ].map((feature) => (
-              <li key={feature} className="flex items-start gap-3">
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-matcha text-xs text-washi" aria-hidden>
-                  ✓
-                </span>
-                {feature}
-              </li>
-            ))}
-          </ul>
+                <h2 className="mt-4 font-nunito text-4xl font-black leading-[1.06] tracking-tight text-sumi text-balance sm:text-5xl">
+                  {returning
+                    ? t("billing.resubscribe_title", "Pick up where you left off")
+                    : t("billing.join_title", "Get Donguri Pro")}
+                </h2>
 
-          <div className="flex flex-col gap-3 px-6 pb-6">
-            <BillingActionButton
-              action={startCheckout}
-              variant="secondary"
-              size="lg"
-              fullWidth
-              pendingText={t("billing.redirecting", "Taking you to secure checkout…")}
-            >
-              {trialEligible
-                ? t("billing.start_trial", "Start free trial")
-                : t("billing.subscribe", "Subscribe for {{price}}", { price: priceLabel })}
-            </BillingActionButton>
-            <p className="text-center text-xs text-sumi-soft">
-              {trialEligible
-                ? t("billing.trial_fineprint", "Card required. We'll email you before your trial ends. Payments are handled securely by Stripe.")
-                : t("billing.fineprint", "Cancel any time. Payments are handled securely by Stripe.")}
-            </p>
+                <p className="mt-4 max-w-xl text-lg text-sumi-soft text-pretty">
+                  {returning
+                    ? t("billing.resubscribe_body", "Your membership has ended. Resubscribe to get back to your courses — your progress is saved.")
+                    : t("billing.join_body", "Learn every word and grammar point, and chat with Charles Duck every day. {{price}}, and you can cancel anytime.", {
+                        price: priceLabel,
+                      })}
+                </p>
+              </div>
+
+              {/* Charles peeks up from the bottom corner of the band. */}
+              <Image
+                src="/images/charles.webp"
+                alt=""
+                width={1254}
+                height={1254}
+                className="absolute right-5 -bottom-2 hidden h-24 w-auto -scale-x-100 lg:block"
+              />
+              <Image
+                src="/images/donguri-peering.webp"
+                alt=""
+                width={434}
+                height={834}
+                className="absolute left-8 -bottom-4 hidden h-32 w-auto -rotate-6 lg:block"
+              />
+            </div>
+
+            <ul className="grid grid-cols-1 gap-3 px-6 pt-7 sm:grid-cols-2 sm:px-10">
+              {features.map((feature) => (
+                <li
+                  key={feature.title}
+                  className={cn(
+                    "flex items-center gap-3 rounded-2xl border p-4 font-nunito text-base font-bold leading-tight text-sumi shadow-sm",
+                    feature.tile,
+                  )}
+                >
+                  <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-full", feature.chip)}>
+                    <feature.icon aria-hidden className="h-5 w-5" strokeWidth={2.25} />
+                  </span>
+                  {feature.title}
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-7 flex flex-col items-center border-t border-dashed border-card-border px-6 pt-7 pb-8 sm:px-10">
+              <div className="w-full sm:w-auto">
+                <BillingActionButton
+                  action={startCheckout}
+                  variant="secondary"
+                  size="lg"
+                  fullWidth
+                  className="h-14 px-8 text-base"
+                  pendingText={t("billing.redirecting", "Taking you to secure checkout…")}
+                >
+                  {t("billing.subscribe", "Subscribe for {{price}}", { price: priceLabel })}
+                </BillingActionButton>
+              </div>
+
+              <ul className="mt-5 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm text-sumi-soft">
+                {[
+                  t("home.hero.point_cancel", "Cancel anytime"),
+                  t("home.hero.point_japanese", "Explained in Japanese"),
+                  t("billing.point_stripe", "Secure payment with Stripe"),
+                ].map((point) => (
+                  <li key={point} className="inline-flex items-center gap-1.5">
+                    <Check aria-hidden className="h-4 w-4 text-matcha" strokeWidth={3} />
+                    {point}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </section>
       )}
@@ -209,7 +293,7 @@ function StatusBadge({
           : [t("billing.status_active", "Active"), "bg-matcha-soft text-matcha-dark"];
 
   return (
-    <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", tone)}>{label}</span>
+    <span className={cn("rounded-full px-3.5 py-1.5 text-xs font-bold", tone)}>{label}</span>
   );
 }
 
@@ -232,9 +316,10 @@ async function CheckoutNotice({
   return (
     <>
         {justStarted && (
-          <div className="flex max-w-2xl flex-col gap-3 rounded-2xl border border-matcha/40 bg-matcha-soft/60 p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="font-semibold text-sumi">
+          <div className="flex max-w-2xl flex-col gap-4 rounded-3xl border border-matcha/40 bg-matcha-soft p-5 sm:flex-row sm:items-center">
+            <DonguriMascot className="profile-bob h-16 w-auto shrink-0 self-start sm:self-center" aria-hidden />
+            <div className="flex-1">
+              <p className="font-nunito text-lg font-extrabold text-sumi">
                 {isTrial
                   ? t("billing.welcome_trial", "Your free trial has started 🎉")
                   : t("billing.welcome_member", "Welcome to Donguri 🎉")}

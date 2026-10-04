@@ -1,4 +1,5 @@
 import * as z from "zod";
+import type { AccessTier } from "@/lib/access";
 import type { AccessoryId } from "@/lib/levels";
 import {
   BADGE_METRICS,
@@ -196,7 +197,13 @@ export type Profile = {
   // Synced copy of their Stripe subscription (see lib/billing.ts), null if
   // they've never started Checkout.
   subscription: ProfileSubscription | null;
-  // Whether they can use /dashboard content right now — admins always can.
+  // Learning without an account (a Supabase anonymous user) — see
+  // lib/access.ts.
+  is_guest: boolean;
+  // guest / free / member — what they can learn (see lib/access.ts).
+  tier: AccessTier;
+  // Whether they're a member right now (paid, or an admin) — the daily
+  // challenge and unlimited learning. Same as `tier === "member"`.
   hasAccess: boolean;
 };
 

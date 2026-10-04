@@ -47,7 +47,7 @@ export function Lessons({ t }: { t: TFunction }) {
   ];
 
   return (
-    <Section>
+    <Section id="lessons">
       <div className="grid items-center gap-14 md:grid-cols-2">
         <div>
           <SectionHeading

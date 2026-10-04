@@ -1,7 +1,7 @@
 import "server-only";
 
 import OpenAI from "openai";
-import { requireSubscriber } from "@/lib/dal";
+import { requireMember } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import { startOfUTCDay } from "@/lib/srs";
 import { challengeLanguage, pickChallengeTarget, type ChallengeTarget } from "@/lib/daily-challenge";
@@ -54,7 +54,7 @@ export async function dailyChallengeHints(
   turns: HintTurn[],
   draft: string,
 ): Promise<HintWord[]> {
-  const user = await requireSubscriber();
+  const user = await requireMember();
   if (!process.env.OPENAI_API_KEY || !draft.trim()) return [];
 
   const enrollment = await prisma.courseEnrollment.findFirst({

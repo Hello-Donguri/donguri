@@ -54,7 +54,7 @@ export default async function DashboardPage() {
       {/* No one course here, so English greetings, with the line under them
           in the learner's own language. */}
       <Greeting
-        firstName={profile.first_name ?? profile.email}
+        firstName={profile.first_name ?? (profile.is_guest ? t("dashboard_layout.guest_name", "Guest") : profile.email)}
         motivations={DEFAULT_MOTIVATIONS[profile.native_language ?? "en"]}
       />
 

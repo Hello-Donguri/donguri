@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
+import { StartFreeButton } from "@/components/landing/start-free-button";
 import type { TFunction } from "@/lib/i18n/translate";
 
 export function FinalCta({ t }: { t: TFunction }) {
@@ -20,16 +20,16 @@ export function FinalCta({ t }: { t: TFunction }) {
         </h2>
         <p className="mt-3 max-w-md text-lg text-sumi-soft text-pretty">
           {t(
-            "home.final.subtext",
-            "Start your free trial today. Donguri will have your first lesson ready.",
+            "home.final.subtext_free",
+            "Try your first words right now, no sign-up needed. Donguri will have your first lesson ready.",
           )}
         </p>
 
-        <Button href="/signup" size="lg" className="mt-8 h-14 px-10 text-base">
-          {t("home.final.cta", "Start your free trial")}
-        </Button>
+        <div className="mt-8">
+          <StartFreeButton label={t("home.final.cta_start", "Start learning free")} className="px-10" />
+        </div>
         <p className="mt-3 text-xs text-sumi-soft">
-          {t("home.final.microcopy", "14 days free. Cancel anytime.")}
+          {t("home.final.microcopy_free", "40 words and 20 grammar points free with an account.")}
         </p>
       </div>
     </section>

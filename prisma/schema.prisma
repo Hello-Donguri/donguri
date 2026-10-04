@@ -23,6 +23,9 @@ model Profile {
   // Keeps /dashboard/users/<username> to its owner — see section 43 of
   // supabase/schema.sql.
   profileHidden          Boolean                 @default(false) @map("profile_hidden")
+  // A visitor learning without an account (a Supabase anonymous user) —
+  // see section 50 of supabase/schema.sql and lib/access.ts.
+  isGuest                Boolean                 @default(false) @map("is_guest")
   // 'en', 'ja' or 'other'; null for accounts from before it was asked.
   // See section 48 of supabase/schema.sql.
   nativeLanguage         String?                 @map("native_language")

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Lock } from "lucide-react";
 import { FakeButton } from "@/components/ui/fake-button";
 import { CountBadge } from "@/components/ui/count-badge";
 import { NextReviewCountdown } from "@/components/vocab/next-review-countdown";
@@ -100,14 +101,84 @@ export function ReviewCard({
   dueCount: initialDueCount,
   upcomingDue,
   nextDueAt,
+  locked = false,
 }: {
   courseSlug: string;
   dueCount: number;
   upcomingDue: Date[];
   // The next word due beyond the upcoming list (over a day away), if any.
   nextDueAt: Date | null;
+  // For guests (see lib/access.ts): greyed out, pointing at sign-up.
+  locked?: boolean;
 }) {
   const t = useTranslations();
+  if (locked) return <LockedReviewCard />;
+  return (
+    <LiveReviewCard
+      courseSlug={courseSlug}
+      initialDueCount={initialDueCount}
+      upcomingDue={upcomingDue}
+      nextDueAt={nextDueAt}
+      t={t}
+    />
+  );
+}
+
+// Reviews need an account: greyed out, with a lock, linking to sign-up.
+function LockedReviewCard() {
+  const t = useTranslations();
+  return (
+    <Link
+      href="/signup"
+      className={`${CARD_CLASS} opacity-60 grayscale transition hover:opacity-75`}
+      style={{ backgroundImage: "url(/images/red-bg.webp)" }}
+    >
+      <div className="relative z-10">
+        <div className="flex items-center gap-3">
+          <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-100/95 text-2xl font-bold leading-none text-red-600 shadow-sm">
+            復
+            <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-sumi text-washi shadow-sm">
+              <Lock aria-hidden className="h-3 w-3" strokeWidth={2.5} />
+            </span>
+          </div>
+          <span className="text-sm font-bold uppercase tracking-[0.2em] text-ink-on-dark/90">
+            {t("course_home.review_label", "Review")}
+          </span>
+        </div>
+        <h2 className="mt-4 text-2xl font-extrabold leading-tight sm:text-3xl text-ink-on-dark">
+          {t("course_home.review_locked_title", "Sign up to review")}
+        </h2>
+        <p className="mt-2 max-w-[65%] text-sm leading-relaxed sm:max-w-[60%] text-ink-on-dark/85">
+          {t(
+            "course_home.review_locked_subtitle",
+            "Reviews bring words back just before you'd forget them. Create a free account to unlock them.",
+          )}
+        </p>
+      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element -- decorative, sized by CSS like the other course cards. */}
+      <img
+        src="/images/rabbit-flash.webp"
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none absolute bottom-3 right-2 z-0 h-28 select-none object-contain"
+      />
+    </Link>
+  );
+}
+
+function LiveReviewCard({
+  courseSlug,
+  initialDueCount,
+  upcomingDue,
+  nextDueAt,
+  t,
+}: {
+  courseSlug: string;
+  initialDueCount: number;
+  upcomingDue: Date[];
+  nextDueAt: Date | null;
+  t: ReturnType<typeof useTranslations>;
+}) {
   const { dueCount, nextAt } = useLiveDueCount(courseSlug, {
     dueCount: initialDueCount,
     upcoming: upcomingDue.map((at) => new Date(at).getTime()),

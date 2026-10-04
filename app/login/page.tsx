@@ -10,7 +10,17 @@ export const metadata: Metadata = {
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const { t } = await getTranslator();
-  const { error } = await searchParams;
+  const { error, notice } = await searchParams;
+  // From an email link (see app/auth/confirm).
+  const noticeText =
+    notice === "confirmed"
+      ? t("auth.notice_confirmed", "Your email is confirmed — log in to continue.")
+      : notice === "link_invalid"
+        ? t(
+            "auth.notice_link_invalid",
+            "That link has expired or has already been used. If you've already confirmed your email, just log in.",
+          )
+        : null;
 
   return (
     <AuthCard
@@ -22,6 +32,18 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         href: "/signup",
       }}
     >
+      {noticeText && (
+        <p
+          role="status"
+          className={
+            notice === "confirmed"
+              ? "mb-5 rounded-2xl bg-matcha-soft/60 px-4 py-3 text-sm text-matcha-dark"
+              : "mb-5 rounded-2xl bg-kin/15 px-4 py-3 text-sm text-sumi"
+          }
+        >
+          {noticeText}
+        </p>
+      )}
       <OAuthButtons error={error === "oauth"} />
       <LoginForm />
     </AuthCard>

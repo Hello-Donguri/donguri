@@ -10,6 +10,7 @@ type Props = {
   variant?: "primary" | "secondary" | "outline";
   size?: "sm" | "md" | "lg";
   fullWidth?: boolean;
+  className?: string;
 };
 
 // A one-button form for the billing server actions (startCheckout,
@@ -23,10 +24,10 @@ export function BillingActionButton({ action, ...props }: Props) {
   );
 }
 
-function PendingButton({ children, pendingText, variant, size, fullWidth }: Omit<Props, "action">) {
+function PendingButton({ children, pendingText, variant, size, fullWidth, className }: Omit<Props, "action">) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant={variant} size={size} fullWidth={fullWidth} disabled={pending}>
+    <Button type="submit" variant={variant} size={size} fullWidth={fullWidth} className={className} disabled={pending}>
       {pending ? pendingText : children}
     </Button>
   );

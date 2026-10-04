@@ -5,11 +5,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Logo } from "@/components/logo";
-import { getSession } from "@/lib/dal";
+import { getProfile, getSession } from "@/lib/dal";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
 import { getTranslator } from "@/lib/i18n/server";
+import { getMembershipPriceLabel } from "@/lib/billing";
 import { Hero } from "@/components/landing/hero";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { Lessons } from "@/components/landing/lessons";
@@ -24,11 +25,23 @@ import { FinalCta } from "@/components/landing/final-cta";
 export default async function Home() {
   const user = await getSession();
 
-  if (user) {
+  // A guest's session can outlive the guest (merged into a real account, or
+  // cleaned up) while its cookies are still being cleared — only send on to
+  // the dashboard a session whose account still exists, or this bounces
+  // between here and the dashboard's sign-in check.
+  if (user && (!user.is_anonymous || (await getProfile()))) {
     redirect("/dashboard");
   }
 
-  const { t } = await getTranslator();
+  const { t, locale } = await getTranslator();
+  // Shown on the pricing card; left off rather than failing the page if
+  // Stripe can't be reached.
+  const priceLabel = await getMembershipPriceLabel(locale, t("billing.per_month", "month")).catch(
+    (error) => {
+      console.error("Couldn't load the membership price:", error);
+      return null;
+    },
+  );
 
   return (
     <div className="flex min-h-screen flex-col bg-washi">
@@ -62,7 +75,7 @@ export default async function Home() {
         <ReviewSchedule t={t} />
         <DailyChallenge t={t} />
         <Progress t={t} />
-        <ForJapaneseSpeakers t={t} />
+        <ForJapaneseSpeakers t={t} priceLabel={priceLabel} />
         <Faq t={t} />
       </main>
 

@@ -19,7 +19,8 @@ type Leader = { id: string; weeklyXp: number };
 async function weeklyLeader(): Promise<Leader | null> {
   const rows = await prisma.xpEvent.groupBy({
     by: ["userId"],
-    where: { createdAt: { gte: addDays(startOfUTCDay(new Date()), -6) } },
+    // Guests (see lib/access.ts) can't hold the crown.
+    where: { createdAt: { gte: addDays(startOfUTCDay(new Date()), -6) }, profile: { isGuest: false } },
     _sum: { amount: true },
   });
   const weekly = rows

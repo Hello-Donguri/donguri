@@ -3,7 +3,7 @@
 import OpenAI from "openai";
 import { revalidatePath } from "next/cache";
 import {
-  requireSubscriber,
+  requireMember,
   requireProfile,
   MAX_DAILY_CHALLENGE_ATTEMPTS,
   bumpStreak,
@@ -578,7 +578,7 @@ export async function sendDailyChallengeMessage(
   message: string,
   grammarMessage: string | null = null,
 ): Promise<SendDailyChallengeMessageResult> {
-  const user = await requireSubscriber();
+  const user = await requireMember();
   const trimmedMessage = message.trim();
 
   if (!trimmedMessage) {
@@ -866,7 +866,7 @@ function revalidateChallengePaths(courseSlug: string) {
 // section 42 of supabase/schema.sql). The target is re-derived here, never
 // taken from the client.
 export async function skipDailyChallenge(courseSlug: string): Promise<{ ok: boolean }> {
-  const user = await requireSubscriber();
+  const user = await requireMember();
 
   const enrollment = await prisma.courseEnrollment.findFirst({
     where: { userId: user.id, unenrolledAt: null, course: { slug: courseSlug, active: true } },

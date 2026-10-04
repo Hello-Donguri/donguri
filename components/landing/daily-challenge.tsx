@@ -38,7 +38,7 @@ export function DailyChallenge({ t }: { t: TFunction }) {
   ];
 
   return (
-    <Section tone="washi-soft">
+    <Section id="daily-challenge" tone="washi-soft">
       <div className="grid items-center gap-14 md:grid-cols-2">
         <div>
           <SectionHeading

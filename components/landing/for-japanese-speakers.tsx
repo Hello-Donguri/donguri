@@ -1,11 +1,13 @@
 import { Check, Languages, LogIn, MessageSquareText, Smartphone } from "lucide-react";
 import { Section, SectionHeading, FeatureList, Eyebrow } from "@/components/landing/section";
-import { Button } from "@/components/ui/button";
+import { StartFreeButton } from "@/components/landing/start-free-button";
 import type { TFunction } from "@/lib/i18n/translate";
 
 // "Made for Japanese speakers" beside the membership card — the two
 // questions a visitor has left once they've seen how it works.
-export function ForJapaneseSpeakers({ t }: { t: TFunction }) {
+// `priceLabel` is the membership price ("¥850/month"), or null when it
+// couldn't be fetched from Stripe — then the price line is just left out.
+export function ForJapaneseSpeakers({ t, priceLabel }: { t: TFunction; priceLabel: string | null }) {
   const icon = "h-5 w-5";
   const items = [
     {
@@ -63,14 +65,20 @@ export function ForJapaneseSpeakers({ t }: { t: TFunction }) {
         <div id="pricing" className="scroll-mt-6 rounded-4xl border border-card-border bg-raised p-7 shadow-lg sm:p-9">
           <Eyebrow accent="kin">{t("home.pricing.eyebrow", "Membership")}</Eyebrow>
           <h2 className="mt-5 font-nunito text-3xl font-extrabold tracking-tight text-sumi">
-            {t("home.pricing.heading", "Try everything free for 14 days.")}
+            {t("home.pricing.heading_free", "Start free. Become a member when you're ready.")}
           </h2>
           <p className="mt-3 text-sumi-soft text-pretty">
             {t(
-              "home.pricing.subtext",
-              "One membership unlocks the whole app. Add a card to start your trial. You won't be charged until day 15, and you can cancel before then from your account.",
+              "home.pricing.subtext_free",
+              "Try 9 words without signing up, then learn 40 words and 20 grammar points free with an account. A membership unlocks everything, including daily chats with Charles Duck.",
             )}
           </p>
+          {priceLabel && (
+            <p className="mt-5 font-nunito text-sumi">
+              <span className="text-4xl font-black tracking-tight">{priceLabel.split("/")[0]}</span>
+              <span className="text-sumi-soft"> / {t("billing.per_month", "month")}</span>
+            </p>
+          )}
 
           <ul className="mt-6 flex flex-col gap-3 border-t border-sumi/10 pt-6">
             {included.map((item) => (
@@ -83,11 +91,11 @@ export function ForJapaneseSpeakers({ t }: { t: TFunction }) {
             ))}
           </ul>
 
-          <Button href="/signup" size="lg" fullWidth className="mt-8 h-14 text-base">
-            {t("home.pricing.cta", "Start your free trial")}
-          </Button>
+          <div className="mt-8">
+            <StartFreeButton label={t("home.pricing.cta_start", "Start learning free")} fullWidth />
+          </div>
           <p className="mt-3 text-center text-xs text-sumi-soft">
-            {t("home.pricing.microcopy", "Cancel anytime. The trial is for first-time members.")}
+            {t("home.pricing.microcopy_free", "No card needed to start. Cancel your membership anytime.")}
           </p>
         </div>
       </div>

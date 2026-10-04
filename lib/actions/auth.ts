@@ -16,7 +16,9 @@ import {
   type ForgotPasswordFormState,
   type ResetPasswordFormState,
 } from "@/lib/definitions";
-import { requireUser } from "@/lib/dal";
+import { getSession, requireUser } from "@/lib/dal";
+import { mergeGuestInto, rememberGuestForOAuth } from "@/lib/guest-merge";
+import { clearSessionCookies } from "@/lib/supabase/session-cookies";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 
@@ -46,6 +48,14 @@ const getOrigin = async () => {
   return `${protocol}://${host}`;
 };
 
+// The id of the guest (anonymous user, see lib/access.ts) currently signed
+// in, if any — read before a sign-in replaces their session, so what they
+// learnt can be moved onto the account (see lib/guest-merge.ts).
+async function currentGuestId(): Promise<string | null> {
+  const user = await getSession();
+  return user?.is_anonymous ? user.id : null;
+}
+
 export async function login(
   _state: LoginFormState,
   formData: FormData,
@@ -60,8 +70,9 @@ export async function login(
   }
 
   const { email, password } = validatedFields.data;
+  const guestId = await currentGuestId();
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
@@ -69,6 +80,8 @@ export async function login(
   if (error) {
     return { message: "Invalid email or password." };
   }
+
+  if (guestId) await mergeGuestInto(guestId, data.user.id);
 
   redirect("/dashboard");
 }
@@ -100,6 +113,7 @@ export async function signup(
   }
   const fullName = `${firstName} ${lastName}`.trim();
   const origin = await getOrigin();
+  const guestId = await currentGuestId();
   const supabase = await createClient();
 
   const { data, error } = await supabase.auth.signUp({
@@ -176,12 +190,24 @@ export async function signup(
     };
   }
 
+  // Moved now, while both ids are known — the confirmation link may well
+  // be opened on another device, where the guest session doesn't exist.
+  if (guestId) await mergeGuestInto(guestId, data.user.id);
+
   if (data.session) {
     redirect("/dashboard");
   }
 
+  // The guest's session is still in the cookies, for a user that no longer
+  // exists — clear it so they land signed out, ready to confirm. Not with
+  // signOut(): that also deletes the cookie the confirmation link needs to
+  // sign them in (see lib/supabase/session-cookies.ts).
+  if (guestId) await clearSessionCookies();
+
   return {
-    message: "Check your inbox to confirm your email before logging in.",
+    message: guestId
+      ? "Your progress is saved to your new account. Check your inbox to confirm your email, then log in to carry on."
+      : "Check your inbox to confirm your email before logging in.",
   };
 }
 
@@ -197,6 +223,8 @@ export type OAuthProvider = keyof typeof OAUTH_PROVIDERS;
 
 export async function signInWithOAuth(provider: OAuthProvider) {
   const origin = await getOrigin();
+  const guestId = await currentGuestId();
+  if (guestId) await rememberGuestForOAuth(guestId);
   const supabase = await createClient();
 
   // Runs server-side, so the PKCE code verifier lands in a cookie that
@@ -298,7 +326,7 @@ export async function completeOnboarding(
 export async function logout() {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  redirect("/login");
+  redirect("/");
 }
 
 export async function forgotPassword(

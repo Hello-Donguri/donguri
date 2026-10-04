@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { mergeGuestInto, takeRememberedGuest } from "@/lib/guest-merge";
 
 // Where Google / LINE send the user back to after signInWithOAuth (see
 // lib/actions/auth.ts). Exchanges the one-time code for a session. The
@@ -13,9 +14,14 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
+      // Signing in from a guest session (see lib/guest-merge.ts): bring
+      // what they learnt along.
+      const guestId = await takeRememberedGuest();
+      if (guestId) await mergeGuestInto(guestId, data.user.id);
+
       return NextResponse.redirect(`${origin}${next}`);
     }
 

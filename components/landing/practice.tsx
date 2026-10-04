@@ -40,7 +40,7 @@ export function Practice({ t }: { t: TFunction }) {
   ];
 
   return (
-    <Section tone="washi-soft">
+    <Section id="quizzes" tone="washi-soft">
       <div className="grid items-center gap-14 md:grid-cols-2">
         {/* Text first on a phone; the mock-up on the left from md up. */}
         <div className="order-last md:order-first">

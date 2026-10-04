@@ -1896,3 +1896,36 @@ update public.courses set
     "君はすごい！"
   ]'::jsonb
 where slug = 'en-for-ja';
+
+-- 50. Guest learners --------------------------------------------------------------------
+-- Visitors can start learning straight from the home page without an
+-- account: the app signs them in with a Supabase *anonymous* user (enable
+-- "Anonymous sign-ins" under Authentication → Sign In / Providers). Their
+-- profile is flagged `is_guest` — kept off leaderboards and the weekly
+-- crown, and capped at 9 learnt items (see lib/access.ts). When they sign
+-- up or log in, lib/guest-merge.ts moves their progress onto the real
+-- account and deletes the guest. Anonymous users have no email, so the
+-- auto-create trigger stores '' rather than violating `email not null`.
+
+alter table public.profiles add column if not exists is_guest boolean not null default false;
+
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.profiles (id, email, full_name, first_name, last_name, is_guest)
+  values (
+    new.id,
+    coalesce(new.email, ''),
+    new.raw_user_meta_data ->> 'full_name',
+    new.raw_user_meta_data ->> 'first_name',
+    new.raw_user_meta_data ->> 'last_name',
+    coalesce(new.is_anonymous, false)
+  )
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;

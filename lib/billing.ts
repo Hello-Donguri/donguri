@@ -1,22 +1,10 @@
 import "server-only";
 import type Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
-import { cacheLife } from "next/cache";
+import { cacheLife, cacheTag } from "next/cache";
 import { getMembershipPrice, stripe } from "@/lib/stripe";
 
-// Subscription statuses that unlock /dashboard content. `past_due` stays in
-// so a failed renewal doesn't lock someone out while Stripe retries the
-// card (Smart Retries); once retries run out it moves to `unpaid` or
-// `canceled` and access ends.
-const ACCESS_STATUSES = new Set(["trialing", "active", "past_due"]);
-
-export function hasActiveAccess(
-  role: string,
-  subscription: { status: string | null } | null,
-): boolean {
-  if (role === "admin") return true;
-  return subscription?.status != null && ACCESS_STATUSES.has(subscription.status);
-}
+export { hasActiveAccess } from "@/lib/billing-status";
 
 function toDate(seconds: number | null | undefined): Date | null {
   return seconds ? new Date(seconds * 1000) : null;
@@ -87,7 +75,11 @@ export async function syncCheckoutSession(sessionId: string, userId: string): Pr
 }
 
 // The membership price for display, cached — it only changes when the
-// price is edited in Stripe.
+// price is edited in Stripe. After changing it there (a new price with the
+// lookup key moved onto it), `revalidateTag(MEMBERSHIP_PRICE_TAG)` — or a
+// redeploy — shows the new one straight away instead of within hours.
+export const MEMBERSHIP_PRICE_TAG = "membership-price";
+
 export async function getMembershipDisplayPrice(): Promise<{
   amount: number;
   currency: string;
@@ -95,6 +87,7 @@ export async function getMembershipDisplayPrice(): Promise<{
 }> {
   "use cache";
   cacheLife("hours");
+  cacheTag(MEMBERSHIP_PRICE_TAG);
 
   const price = await getMembershipPrice();
   return {
@@ -102,4 +95,15 @@ export async function getMembershipDisplayPrice(): Promise<{
     currency: price.currency,
     interval: price.recurring?.interval ?? "month",
   };
+}
+
+// "¥850/month" — the membership price as shown to learners, in their
+// locale. `perMonth` is the translated word for "month".
+export async function getMembershipPriceLabel(locale: string, perMonth: string): Promise<string> {
+  const price = await getMembershipDisplayPrice();
+  const amount = new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: price.currency.toUpperCase(),
+  }).format(price.amount);
+  return `${amount}/${price.interval === "month" ? perMonth : price.interval}`;
 }

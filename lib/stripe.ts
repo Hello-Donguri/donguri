@@ -23,7 +23,6 @@ export function stripe(): Stripe {
 export const MEMBERSHIP_PRICE_LOOKUP_KEY =
   process.env.STRIPE_PRICE_LOOKUP_KEY ?? "donguri_monthly_jpy";
 
-export const TRIAL_PERIOD_DAYS = 14;
 
 export async function getMembershipPrice(): Promise<Stripe.Price> {
   const { data } = await stripe().prices.list({

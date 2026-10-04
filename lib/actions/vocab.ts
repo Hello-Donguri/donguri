@@ -5,7 +5,7 @@ import {
   bumpStreak,
   ensureDeckActivations,
   introduceLearnWords,
-  requireSubscriber,
+  requireLearner,
 } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import {
@@ -392,7 +392,7 @@ export async function submitAnswer(
   xp: number;
   meanings: Record<string, OptionMeaning>;
 }> {
-  const user = await requireSubscriber();
+  const user = await requireLearner();
 
   const word = await prisma.word.findUniqueOrThrow({
     where: { id: wordId },
@@ -475,7 +475,7 @@ export async function submitTypedAnswer(
   alternatives: string[];
   fullAnswer: string | null;
 }> {
-  const user = await requireSubscriber();
+  const user = await requireLearner();
 
   const word = await prisma.word.findUniqueOrThrow({
     where: { id: wordId },
@@ -567,7 +567,7 @@ export async function submitFormAnswer(
   fullAnswer?: string | null;
   meanings?: Record<string, OptionMeaning>;
 }> {
-  const user = await requireSubscriber();
+  const user = await requireLearner();
   const courseSelect = {
     languageDeck: { select: { course: { select: { id: true, targetLanguage: true } } } },
   };
@@ -669,7 +669,7 @@ export async function submitCustomAnswer(
   questionId: string,
   selectedOption: string,
 ): Promise<{ correct: boolean; correctAnswer: string; xp: number }> {
-  const user = await requireSubscriber();
+  const user = await requireLearner();
 
   const question = await prisma.wordQuizQuestion.findUniqueOrThrow({
     where: { id: questionId },
@@ -718,7 +718,7 @@ export async function completeQuiz(
   newlyUnlockedAccessories: AccessoryId[];
   unlockedAccessories: AccessoryId[];
 }> {
-  const user = await requireSubscriber();
+  const user = await requireLearner();
 
   const perfect = totalQuestions > 0 && correctCount === totalQuestions;
 
@@ -796,7 +796,7 @@ export async function learnWord(courseSlug: string, wordId: string): Promise<voi
 }
 
 export async function skipWord(wordId: string): Promise<void> {
-  const user = await requireSubscriber();
+  const user = await requireLearner();
 
   await prisma.userWordProgress.upsert({
     where: { userId_wordId: { userId: user.id, wordId } },
@@ -810,7 +810,10 @@ export async function skipWord(wordId: string): Promise<void> {
     },
     update: {
       status: "known",
-      skipped: true,
+      // A word they've already been taught stays counted against a free
+      // allowance (see lib/access.ts) — otherwise learn-then-skip would
+      // hand the slot back for something new.
+      ...(user.tier === "member" && { skipped: true }),
       stage: MAX_STAGE,
       nextReviewAt: null,
     },
@@ -820,7 +823,7 @@ export async function skipWord(wordId: string): Promise<void> {
 }
 
 export async function skipLanguageDeck(languageDeckId: string): Promise<void> {
-  const user = await requireSubscriber();
+  const user = await requireLearner();
 
   const words = await prisma.word.findMany({
     where: { languageDeckId },
@@ -849,7 +852,14 @@ export async function skipLanguageDeck(languageDeckId: string): Promise<void> {
       wordId: { in: words.map((word) => word.id) },
       status: { not: "known" },
     },
-    data: { status: "known", skipped: true, stage: MAX_STAGE, nextReviewAt: null },
+    // Same as skipWord: already-taught words stay counted against a free
+    // allowance.
+    data: {
+      status: "known",
+      ...(user.tier === "member" && { skipped: true }),
+      stage: MAX_STAGE,
+      nextReviewAt: null,
+    },
   });
 
   // "page" scope (the default) only revalidates this exact path, not the
@@ -871,7 +881,7 @@ export async function toggleDeckActivation(
   deckId: string,
   active: boolean,
 ): Promise<void> {
-  const user = await requireSubscriber();
+  const user = await requireLearner();
 
   await ensureDeckActivations(courseSlug);
   await prisma.userDeckActivation.upsert({
@@ -888,7 +898,7 @@ export async function toggleDeckActivation(
 // `resetCourseProgress`, XP, streaks and review history are kept — that work
 // still happened.
 export async function restartDeck(courseSlug: string, deckId: string): Promise<void> {
-  const user = await requireSubscriber();
+  const user = await requireLearner();
 
   await ensureDeckActivations(courseSlug);
 
@@ -907,7 +917,7 @@ export async function restartDeck(courseSlug: string, deckId: string): Promise<v
 }
 
 export async function resetCourseProgress(courseId: string): Promise<void> {
-  const user = await requireSubscriber();
+  const user = await requireLearner();
 
   await prisma.userWordProgress.deleteMany({
     where: { userId: user.id, word: { languageDeck: { courseId } } },

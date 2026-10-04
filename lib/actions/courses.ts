@@ -2,11 +2,11 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requireSubscriber } from "@/lib/dal";
+import { requireLearner } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 
 export async function enrollInCourse(courseId: string): Promise<void> {
-  const user = await requireSubscriber();
+  const user = await requireLearner();
 
   const course = await prisma.course.findUniqueOrThrow({
     where: { id: courseId },
@@ -30,7 +30,7 @@ export async function enrollInCourse(courseId: string): Promise<void> {
 // stay exactly as they were, so enrolling again picks up where they left
 // off (see enrollInCourse and section 45 of supabase/schema.sql).
 export async function unenrollFromCourse(courseId: string): Promise<void> {
-  const user = await requireSubscriber();
+  const user = await requireLearner();
 
   await prisma.courseEnrollment.updateMany({
     where: { userId: user.id, courseId, unenrolledAt: null },

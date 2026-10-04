@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import Link from "next/link";
-import { getCourseHome, getCourseTitle, getLearnQueueForCourse } from "@/lib/dal";
+import { getCourseHome, getCourseTitle, getLearnQueueForCourse, getLearningAllowance } from "@/lib/dal";
+import { getMembershipPriceLabel } from "@/lib/billing";
+import { LimitReached } from "@/components/access/limit-reached";
 import { LearnSession } from "@/components/vocab/learn-session";
 import { FreshSession } from "@/components/vocab/fresh-session";
 import { EnterShortcut } from "@/components/vocab/enter-shortcut";
@@ -26,7 +28,7 @@ export default async function LearnPage({ params }: PageProps) {
   await connection();
   const { slug } = await params;
 
-  const [{ course }, words, { t }] = await Promise.all([
+  const [{ course }, { words, limitReached }, { t, locale }] = await Promise.all([
     getCourseHome(slug),
     getLearnQueueForCourse(slug),
     getTranslator(),
@@ -38,6 +40,20 @@ export default async function LearnPage({ params }: PageProps) {
     { href: `/dashboard/courses/${slug}`, label: course.title, prefetch: true },
     { label: t("learn_page.breadcrumb_learn", "Learn") },
   ];
+
+  if (limitReached) {
+    const [allowance, priceLabel] = await Promise.all([
+      getLearningAllowance(),
+      getMembershipPriceLabel(locale, t("billing.per_month", "month")),
+    ]);
+
+    return (
+      <div className="flex flex-col gap-6">
+        <Breadcrumbs items={breadcrumbItems} />
+        <LimitReached allowance={allowance} courseSlug={slug} priceLabel={priceLabel} t={t} />
+      </div>
+    );
+  }
 
   if (words.length === 0) {
     return (

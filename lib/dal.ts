@@ -1,4 +1,4 @@
-import { hasActiveAccess } from "@/lib/billing";
+import { accessTier, allowanceFor, withinAllowance, type Allowance } from "@/lib/access";
 import "server-only";
 
 import { cache } from "react";
@@ -133,6 +133,7 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
       profileHidden: true,
       nativeLanguage: true,
       emailOvertaken: true,
+      isGuest: true,
       subscription: {
         select: {
           status: true,
@@ -149,6 +150,8 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
     return null;
   }
 
+  const tier = accessTier(profile.role, profile.isGuest, profile.subscription);
+
   return {
     id: profile.id,
     email: profile.email,
@@ -163,7 +166,9 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
     native_language: isNativeLanguage(profile.nativeLanguage) ? profile.nativeLanguage : null,
     email_overtaken: profile.emailOvertaken,
     subscription: profile.subscription,
-    hasAccess: hasActiveAccess(profile.role, profile.subscription),
+    is_guest: profile.isGuest,
+    tier,
+    hasAccess: tier === "member",
   };
 });
 
@@ -172,14 +177,20 @@ export const requireProfile = cache(async (): Promise<Profile> => {
   const profile = await getProfile();
 
   if (!profile) {
+    // A guest's session can outlive the guest (merged into a real account,
+    // or cleaned up) — start them afresh rather than asking a user who no
+    // longer exists to fill in their details.
+    if (user.is_anonymous) redirect("/auth/signout");
+
     console.error(`No Prisma profile exists for authenticated user ${user.id}`);
 
     redirect("/onboarding");
   }
 
   // OAuth sign-ups, and accounts from before usernames existed, haven't
-  // been asked for these yet — see app/onboarding.
-  if (!isProfileComplete(profile)) {
+  // been asked for these yet — see app/onboarding. Guests are never asked:
+  // they give their details when they sign up.
+  if (!profile.is_guest && !isProfileComplete(profile)) {
     redirect("/onboarding");
   }
 
@@ -196,18 +207,56 @@ export function isProfileComplete(
   return Boolean(profile.username && profile.first_name && profile.last_name);
 }
 
-// For everything behind the paywall: the signed-in profile, or a redirect
-// to the billing page to start the free trial / resubscribe. Called from
+// For course content: any signed-in learner — guest, free or member (see
+// lib/access.ts). What each tier may *learn* is capped separately, where
+// new items are introduced (see getLearningAllowance); reviews and
+// quizzes of what they've already learnt are open to everyone. Called from
 // the data functions and server actions that serve course content (not
 // just the pages), since those are reachable directly.
-export const requireSubscriber = cache(async (): Promise<Profile> => {
+export const requireLearner = cache(async (): Promise<Profile> => {
+  return requireProfile();
+});
+
+// Members-only features (the daily challenge): a member's profile, or a
+// redirect — guests to sign up, free accounts to the membership page.
+export const requireMember = cache(async (): Promise<Profile> => {
   const profile = await requireProfile();
 
-  if (!profile.hasAccess) {
-    redirect("/dashboard/billing");
-  }
+  if (profile.tier === "guest") redirect("/signup");
+  if (profile.tier !== "member") redirect("/dashboard/billing");
 
   return profile;
+});
+
+// Pages that only make sense with a real account (profile, settings,
+// membership) — guests are sent to sign up instead.
+export const requireRegisteredProfile = cache(async (): Promise<Profile> => {
+  const profile = await requireProfile();
+
+  if (profile.is_guest) redirect("/signup");
+
+  return profile;
+});
+
+// How many more new words and grammar points the current user may learn
+// (see lib/access.ts). Counts every item they've been taught, across all
+// courses; skipped ("I know this") items aren't taught, so don't count.
+export const getLearningAllowance = cache(async (): Promise<Allowance> => {
+  const profile = await requireLearner();
+
+  if (profile.tier === "member") {
+    return allowanceFor("member", { vocab: 0, grammar: 0 });
+  }
+
+  const [vocab, grammar] = await Promise.all(
+    (["vocab", "grammar"] as const).map((path) =>
+      prisma.userWordProgress.count({
+        where: { userId: profile.id, skipped: false, word: { path } },
+      }),
+    ),
+  );
+
+  return allowanceFor(profile.tier, { vocab, grammar });
 });
 
 export const requireAdminProfile = cache(async (): Promise<Profile> => {
@@ -224,7 +273,7 @@ export const requireAdminProfile = cache(async (): Promise<Profile> => {
 // deciding whether to show a way back to the course list (see the course
 // home's "My courses" breadcrumb) without loading every course's progress.
 export const getEnrolledCourseCount = cache(async (): Promise<number> => {
-  const user = await requireSubscriber();
+  const user = await requireLearner();
   return prisma.courseEnrollment.count({
     where: { userId: user.id, unenrolledAt: null, course: { active: true } },
   });
@@ -232,7 +281,7 @@ export const getEnrolledCourseCount = cache(async (): Promise<number> => {
 
 export const getEnrolledCourses = cache(
   async (): Promise<EnrolledCourseSummary[]> => {
-    const user = await requireSubscriber();
+    const user = await requireLearner();
 
     const enrollments = await prisma.courseEnrollment.findMany({
       where: { userId: user.id, unenrolledAt: null, course: { active: true } },
@@ -580,7 +629,7 @@ export const getAdminWordQuizQuestions = cache(async (wordId: string) => {
 });
 
 export const getAvailableCourses = cache(async (): Promise<AvailableCourse[]> => {
-  const user = await requireSubscriber();
+  const user = await requireLearner();
 
   const courses = await prisma.course.findMany({
     // Courses they're not currently in — including ones they've left, which
@@ -612,7 +661,7 @@ export const getAvailableCourses = cache(async (): Promise<AvailableCourse[]> =>
 // Postgres for one page view. One combined query instead of two separate
 // ones for the same reason.
 const requireEnrolledCourse = cache(async (courseSlug: string) => {
-  const user = await requireSubscriber();
+  const user = await requireLearner();
 
   const enrollment = await prisma.courseEnrollment.findFirst({
     where: { userId: user.id, unenrolledAt: null, course: { slug: courseSlug, active: true } },
@@ -804,6 +853,10 @@ const getActiveDeckIds = cache(
         .map((activation) => activation.languageDeckId);
     }
 
+    // Guests (see lib/access.ts) start with nothing selected — choosing
+    // their decks is part of trying Donguri out.
+    if ((await requireLearner()).is_guest) return [];
+
     const firstDeck = await getDefaultDeck(courseId);
 
     return firstDeck ? [firstDeck.id] : [];
@@ -829,7 +882,9 @@ export async function ensureDeckActivations(courseSlug: string) {
     where: { userId: user.id, languageDeck: { courseId: course.id } },
   });
 
-  if (existing > 0) {
+  // Guests have no implicit default deck (see getActiveDeckIds), so
+  // there's nothing to write down.
+  if (existing > 0 || user.is_guest) {
     return;
   }
 
@@ -1328,6 +1383,8 @@ async function getWeeklyXpByUser(
     by: ["userId"],
     where: {
       createdAt: { gte: startOfTrailingWeek() },
+      // Guests (see lib/access.ts) have no name to show and aren't ranked.
+      profile: { isGuest: false },
       ...(userIds && { userId: { in: userIds } }),
     },
     _sum: { amount: true },
@@ -1392,6 +1449,7 @@ export const getLeaderboards = cache(
         select: LEADERBOARD_PROFILE_SELECT,
       }),
       prisma.profile.findMany({
+        where: { isGuest: false },
         orderBy: { xp: "desc" },
         take: 10,
         select: LEADERBOARD_PROFILE_SELECT,
@@ -1574,14 +1632,20 @@ async function getLastActiveAt(userId: string): Promise<Date | null> {
 // so the UI can label which is which). Read-only, so the page can be
 // prefetched without introducing words the user never opens: LearnSession
 // marks each word learnt only as the learner clicks "Got it" on it, via the
-// `learnWord` action (see `introduceLearnWords` below).
+// `learnWord` action (see `introduceLearnWords` below). Capped by the
+// learner's free allowance (see lib/access.ts) — `limitReached` says when
+// there was more to learn but the allowance ran out, so the page can ask
+// them to sign up or become a member instead of saying they're done.
 export const getLearnQueueForCourse = cache(
-  async (courseSlug: string): Promise<RevealWord[]> => {
+  async (courseSlug: string): Promise<{ words: RevealWord[]; limitReached: boolean }> => {
     const { user, course } = await requireEnrolledCourse(courseSlug);
-    const languageDeckIds = await getActiveDeckIds(course.id, user.id);
+    const [languageDeckIds, allowance] = await Promise.all([
+      getActiveDeckIds(course.id, user.id),
+      getLearningAllowance(),
+    ]);
 
     if (languageDeckIds.length === 0) {
-      return [];
+      return { words: [], limitReached: false };
     }
 
     const candidates = await prisma.word.findMany({
@@ -1596,9 +1660,12 @@ export const getLearnQueueForCourse = cache(
       },
     });
 
-    const newWords = shuffle(candidates).slice(0, SET_SIZE);
+    const newWords = withinAllowance(shuffle(candidates), allowance).slice(0, SET_SIZE);
 
-    return newWords.map((word) => toRevealWord(word, course));
+    return {
+      words: newWords.map((word) => toRevealWord(word, course)),
+      limitReached: newWords.length === 0 && candidates.length > 0,
+    };
   },
 );
 
@@ -1671,21 +1738,29 @@ export async function getLessonWord(
 // active decks that they haven't met yet — and anything else is ignored.
 export async function introduceLearnWords(courseSlug: string, wordIds: string[]) {
   const { user, course } = await requireEnrolledCourse(courseSlug);
-  const languageDeckIds = await getActiveDeckIds(course.id, user.id);
+  const [languageDeckIds, allowance] = await Promise.all([
+    getActiveDeckIds(course.id, user.id),
+    getLearningAllowance(),
+  ]);
 
   if (wordIds.length === 0 || languageDeckIds.length === 0) {
     return;
   }
 
-  const words = await prisma.word.findMany({
-    where: {
-      id: { in: wordIds.slice(0, SET_SIZE) },
-      languageDeckId: { in: languageDeckIds },
-      active: true,
-      progress: { none: { userId: user.id } },
-    },
-    select: { id: true },
-  });
+  // Re-checked here, not just when the queue was built — server actions
+  // are callable directly, so this is what actually enforces the limit.
+  const words = withinAllowance(
+    await prisma.word.findMany({
+      where: {
+        id: { in: wordIds.slice(0, SET_SIZE) },
+        languageDeckId: { in: languageDeckIds },
+        active: true,
+        progress: { none: { userId: user.id } },
+      },
+      select: { id: true, path: true },
+    }),
+    allowance,
+  );
 
   if (words.length === 0) {
     return;

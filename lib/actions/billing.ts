@@ -2,10 +2,10 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { requireProfile } from "@/lib/dal";
+import { requireProfile, requireRegisteredProfile } from "@/lib/dal";
 import { getLocale } from "@/lib/i18n/get-locale";
 import { prisma } from "@/lib/prisma";
-import { getMembershipPrice, stripe, TRIAL_PERIOD_DAYS } from "@/lib/stripe";
+import { getMembershipPrice, stripe } from "@/lib/stripe";
 
 // Absolute app URL for Stripe's redirect URLs. NEXT_PUBLIC_SITE_URL may be
 // set without a scheme (e.g. "localhost:3000"), which Stripe rejects, so
@@ -51,12 +51,11 @@ async function getOrCreateCustomer(profile: {
   });
 }
 
-// Sends the user to Stripe Checkout for the membership. First-timers get
-// the 14-day free trial (card collected up front, first charge on day 15);
-// anyone who's had a subscription before — tracked here and double-checked
-// against Stripe — subscribes straight away, so the trial can't be reused.
+// Sends the user to Stripe Checkout for the membership — charged straight
+// away, no trial: the free allowance (see lib/access.ts) is how people try
+// Donguri now. Guests make an account first.
 export async function startCheckout(): Promise<void> {
-  const profile = await requireProfile();
+  const profile = await requireRegisteredProfile();
 
   if (profile.subscription && profile.hasAccess) {
     redirect("/dashboard/billing");
@@ -69,13 +68,6 @@ export async function startCheckout(): Promise<void> {
     getLocale(),
   ]);
 
-  const previous = await stripe().subscriptions.list({
-    customer: customer.stripeCustomerId,
-    status: "all",
-    limit: 1,
-  });
-  const trialEligible = !customer.trialUsed && previous.data.length === 0;
-
   const session = await stripe().checkout.sessions.create({
     mode: "subscription",
     customer: customer.stripeCustomerId,
@@ -84,13 +76,6 @@ export async function startCheckout(): Promise<void> {
     payment_method_collection: "always",
     subscription_data: {
       metadata: { userId: profile.id },
-      ...(trialEligible && {
-        trial_period_days: TRIAL_PERIOD_DAYS,
-        // Belt and braces with payment_method_collection: "always" — a
-        // trial that somehow ends without a card cancels rather than
-        // leaving an unpaid subscription behind.
-        trial_settings: { end_behavior: { missing_payment_method: "cancel" } },
-      }),
     },
     allow_promotion_codes: true,
     locale: locale === "ja" ? "ja" : "auto",

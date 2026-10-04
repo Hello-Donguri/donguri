@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import { ArrowLeft } from "lucide-react";
-import { getCourseTitle, getReviewQueue, requireProfile } from "@/lib/dal";
+import { getCourseTitle, getReviewQueue, requireRegisteredProfile } from "@/lib/dal";
 import { ReviewSession } from "@/components/vocab/review-session";
 import { FreshSession } from "@/components/vocab/fresh-session";
 import Link from "next/link";
@@ -23,11 +23,10 @@ export default async function CourseReviewPage({ params }: PageProps) {
   // queue must always be fresh.
   await connection();
   const { slug } = await params;
-  const [quiz, profile, { t }] = await Promise.all([
-    getReviewQueue(slug),
-    requireProfile(),
-    getTranslator(),
-  ]);
+  // Reviews need an account — guests (see lib/access.ts) are sent to sign
+  // up, matching the locked card on the course page.
+  const profile = await requireRegisteredProfile();
+  const [quiz, { t }] = await Promise.all([getReviewQueue(slug), getTranslator()]);
 
   // An empty queue is still handed to ReviewSession rather than rendering
   // an empty state here: it sends a learner who arrives with nothing due

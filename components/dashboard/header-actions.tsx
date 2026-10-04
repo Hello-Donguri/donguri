@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Award, BookOpen, Bug, ChevronDown, RotateCcw, CreditCard, Flame, GraduationCap, LogOut, Mail, Menu, Settings, User, Users, X } from "lucide-react";
+import { Award, BookOpen, Bug, ChevronDown, RotateCcw, CreditCard, Flame, GraduationCap, LogIn, LogOut, Mail, Menu, Settings, User, UserPlus, Users, X } from "lucide-react";
 import { DonguriAvatar } from "@/components/icons/DonguriAvatar";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
@@ -22,6 +22,9 @@ type HeaderActionsProps = {
     fullName: string | null;
     email: string;
     role: UserRole;
+    // Learning without an account (see lib/access.ts) — the menu offers
+    // sign-up and log-in instead of account pages.
+    isGuest: boolean;
   };
   equippedAccessory: AccessoryId | null;
   // Each enrolled course's current streak by slug (see `getCourseStreaks`
@@ -339,9 +342,11 @@ function AdminMenu({ role, className }: { role: UserRole; className?: string }) 
 // in the mobile header row.
 function AccountLinks({
   onNavigate,
+  isGuest,
   showThemeToggle = false,
 }: {
   onNavigate: () => void;
+  isGuest: boolean;
   showThemeToggle?: boolean;
 }) {
   const t = useTranslations();
@@ -356,6 +361,73 @@ function AccountLinks({
         <BookOpen className="h-4 w-4 text-sumi-soft" aria-hidden="true" />
         {t("dashboard_layout.courses", "Courses")}
       </Link>
+      {isGuest ? (
+        <>
+          <Link
+            href="/signup"
+            onClick={onNavigate}
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-ai-dark transition hover:bg-ai/10"
+          >
+            <UserPlus className="h-4 w-4" aria-hidden="true" />
+            {t("dashboard_layout.guest_sign_up", "Sign up to save progress")}
+          </Link>
+          <Link
+            href="/login"
+            onClick={onNavigate}
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-sumi transition hover:bg-sumi/5"
+          >
+            <LogIn className="h-4 w-4 text-sumi-soft" aria-hidden="true" />
+            {t("nav.log_in", "Log in")}
+          </Link>
+        </>
+      ) : (
+        <AccountPageLinks onNavigate={onNavigate} />
+      )}
+
+      <div className="my-1 border-t border-card-border" />
+
+      <div className="px-3 py-2">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-sumi-soft">
+          {t("dashboard_layout.language", "Language")}
+        </p>
+        <LocaleSwitcher />
+      </div>
+
+      {showThemeToggle && (
+        <div className="flex items-center justify-between px-3 py-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-sumi-soft">
+            {t("dashboard_layout.theme", "Theme")}
+          </p>
+          <ThemeToggle />
+        </div>
+      )}
+
+      {/* A guest logging out would lose what they've learnt. */}
+      {!isGuest && (
+        <>
+          <div className="my-1 border-t border-card-border" />
+
+          <form action={logout}>
+            <button
+              type="submit"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-shu transition hover:bg-shu/10"
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+              {t("dashboard_layout.log_out", "Log out")}
+            </button>
+          </form>
+        </>
+      )}
+    </>
+  );
+}
+
+// Profile, settings and membership — only for real accounts.
+function AccountPageLinks({ onNavigate }: { onNavigate: () => void }) {
+  const t = useTranslations();
+
+  return (
+    <>
       <Link
         href="/dashboard/profile"
         onClick={onNavigate}
@@ -380,36 +452,6 @@ function AccountLinks({
         <CreditCard className="h-4 w-4 text-sumi-soft" aria-hidden="true" />
         {t("dashboard_layout.membership", "Membership")}
       </Link>
-
-      <div className="my-1 border-t border-card-border" />
-
-      <div className="px-3 py-2">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-sumi-soft">
-          {t("dashboard_layout.language", "Language")}
-        </p>
-        <LocaleSwitcher />
-      </div>
-
-      {showThemeToggle && (
-        <div className="flex items-center justify-between px-3 py-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-sumi-soft">
-            {t("dashboard_layout.theme", "Theme")}
-          </p>
-          <ThemeToggle />
-        </div>
-      )}
-
-      <div className="my-1 border-t border-card-border" />
-
-      <form action={logout}>
-        <button
-          type="submit"
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-shu transition hover:bg-shu/10"
-        >
-          <LogOut className="h-4 w-4" aria-hidden="true" />
-          {t("dashboard_layout.log_out", "Log out")}
-        </button>
-      </form>
     </>
   );
 }
@@ -437,7 +479,12 @@ export function HeaderActions({ profile, equippedAccessory, streaks, xp }: Heade
     };
   }, [mobileOpen]);
 
-  const displayName = profile.fullName ?? profile.email;
+  const displayName = profile.isGuest
+    ? t("dashboard_layout.guest_name", "Guest")
+    : (profile.fullName ?? profile.email);
+  const subtitle = profile.isGuest
+    ? t("dashboard_layout.guest_subtitle", "Not signed in")
+    : profile.email;
 
   return (
     <>
@@ -473,13 +520,13 @@ export function HeaderActions({ profile, equippedAccessory, streaks, xp }: Heade
                   <DonguriAvatar equippedAccessory={equippedAccessory} className="h-11 w-11 shrink-0" />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-sumi">{displayName}</p>
-                    <p className="truncate text-xs text-sumi-soft">{profile.email}</p>
+                    <p className="truncate text-xs text-sumi-soft">{subtitle}</p>
                   </div>
                 </div>
 
                 <div className="my-1 border-t border-card-border" />
 
-                <AccountLinks onNavigate={() => setDesktopOpen(false)} />
+                <AccountLinks onNavigate={() => setDesktopOpen(false)} isGuest={profile.isGuest} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -534,13 +581,13 @@ export function HeaderActions({ profile, equippedAccessory, streaks, xp }: Heade
                 <DonguriAvatar equippedAccessory={equippedAccessory} className="h-12 w-12 shrink-0" />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-sumi">{displayName}</p>
-                  <p className="truncate text-xs text-sumi-soft">{profile.email}</p>
+                  <p className="truncate text-xs text-sumi-soft">{subtitle}</p>
                 </div>
               </div>
 
               <div className="my-1 border-t border-card-border" />
 
-              <AccountLinks onNavigate={() => setMobileOpen(false)} showThemeToggle />
+              <AccountLinks onNavigate={() => setMobileOpen(false)} isGuest={profile.isGuest} showThemeToggle />
             </motion.div>
           </>
         )}

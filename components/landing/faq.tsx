@@ -33,10 +33,10 @@ export function Faq({ t }: { t: TFunction }) {
       ),
     },
     {
-      q: t("home.faq.trial_q", "How does the free trial work?"),
+      q: t("home.faq.free_q", "What can I do for free?"),
       a: t(
-        "home.faq.trial_a",
-        "Your first 14 days are free. You add a card when you start, but you're only charged from day 15, and only if you haven't cancelled.",
+        "home.faq.free_a",
+        "Learn your first 9 words straight away, with no sign-up. Make a free account to save your progress and learn up to 40 words and 20 grammar points, with reviews included. After that, a membership unlocks everything, and you can cancel anytime.",
       ),
     },
     {

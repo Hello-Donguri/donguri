@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { cacheLife } from "next/cache";
-import { requireProfile } from "@/lib/dal";
+import { requireRegisteredProfile } from "@/lib/dal";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ async function loadProfile() {
   "use cache: private";
   cacheLife({ stale: 30, revalidate: 60, expire: 300 });
 
-  return requireProfile();
+  return requireRegisteredProfile();
 }
 
 export default async function SettingsPage() {

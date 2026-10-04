@@ -64,7 +64,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (isAuthRoute && user) {
+  // A guest (anonymous user — see lib/access.ts) is signed in, but still
+  // needs the log-in and sign-up pages to make a real account.
+  if (isAuthRoute && user && !user.is_anonymous) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     url.search = "";
