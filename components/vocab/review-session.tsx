@@ -482,6 +482,7 @@ const ReviewSessionQuestions = ({
               translation={question.clozeSentenceJa}
               highlight={question.clozeHighlightJa}
               romanization={question.clozeRomanization}
+              blankWords={question.clozeBlankWords}
               path={question.path}
               feedback={feedback}
             />

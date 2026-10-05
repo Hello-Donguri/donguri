@@ -2368,10 +2368,17 @@ function buildClozeQuestion(
   course: { targetLanguage: string; sourceLanguage: string },
   grammarPool: GrammarPool | null,
 ): QuizQuestion {
+  const ownForms = (word.forms ?? []).map((form) => form.value);
+  const answer =
+    match.formId === null
+      ? word.term
+      : (word.forms?.find((form) => form.id === match.formId)?.value ?? word.term);
+
   const base = {
     wordId: word.id,
     path: word.path,
     formId: match.formId,
+    clozeBlankWords: isLatinTypeable(answer) ? answer.trim().split(/\s+/).length : 1,
     clozeSentence: match.sentence,
     clozeSentenceJa: match.translation,
     clozeHighlightJa:
@@ -2379,12 +2386,6 @@ function buildClozeQuestion(
     clozeRomanization: match.romanization,
     targetLanguage: course.targetLanguage,
   };
-
-  const ownForms = (word.forms ?? []).map((form) => form.value);
-  const answer =
-    match.formId === null
-      ? word.term
-      : (word.forms?.find((form) => form.id === match.formId)?.value ?? word.term);
 
   if (!isLatinTypeable(answer)) {
     const options = buildFormChoiceOptions(answer, ownForms, [

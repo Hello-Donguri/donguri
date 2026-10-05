@@ -497,6 +497,7 @@ export const ClozeCard = ({
   romanization,
   path,
   feedback,
+  blankWords = 1,
 }: {
   sentence: string;
   translation: string;
@@ -506,9 +507,19 @@ export const ClozeCard = ({
   romanization: string | null;
   path: "vocab" | "grammar";
   feedback: ChoiceFeedback | null;
+  // How many words the answer is — one box each, so "___ live here?" shows
+  // two boxes for "Does he".
+  blankWords?: number;
 }) => {
   const t = useTranslations();
   const highlightIndex = highlight ? translation.indexOf(highlight) : -1;
+  // Once answered, the right answer fills the boxes a word each — or all of
+  // it in one box, if it's an accepted answer with a different word count.
+  const answerWords = feedback?.correctAnswer.trim().split(/\s+/) ?? [];
+  const boxes =
+    feedback && answerWords.length !== blankWords
+      ? [feedback.correctAnswer]
+      : Array.from({ length: Math.max(blankWords, 1) }, (_, index) => answerWords[index] ?? " ");
   const slotStyle = !feedback
     ? path === "grammar"
       ? "bg-matcha-soft text-matcha-dark ring-matcha/50"
@@ -552,11 +563,15 @@ export const ClozeCard = ({
       </p>
       <p className="mt-2 text-2xl font-semibold leading-relaxed text-sumi">
         {fill(sentence, (key) => (
-          <span
-            key={key}
-            className={`mx-1 inline-block min-w-[2.5em] rounded-lg px-2 ring-2 transition-colors ${slotStyle}`}
-          >
-            {feedback ? feedback.correctAnswer : " "}
+          <span key={key} className="mx-1 inline-flex gap-1.5 align-baseline">
+            {boxes.map((word, index) => (
+              <span
+                key={index}
+                className={`inline-block min-w-[2.5em] rounded-lg px-2 ring-2 transition-colors ${slotStyle}`}
+              >
+                {word}
+              </span>
+            ))}
           </span>
         ))}
       </p>

@@ -393,6 +393,9 @@ type FormClozeQuestion = {
   // The target sentence's romanization with the answer blanked too (e.g.
   // "ngo5 ___ uk1 kei2." for Cantonese) — null when there isn't one.
   clozeRomanization: string | null;
+  // How many words the blank's answer is ("Does he" is 2), so the card
+  // draws a box for each. Always 1 for answers without spaces (Chinese).
+  clozeBlankWords: number;
   targetLanguage: string;
   path: "vocab" | "grammar";
 };
