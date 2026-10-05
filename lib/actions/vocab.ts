@@ -163,12 +163,24 @@ function spellingDistance(a: string, b: string): number {
   return rows[a.length][b.length];
 }
 
-// The accepted reading a wrong English answer was nearly spelt as, or null.
-// "Nearly" means the same first letter and 1 slip for a 4-7 letter answer,
-// up to 2 from 8 letters ("recieve", "beautful", "accomodation"). Answers
-// under 4 letters never count — one change there is usually a different
-// word (cat / cut). Checked against each reading with its bracketed note
-// off, since that's the part people type.
+// Accents taken off ("élève" → "eleve", "cœur" → "coeur"), for telling a
+// missing or wrong accent apart from a real misspelling.
+function withoutAccents(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/œ/g, "oe")
+    .replace(/æ/g, "ae");
+}
+
+// The accepted reading a wrong Latin-script answer was nearly spelt as, or
+// null. "Nearly" means the same first letter and 1 slip for a 4-7 letter
+// answer, up to 2 from 8 letters ("recieve", "beautful", "accomodation").
+// Answers under 4 letters never count — one change there is usually a
+// different word (cat / cut). A word whose only slip is its accents
+// ("eleve" for "élève", "a" for "à") is a near miss at any length. Checked
+// against each reading with its bracketed note off, since that's the part
+// people type.
 function nearMissReading(typed: string, stored: string, leniency: AnswerLeniency): string | null {
   const guess = normaliseAnswer(typed);
   if (!guess) return null;
@@ -186,15 +198,20 @@ function nearMissReading(typed: string, stored: string, leniency: AnswerLeniency
     const differing = targetWords.flatMap((word, index) =>
       word === guessWords[index] ? [] : [[guessWords[index], word] as const],
     );
-    if (differing.length === 1 && isNearMissWord(...differing[0])) return answer;
+    if (differing.length === 0) continue;
+    const accentOnly = differing.filter(([guessWord, word]) => withoutAccents(guessWord) === withoutAccents(word));
+    const misspelt = differing.filter((pair) => !accentOnly.includes(pair));
+    if (misspelt.length === 0) return answer;
+    if (misspelt.length === 1 && isNearMissWord(...misspelt[0])) return answer;
   }
   return null;
 }
 
 // One word nearly spelt right: the same first letter, and 1 slip for a
-// 4-7 letter word, up to 2 from 8 letters. Words under 4 letters never
-// count (cat / cut).
+// 4-7 letter word, up to 2 from 8 letters, not counting accents. Words
+// under 4 letters never count (cat / cut).
 function isNearMissWord(guess: string, target: string): boolean {
+  [guess, target] = [withoutAccents(guess), withoutAccents(target)];
   if (target.length < 4 || guess[0] !== target[0]) return false;
   const distance = spellingDistance(guess, target);
   return distance > 0 && distance <= (target.length >= 8 ? 2 : 1);
@@ -224,14 +241,15 @@ function jyutpingSpellingMiss(typed: string, stored: string, leniency: AnswerLen
 // A typed answer that's nearly right isn't marked wrong straight away:
 // the learner is shown the right answer and types it again. "tone" is a
 // Cantonese answer with only its tones wrong; "spelling" is a small
-// spelling slip — in an English answer (see nearMissReading), or one letter
+// spelling slip — in an English or French answer (see nearMissReading), or one letter
 // in one syllable of a Jyutping answer (see jyutpingSpellingMiss). Getting it on
 // that second go counts as correct, for half the usual XP.
 export type RetryReason = "tone" | "spelling";
 const RETRY_XP = 0.5;
 
-// Whether a wrong typed answer gets a second go, and why. English answers
-// only in the English course, and never for Japanese being typed back.
+// Whether a wrong typed answer gets a second go, and why. Latin-script
+// answers in the English and French courses (French or English typed in
+// the French course), never Japanese being typed back.
 function retryFor(
   typed: string,
   stored: string,
@@ -246,7 +264,7 @@ function retryFor(
     const answer = jyutpingSpellingMiss(typed, stored, leniency);
     if (answer) return { reason: "spelling", answer };
   }
-  if (targetLanguage === "en" && isLatinTypeable(stored)) {
+  if ((targetLanguage === "en" || targetLanguage === "fr") && isLatinTypeable(stored)) {
     const answer = nearMissReading(typed, stored, leniency);
     if (answer) return { reason: "spelling", answer };
   }
@@ -783,6 +801,22 @@ export async function completeQuiz(
 // still-visible modal the way calling it from inside `completeQuiz` did.
 export async function refreshDashboardHeader(): Promise<void> {
   revalidatePath("/dashboard", "layout");
+}
+
+// Flags or unflags a word to revisit its lesson later (see getFlaggedWords
+// in lib/dal.ts) — from a review question, or the course page's flagged
+// list. Only the course page is revalidated, by its literal path: flagging
+// mid-review must not re-render the review and swap its questions out (see
+// submitAnswer), and the review page isn't that path.
+export async function setWordFlag(courseSlug: string, wordId: string, flagged: boolean): Promise<void> {
+  const user = await requireLearner();
+
+  await prisma.userWordProgress.updateMany({
+    where: { userId: user.id, wordId },
+    data: { flaggedAt: flagged ? new Date() : null },
+  });
+
+  revalidatePath(`/dashboard/courses/${courseSlug}`);
 }
 
 // Called by LearnSession each time the learner clicks "Got it", to mark

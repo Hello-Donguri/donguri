@@ -548,7 +548,32 @@ export type CourseSummary = {
 
 // A course the learner isn't in — `previouslyEnrolled` when they left it,
 // so rejoining picks their progress back up.
-export type AvailableCourse = CourseSummary & { previouslyEnrolled: boolean };
+// A word or grammar point the learner flagged (from a review) to revisit
+// its lesson — listed on the course page, newest first.
+export type FlaggedWord = {
+  id: string;
+  term: string;
+  translation: string;
+  romanization: string | null;
+  path: string;
+};
+
+// The level a learner picks when they enroll in a course — sets how Charles
+// Duck talks to them in the daily challenge (see levelProfile in
+// lib/daily-challenge.ts).
+export const COURSE_LEVELS = ["beginner", "intermediate", "advanced"] as const;
+export type CourseLevel = (typeof COURSE_LEVELS)[number];
+
+export function parseCourseLevel(value: unknown): CourseLevel {
+  return COURSE_LEVELS.includes(value as CourseLevel) ? (value as CourseLevel) : "beginner";
+}
+
+// `previousLevel`: the level they had in a course they've left, so
+// re-enrolling starts from it; null if they've never been in it.
+export type AvailableCourse = CourseSummary & {
+  previouslyEnrolled: boolean;
+  previousLevel: CourseLevel | null;
+};
 
 export type EnrolledCourseSummary = CourseSummary &
   CourseStreak & {

@@ -37,7 +37,7 @@ async function loadDailyChallenge(slug: string) {
   "use cache: private";
   cacheLife({ stale: 30, revalidate: 60, expire: 300 });
 
-  const [{ course }, challenge, results, profile] = await Promise.all([
+  const [{ course, level }, challenge, results, profile] = await Promise.all([
     getCourseHome(slug),
     getDailyChallenge(slug),
     getDailyChallengeResults(slug),
@@ -50,6 +50,7 @@ async function loadDailyChallenge(slug: string) {
 
   return {
     targetLanguage: course.targetLanguage,
+    level,
     challenge,
     results,
     equippedAccessory,
@@ -61,7 +62,7 @@ export default async function DailyChallengePage({ params }: PageProps) {
   const { slug } = await params;
 
   const [
-    { targetLanguage, challenge, results, equippedAccessory, firstName },
+    { targetLanguage, level, challenge, results, equippedAccessory, firstName },
     { t },
   ] = await Promise.all([
     loadDailyChallenge(slug),
@@ -115,7 +116,7 @@ export default async function DailyChallengePage({ params }: PageProps) {
               results={results}
               maxAttemptsPerDay={challenge.maxAttemptsPerDay}
               equippedAccessory={equippedAccessory}
-              reviewPromise={getDailyChallengeReview(results, targetLanguage)}
+              reviewPromise={getDailyChallengeReview(results, targetLanguage, level)}
             />
           ) : (
             <div className="flex flex-col items-center gap-4 rounded-3xl border border-card-border bg-washi-soft px-6 py-16 text-center">

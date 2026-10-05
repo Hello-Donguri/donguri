@@ -18,6 +18,7 @@ import type {
   DailyActivityCount,
   DailyChallengeStatus,
   EnrolledCourseSummary,
+  FlaggedWord,
   CourseStreakInfo,
   WeeklyStats,
   LeaderboardEntry,
@@ -34,7 +35,7 @@ import type {
   WordCategoryOption,
   WordType,
 } from "@/lib/definitions";
-import { NATIVE_LANGUAGES, WORD_TYPES, type NativeLanguage } from "@/lib/definitions";
+import { NATIVE_LANGUAGES, WORD_TYPES, parseCourseLevel, type NativeLanguage } from "@/lib/definitions";
 import {
   addDays,
   applyDailyActivity,
@@ -637,11 +638,12 @@ export const getAvailableCourses = cache(async (): Promise<AvailableCourse[]> =>
     where: { active: true, enrollments: { none: { userId: user.id, unenrolledAt: null } } },
     orderBy: { position: "asc" },
     // Any row left here is a course they've left before.
-    include: { enrollments: { where: { userId: user.id }, select: { id: true } } },
+    include: { enrollments: { where: { userId: user.id }, select: { id: true, level: true } } },
   });
 
   return courses.map((course) => ({
     previouslyEnrolled: course.enrollments.length > 0,
+    previousLevel: course.enrollments[0] ? parseCourseLevel(course.enrollments[0].level) : null,
     id: course.id,
     slug: course.slug,
     title: course.title,
@@ -718,7 +720,29 @@ export const getCourseHome = cache(async (courseSlug: string) => {
     course: toCourseSummary(course),
     currentStreak: enrollment.currentStreak,
     longestStreak: enrollment.longestStreak,
+    level: parseCourseLevel(enrollment.level),
   };
+});
+
+// The learner's flagged words in this course, newest flag first (see
+// section 53 of supabase/schema.sql). Inactive words and decks are left
+// out, like everywhere else they'd be learnt or reviewed.
+export const getFlaggedWords = cache(async (courseSlug: string): Promise<FlaggedWord[]> => {
+  const { user, course } = await requireEnrolledCourse(courseSlug);
+
+  const rows = await prisma.userWordProgress.findMany({
+    where: {
+      userId: user.id,
+      flaggedAt: { not: null },
+      word: { active: true, languageDeck: { courseId: course.id, active: true } },
+    },
+    orderBy: { flaggedAt: "desc" },
+    select: {
+      word: { select: { id: true, term: true, translation: true, romanization: true, path: true } },
+    },
+  });
+
+  return rows.map((row) => row.word);
 });
 
 type LanguageDeckWordRow = {

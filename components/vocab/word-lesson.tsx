@@ -486,7 +486,19 @@ export const InlineLesson = ({ courseSlug, wordId }: { courseSlug: string; wordI
 // "See the lesson" for the question just answered: reopens the word's
 // learn card in a dialog, loaded on first open (and kept for re-opens of
 // the same word). The native <dialog> handles focus trapping and Escape.
-export const LessonButton = ({ courseSlug, wordId }: { courseSlug: string; wordId: string }) => {
+// `children` and `className` replace the trigger's own label and look —
+// e.g. a flagged lesson's card on the course page (see FlaggedLessons).
+export const LessonButton = ({
+  courseSlug,
+  wordId,
+  children,
+  className,
+}: {
+  courseSlug: string;
+  wordId: string;
+  children?: ReactNode;
+  className?: string;
+}) => {
   const t = useTranslations();
   const [dialogRef, animate] = useAnimate<HTMLDialogElement>();
   const [lesson, setLesson] = useState<RevealWord | null>(null);
@@ -528,10 +540,17 @@ export const LessonButton = ({ courseSlug, wordId }: { courseSlug: string; wordI
       <button
         type="button"
         onClick={open}
-        className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-sumi-soft transition hover:bg-sumi/5 hover:text-sumi"
+        className={
+          className ??
+          "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-sumi-soft transition hover:bg-sumi/5 hover:text-sumi"
+        }
       >
-        <BookOpen aria-hidden className="h-4 w-4" />
-        {t("lesson_modal.open", "See the lesson")}
+        {children ?? (
+          <>
+            <BookOpen aria-hidden className="h-4 w-4" />
+            {t("lesson_modal.open", "See the lesson")}
+          </>
+        )}
       </button>
 
       <dialog

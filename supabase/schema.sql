@@ -1929,3 +1929,56 @@ begin
   return new;
 end;
 $$;
+
+-- 51. French for English speakers -------------------------------------------------------
+-- A third course. Like Cantonese, the target-language side of word_examples
+-- is the `ja` column and English is `en`; there's no romanization. Content
+-- lives in supabase/seeds/ (fr-general.sql for the first deck).
+
+insert into public.courses (slug, title, target_language, source_language, description, position) values
+  ('fr-for-en', 'French for English Speakers', 'fr', 'en', 'Build natural, idiomatic French vocabulary and grammar, explained for English speakers.', 3)
+on conflict (slug) do nothing;
+
+update public.courses set
+  greetings = '{
+    "hello":        {"text": "Salut, {name} !"},
+    "welcome":      {"text": "Bienvenue, {name} !"},
+    "welcome_back": {"text": "Bon retour, {name} !"},
+    "morning":      {"text": "Bonjour, {name} !"},
+    "afternoon":    {"text": "Bon après-midi, {name} !"},
+    "evening":      {"text": "Bonsoir, {name} !"}
+  }'::jsonb,
+  motivations = '[
+    "Every small step is still an adventure.",
+    "Go at your own pace — it all adds up.",
+    "Today''s step leads to tomorrow''s.",
+    "Your goal is getting closer every day.",
+    "You''re doing brilliantly!"
+  ]'::jsonb
+where slug = 'fr-for-en';
+
+-- 52. Course level -----------------------------------------------------------------------
+-- The level a learner picks when they enroll in a course — beginner,
+-- intermediate or advanced. It sets how Charles Duck talks to them in the
+-- daily challenge (see levelProfile in lib/daily-challenge.ts). Existing
+-- enrollments become beginner, which is how Charles has always talked.
+
+alter table public.course_enrollments
+  add column if not exists level text not null default 'beginner';
+
+alter table public.course_enrollments
+  drop constraint if exists course_enrollments_level_check;
+alter table public.course_enrollments
+  add constraint course_enrollments_level_check check (level in ('beginner', 'intermediate', 'advanced'));
+
+-- 53. Flagged lessons -------------------------------------------------------------------
+-- A learner can flag a word or grammar point (from a review) to come back
+-- to its lesson later; flagged ones are listed on the course page. Kept on
+-- the learner's own progress row — every reviewed word has one — and null
+-- when not flagged. When it was flagged orders the list, newest first.
+
+alter table public.user_word_progress add column if not exists flagged_at timestamptz;
+
+create index if not exists user_word_progress_flagged_idx
+  on public.user_word_progress (user_id, flagged_at desc)
+  where flagged_at is not null;

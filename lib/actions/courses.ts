@@ -4,9 +4,13 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireLearner } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
+import { parseCourseLevel } from "@/lib/definitions";
 
-export async function enrollInCourse(courseId: string): Promise<void> {
+// `level` comes from the enroll form's level picker (see CourseCard) —
+// anything unexpected falls back to beginner.
+export async function enrollInCourse(courseId: string, formData: FormData): Promise<void> {
   const user = await requireLearner();
+  const level = parseCourseLevel(formData.get("level"));
 
   const course = await prisma.course.findUniqueOrThrow({
     where: { id: courseId },
@@ -15,9 +19,10 @@ export async function enrollInCourse(courseId: string): Promise<void> {
 
   await prisma.courseEnrollment.upsert({
     where: { userId_courseId: { userId: user.id, courseId } },
-    create: { userId: user.id, courseId },
-    // Rejoining a course they left picks up where they were.
-    update: { unenrolledAt: null },
+    create: { userId: user.id, courseId, level },
+    // Rejoining a course they left picks up where they were, at the level
+    // they've just picked.
+    update: { unenrolledAt: null, level },
   });
 
   revalidatePath("/dashboard");

@@ -43,7 +43,7 @@ export function WordHintsToggle({ enabled, onChange }: { enabled: boolean; onCha
       role="switch"
       aria-checked={enabled}
       onClick={() => onChange(!enabled)}
-      title={t("word_hints.toggle_hint", "Suggest words you've learnt when you pause while typing")}
+      title={t("word_hints.toggle_hint", "Suggest words that could come next when you pause while typing")}
       className="ml-auto inline-flex cursor-pointer items-center gap-2 rounded-full px-2 py-1 text-xs font-medium text-sumi-soft transition hover:bg-sumi/5 hover:text-sumi"
     >
       <Lightbulb aria-hidden className={`h-4 w-4 ${enabled ? "fill-kin/30 text-kin" : ""}`} />
@@ -103,11 +103,11 @@ function hintsUsedUp(base: string, draft: string, words: HintWord[]): boolean {
   return !midHint;
 }
 
-// When the learner stops typing mid-reply for PAUSE_MS, four words they've
-// learnt appear above the reply box — one that would help them carry on,
-// three that make no sense there, in no order (see dailyChallengeHints). A
-// gentle reminder rather than the answer: no meanings, so they still have
-// to recognise the right one, and nothing to tap — they type it themselves.
+// When the learner stops typing mid-reply for PAUSE_MS, up to four words
+// that would help them carry on appear above the reply box — ones they've
+// learnt first, then simple everyday words if too few of those fit (see
+// dailyChallengeHints). A gentle reminder rather than the answer: no
+// meanings, and nothing to tap — they type it themselves.
 // They go once the learner has typed another word — or, partway through
 // typing one of the hints, once that whole hint is in (see hintsUsedUp) —
 // or when the reply is sent or emptied, or they're dismissed.

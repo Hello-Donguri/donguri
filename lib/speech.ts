@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 // BCP-47 tags the browser's SpeechSynthesis API expects.
 const SPEECH_LANG: Record<string, string> = {
   en: "en-US",
+  fr: "fr-FR",
   ja: "ja-JP",
   yue: "zh-HK",
 };
@@ -31,6 +32,7 @@ const PREFERRED_VOICES: Record<string, string[]> = {
   ],
   "zh-HK": ["Google 粤語", "Sinji", "Microsoft HiuMaan", "Microsoft Tracy"],
   "en-US": ["Google US English", "Samantha", "Microsoft Aria", "Microsoft Zira"],
+  "fr-FR": ["Google français", "Amélie", "Thomas", "Audrey", "Microsoft Denise", "Microsoft Julie"],
 };
 
 const NOVELTY_VOICES = [

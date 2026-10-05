@@ -46,6 +46,12 @@ function exampleSides(example: Example, targetLanguage: string) {
     : { target: example.ja, translation: example.en, translationHighlight: example.enHighlight };
 }
 
+// `value` as a whole word in Latin text. Not `\b`, which only knows ASCII
+// letters — it would find no word edge after the "é" of French "taillé".
+function latinWordPattern(value: string): RegExp {
+  return new RegExp(`(?<![\\p{L}\\p{N}_])${escapeRegExp(value)}(?![\\p{L}\\p{N}_])`, "iu");
+}
+
 // Blanks `value` out of `sentence`, or null if it isn't there. Latin text
 // matches whole words only, case-insensitively — so a form value like "you"
 // doesn't match inside "yourself", and "Went" still matches "went". Other
@@ -53,7 +59,7 @@ function exampleSides(example: Example, targetLanguage: string) {
 // a plain substring match.
 function blankOut(sentence: string, value: string): string | null {
   const pattern = isLatinTypeable(value)
-    ? new RegExp(`\\b${escapeRegExp(value)}\\b`, "i")
+    ? latinWordPattern(value)
     : new RegExp(escapeRegExp(value));
   return pattern.test(sentence) ? sentence.replace(pattern, "___") : null;
 }
@@ -80,7 +86,7 @@ export function findTranslationSpan(
 
   for (const candidate of candidates) {
     const pattern = isLatinTypeable(candidate)
-      ? new RegExp(`\\b${escapeRegExp(candidate)}\\b`, "i")
+      ? latinWordPattern(candidate)
       : new RegExp(escapeRegExp(candidate));
     const match = sentence.match(pattern);
     if (match) return match[0];

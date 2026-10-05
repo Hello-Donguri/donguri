@@ -53,7 +53,12 @@ export function highlightEnglish(text: string, candidates: string[]): HighlightS
 
   if (terms.length === 0) return [{ text, match: false }];
 
-  return segment(text, new RegExp(`\\b(${terms.map(escapeRegExp).join("|")})\\b`, "gi"));
+  // Word edges by lookaround rather than `\b`, which only knows ASCII
+  // letters — so accented Latin words (French "taillé") still match.
+  return segment(
+    text,
+    new RegExp(`(?<![\\p{L}\\p{N}_])(${terms.map(escapeRegExp).join("|")})(?![\\p{L}\\p{N}_])`, "giu"),
+  );
 }
 
 export function highlightJapanese(text: string, candidates: string[]): HighlightSegment[] {

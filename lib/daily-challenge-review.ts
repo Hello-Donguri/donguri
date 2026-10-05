@@ -2,11 +2,12 @@ import "server-only";
 import OpenAI from "openai";
 import { cacheLife } from "next/cache";
 import {
-  CANTONESE_QUOTE_RULE,
   JAPANESE_FEEDBACK_RULE,
   challengeLanguage,
+  levelProfile,
   type DailyChallengeResult,
 } from "@/lib/daily-challenge";
+import type { CourseLevel } from "@/lib/definitions";
 
 const REVIEW_TIMEOUT_MS = 12000;
 
@@ -44,11 +45,13 @@ function describeAttempt(result: DailyChallengeResult, index: number): string {
 async function generateReview(
   results: DailyChallengeResult[],
   targetLanguage: string,
+  courseLevel: CourseLevel,
 ): Promise<DailyChallengeReview> {
   "use cache";
   cacheLife("days");
 
   const language = challengeLanguage(targetLanguage);
+  const level = levelProfile(courseLevel);
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const response = await openai.chat.completions.create(
     {
@@ -57,7 +60,7 @@ async function generateReview(
       messages: [
         {
           role: "system",
-          content: `You are Charles Duck, a kind ${language.target}-speaking friend who has just finished today's chat challenges with ${language.learner} who is a beginner learning ${language.target}. In each challenge they had to use a target word or grammar pattern naturally in a chat with you. Here is how each one went:
+          content: `You are Charles Duck, a kind ${language.target}-speaking friend who has just finished today's chat challenges with ${language.learner} who is ${level.learner} learning ${language.target}. In each challenge they had to use a target word or grammar pattern naturally in a chat with you. Here is how each one went:
 
 ${results.map(describeAttempt).join("\n\n")}
 
@@ -65,14 +68,14 @@ Look across all of them together, not one at a time, and write:
 - "feedback": 2-3 short sentences on how they did today overall — start with something specific they did well, then the main pattern you noticed across their messages.
 - "focus": ONE short, concrete thing to practise next time, based on what actually came up today.
 
-Write in very simple, beginner-friendly English — short words, short sentences, no grammar jargon. Be warm and encouraging but honest; don't invent problems that didn't happen.
+Write in ${level.feedbackStyle}. Be warm and encouraging but honest; don't invent problems that didn't happen.
 
 ${
             language.feedbackIn === "Japanese"
               ? `Also write "feedbackJa" and "focusJa". ${JAPANESE_FEEDBACK_RULE}
 
 Return only a JSON object: { "feedback": "...", "focus": "...", "feedbackJa": "...", "focusJa": "..." }`
-              : `Write both in ENGLISH, never Cantonese — the learner is an English speaker. ${CANTONESE_QUOTE_RULE}
+              : `Write both in ENGLISH, never ${language.target} — the learner is an English speaker. ${language.quoteRule}
 
 Return only a JSON object: { "feedback": "...", "focus": "..." }`
           }`,
@@ -109,6 +112,7 @@ Return only a JSON object: { "feedback": "...", "focus": "..." }`
 export async function getDailyChallengeReview(
   results: DailyChallengeResult[],
   targetLanguage: string,
+  level: CourseLevel,
 ): Promise<DailyChallengeReview | null> {
   // Skipped attempts have nothing to look back on.
   const attempted = results.filter((result) => !result.skipped);
@@ -120,7 +124,7 @@ export async function getDailyChallengeReview(
   }
 
   try {
-    return await generateReview(attempted, targetLanguage);
+    return await generateReview(attempted, targetLanguage, level);
   } catch (error) {
     console.error("Daily challenge review generation failed:", error);
     return null;

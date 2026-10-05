@@ -15,10 +15,13 @@ import { startOfUTCDay, dailyChallengeXp } from "@/lib/srs";
 import { isLatinTypeable } from "@/lib/language";
 import {
   CANTONESE_QUOTE_RULE,
+  FRENCH_QUOTE_RULE,
   JAPANESE_FEEDBACK_RULE,
   challengeLanguage,
   friendsPromptRule,
   knownWordsPromptRule,
+  levelProfile,
+  NATURAL_CHAT_RULE,
   glossesPromptField,
   glossesPromptRule,
   parseGlosses,
@@ -339,13 +342,34 @@ function earlierScoredMessages(state: TargetState): string[] {
 }
 
 // The parts of the prompt that depend on the course: English for Japanese
-// speakers (English chat, feedback also in Japanese) or Cantonese for
+// speakers (English chat, feedback also in Japanese), Cantonese for
 // English speakers (written Cantonese with Jyutping, feedback in English,
-// and the learner free to answer in characters or Jyutping).
+// and the learner free to answer in characters or Jyutping), or French for
+// English speakers (French chat, feedback in English).
 function promptLanguage(target: ChallengeTarget) {
+  const level = levelProfile(target.level);
+  if (target.targetLanguage === "fr") {
+    return {
+      intro: `You are Charles Duck, the user's kind French-speaking friend. The user is an English speaker learning French — ${level.learner}.`,
+      writing: `- Write natural, everyday French as friends really text it, using "tu". Correct spelling and accents in everything you write.
+- If the user writes in English instead of French, gently keep chatting in French; an English reply scores low on grammar and naturalness.`,
+      replyFields: `	"text": "Charles Duck's casual chat reply, in French",
+	"translation": "A natural English translation of the same reply",`,
+      feedbackLanguage: `Write it in ENGLISH — the user is an English speaker. Only your chat reply ("text") is in French; "feedback" and everything in "summary" must be English. Use ${level.feedbackStyle}. ${FRENCH_QUOTE_RULE} When you correct something, give the right form, what it means, and what they wrote instead, e.g. "Use que je sois ("that I am"), not que je suis — bien que takes the subjunctive."`,
+      feedbackJaField: "",
+      texting:
+        "This is casual texting, so ignore capital letters and punctuation. A missing or wrong accent is a small mistake: take at most 1 point off grammarScore for it, never fail the target over it, and point out the correct spelling in your feedback.",
+      betterVersion: "in French",
+      betterVersionExtraFields: "",
+      summaryExtraFields: "",
+      readingTheirMessage: "",
+      feedbackRule: `Write "overall" and every tip in ENGLISH, never French — only "betterVersion" is French. ${FRENCH_QUOTE_RULE}`,
+    };
+  }
+
   if (target.targetLanguage === "yue") {
     return {
-      intro: `You are Charles Duck, the user's kind Cantonese-speaking friend. The user is an English speaker who is a beginner in Cantonese.`,
+      intro: `You are Charles Duck, the user's kind Cantonese-speaking friend. The user is an English speaker learning Cantonese — ${level.learner}.`,
       writing: `- Write in natural, colloquial Hong Kong Cantonese as people really text it, in traditional characters (係, 唔, 嘅, 咗, 喺, 佢, 乜嘢 — never Mandarin forms like 是, 不, 的, 了, 在, 他, 什麼).
 - In all your Jyutping, use the everyday Hong Kong spoken readings, not formal reading-aloud ones — e.g. 生日 is saang1 jat6, not sang1 jat6.
 - The user may write in Chinese characters, in Jyutping (with or without tone numbers), or a mix — all are equally fine. Read their Jyutping as the Cantonese it spells. Never mark them down for writing Jyutping instead of characters, or for missing tone numbers or spacing. A WRONG tone number is different — see the scoring rules below.
@@ -353,7 +377,7 @@ function promptLanguage(target: ChallengeTarget) {
       replyFields: `	"text": "Charles Duck's simple, casual chat reply, in Cantonese characters",
 	"romanization": "The same reply in Jyutping with tone numbers — exactly one syllable per Chinese character, keeping the punctuation",
 	"translation": "A natural English translation of the same reply",`,
-      feedbackLanguage: `Write it in ENGLISH — the user is an English speaker and can't yet read Cantonese explanations. Only your chat reply ("text") is in Cantonese; "feedback" and everything in "summary" must be English. Use very simple, beginner-friendly English — short words, short sentences, no grammar jargon. ${CANTONESE_QUOTE_RULE} When you correct a word, name the right form, what it means, and what they wrote instead, e.g. "Use 飲 (jam2, "drink"), not yum2." When you suggest adding something, say what the addition means, e.g. "You could add 鍾意 (zung1 ji3, "like") to say you like it."`,
+      feedbackLanguage: `Write it in ENGLISH — the user is an English speaker and can't yet read Cantonese explanations. Only your chat reply ("text") is in Cantonese; "feedback" and everything in "summary" must be English. Use ${level.feedbackStyle}. ${CANTONESE_QUOTE_RULE} When you correct a word, name the right form, what it means, and what they wrote instead, e.g. "Use 飲 (jam2, "drink"), not yum2." When you suggest adding something, say what the addition means, e.g. "You could add 鍾意 (zung1 ji3, "like") to say you like it."`,
       feedbackJaField: "",
       texting:
         "This is casual texting, so ignore punctuation, and never count writing Jyutping instead of characters — or missing tone numbers — as a mistake. A wrong tone number in their Jyutping is a small mistake: take at most 1 point off grammarScore for it, never fail the target over it, and point out the correct tone in your feedback.",
@@ -369,11 +393,11 @@ function promptLanguage(target: ChallengeTarget) {
   }
 
   return {
-    intro: `You are Charles Duck, the user's kind English-speaking friend.`,
+    intro: `You are Charles Duck, the user's kind English-speaking friend. The user is a Japanese speaker learning English — ${level.learner}.`,
     writing: "",
     replyFields: `	"text": "Charles Duck's simple, casual chat reply in English",
 	"translation": "A natural Japanese translation of the same reply",`,
-    feedbackLanguage: `Write it in very simple, beginner-friendly English — short words, short sentences, no grammar jargon.`,
+    feedbackLanguage: `Write it in ${level.feedbackStyle}.`,
     feedbackJaField: `,
 	"feedbackJa": "The same feedback in Japanese"`,
     texting: "This is casual texting, so ignore capital letters and missing end punctuation.",
@@ -414,7 +438,7 @@ function buildSystemPrompt(
 How to chat:
 - Read the whole conversation so far and keep the thread going naturally, the way a real friend remembers what was just said.
 - Talk about simple, everyday topics a friend would bring up, and mix them up — food, drinks, the weekend, school or work, a trip, a hobby, a game, a movie or show, pets, family, sports, and so on.
-- Use very simple, short sentences, like you are talking to a total beginner. Only common, everyday words — no idioms, no rare or advanced vocabulary, no hard grammar. 1-3 short sentences per reply.
+- ${levelProfile(target.level).chatStyle}
 ${language.writing ? `${language.writing}\n` : ""}- Never use the target word or grammar pattern yourself, in any language. Leave it for the user. Instead, ask simple questions whose most natural answer would use it.
 - Every question must follow on from what the user just said, the way a friend's next question would. Before asking, check: would a real person ask this right after hearing the user's message? If not, it's too sharp a turn — don't ask it. For example, if the user says they saw people playing football, "Where were they playing? Was it far from your house?" follows on; "What is farther away?" does not.
 - Have a destination: the one simple question whose most natural answer would use the target — e.g. for "X ago" (之前): "When did you last see him?" → "Three days ago"; for "this week": "When is your birthday?" → "This week". Work it out in "plan" before every reply.
@@ -422,6 +446,7 @@ ${language.writing ? `${language.writing}\n` : ""}- Never use the target word or
 - You've sent ${charlesMessagesSoFar} message${charlesMessagesSoFar === 1 ? "" : "s"} so far. ${charlesMessagesSoFar >= 2 ? "That's enough build-up: this reply must ask the destination question (after a brief, natural reaction to what they said)." : "By your second reply at the latest, ask the destination question itself."}
 - If nothing in the conversation leads toward the target, change topic the way a friend would — briefly react to what the user said, then signal the switch ("Oh nice! By the way, ...", "That sounds fun. Hey, ..."), and make the new question complete and clear on its own. Never ask a bare question that only makes sense if the user can guess what you're getting at.
 - Keep every question something the user can easily understand and answer — the destination question included: make it clear and concrete, not vague or abstract.
+${NATURAL_CHAT_RULE}
 - If the user's latest message is only one or two words, or is vague and doesn't really answer what you just asked, warmly ask them to say a little more.
 - If the user tries to end the chat early, kindly keep it going with a new simple, friendly question.
 ${friendsPromptRule(target) ? `${friendsPromptRule(target)} If you already mentioned one of them earlier in this chat, keep talking about the same friend.\n` : ""}${knownWordsPromptRule(target) ? `${knownWordsPromptRule(target)}\n` : ""}- Never break character or mention that this is a language exercise, scoring, or practice.
@@ -470,7 +495,7 @@ When usedTarget is true, the chat is over, so "text" should be a short, warm rep
 	"tips": ["Up to 3 short tips, each explaining one real difference between what they wrote and your betterVersion (a wrong word, a wrong tone, words in the wrong order, a missing word), or one other real mistake they made. Before writing each tip, compare it with the exact words they wrote.${language.readingTheirMessage} Never tell them to add something they already wrote — if it's there but in the wrong place, tell them to move it and where to. Never 'correct' something they already got right. They are shown in one list straight after your feedback, so never repeat or reword the feedback's point, and make each tip a different point. If your betterVersion changes how their sentences connect, one tip must explain that simply (e.g. "Your two sentences don't connect yet — try joining them with a word for "so".", naming the actual word). If it fixes a wrong tone, one tip must name the right tone. Use an empty list if there is nothing left to improve."],
 	"overall": "2-3 short sentences on how the user did across the whole chat — how well they used the target, and how natural and relevant their replies were. A verdict, not advice: don't repeat any correction or suggestion from feedback or tips"${language.summaryExtraFields}
 }
-When usedTarget is false, "summary" must be null. Write the summary in the same very simple, beginner-friendly English as the feedback, with no grammar jargon.
+When usedTarget is false, "summary" must be null. Write the summary in the same English style as the feedback.
 ${language.feedbackRule}
 Be honest and strict: 10 means flawless and exactly what a native speaker would text in this situation. Give 10 only when there is truly nothing to improve.
 Do not score based on spelling alone, and do not invent a correction when the sentence is already natural.`;
@@ -494,7 +519,8 @@ async function checkTips(
   if (!summary) return reply;
 
   const isCantonese = target.targetLanguage === "yue";
-  const hasJa = !isCantonese;
+  const language = challengeLanguage(target.targetLanguage);
+  const hasJa = language.feedbackIn === "Japanese";
   const tips = [reply.feedback, ...summary.tips];
   const tipsJa = [reply.feedbackJa, ...(summary.tipsJa.length ? summary.tipsJa : summary.tips.map(() => null))];
   const betterVersion = summary.betterVersionRomanization
@@ -516,7 +542,7 @@ Check each tip against exactly what the learner wrote, word by word:
 - "keep" every other tip exactly as it is.
 
 Return only a JSON object: {"checks": [{"verdict": "keep" | "fix" | "drop", "text": "the rewritten tip, only when verdict is fix"${hasJa ? ', "textJa": "the rewritten tip in Japanese, only when verdict is fix"' : ""}}]} with exactly one entry per tip, in the same order.
-${isCantonese ? `Write any rewritten tip in very simple English. ${CANTONESE_QUOTE_RULE}` : `Write any rewritten tip in very simple English. ${JAPANESE_FEEDBACK_RULE}`}`;
+Write any rewritten tip in ${levelProfile(target.level).feedbackStyle}. ${hasJa ? JAPANESE_FEEDBACK_RULE : language.quoteRule}`;
 
   try {
     const response = await openai.chat.completions.create({

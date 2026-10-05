@@ -6,6 +6,8 @@ import {
   challengeLanguage,
   friendsPromptRule,
   knownWordsPromptRule,
+  NATURAL_CHAT_RULE,
+  levelProfile,
   glossesPromptField,
   glossesPromptRule,
   parseGlosses,
@@ -70,12 +72,27 @@ function buildOpenerPrompt(target: ChallengeTarget, firstName: string | null): s
     .join("\n");
 
   const cantonese = target.targetLanguage === "yue";
-  const style = cantonese
+  const french = target.targetLanguage === "fr";
+  const level = levelProfile(target.level);
+  // Beginners keep each language's own word rules below; other levels get
+  // the level's.
+  const words = (beginnerRule: string) => `- ${level.openerStyle || beginnerRule}`;
+  const style = french
+    ? `- Write natural, everyday French as friends text it, using "tu", with correct accents.
+${words("Only very common, everyday words a total beginner knows. No slang, no idioms, no hard grammar.")}`
+    : cantonese
     ? `- Write in natural, colloquial Hong Kong Cantonese as people really text it, in traditional characters (係, 唔, 嘅, 咗, 喺, 佢, 乜嘢 — not Mandarin forms like 是, 不, 的, 了, 在, 他, 什麼).
-- Only very common, everyday words a total beginner knows. No slang, no idioms, no hard grammar.
+${words("Only very common, everyday words a total beginner knows. No slang, no idioms, no hard grammar.")}
 - In the Jyutping, use the everyday Hong Kong spoken readings, not formal reading-aloud ones — e.g. 生日 is saang1 jat6, not sang1 jat6.`
-    : `- Only very common, everyday words a total beginner knows. No idioms, no slang, no phrasal verbs like "been up to", no hard grammar.`;
-  const fields = cantonese
+    : words(`Only very common, everyday words a total beginner knows. No idioms, no slang, no phrasal verbs like "been up to", no hard grammar.`);
+  const fields = french
+    ? `{
+	"plan": "Private notes, never shown, one short sentence: the question you'll ask and how its natural answer uses the target",
+	"text": "Charles Duck's opening message, in French",
+	"translation": "A natural, casual English translation of the same message",
+	${glossesPromptField(target.targetLanguage)}
+}`
+    : cantonese
     ? `{
 	"plan": "Private notes, never shown, one short sentence: the question you'll ask and how its natural answer uses the target",
 	"text": "Charles Duck's opening message, in Cantonese characters",
@@ -90,7 +107,7 @@ function buildOpenerPrompt(target: ChallengeTarget, firstName: string | null): s
 	${glossesPromptField(target.targetLanguage)}
 }`;
 
-  return `You write the very first text message that Charles Duck, a friendly ${language.target}-speaking duck, sends to start a casual chat with ${language.learner} who is a beginner learning ${language.target}.
+  return `You write the very first text message that Charles Duck, a friendly ${language.target}-speaking duck, sends to start a casual chat with ${language.learner} who is ${level.learner} learning ${language.target}.
 
 Later in the chat, the learner will try to use this naturally:
 ${targets}
@@ -99,6 +116,7 @@ How to write the opener:
 - A casual greeting plus ONE simple question. At most 2 short sentences and about 15 words.
 ${firstName ? `- Greet them by their first name, "${firstName}", in the greeting. Use it once only, and keep it exactly as written in the translation too.\n` : ""}${style}
 - It must sound natural — exactly how a friend would really text.
+${NATURAL_CHAT_RULE}
 - Ask a question whose most natural answer would use the target, so the learner can use it in their very first reply. Work it out in "plan" first. For example, for "from X to Y" (由 X 到 Y): "What time do you usually have dinner?" → "From six to seven"; for "X ago" (之前): "When did you last see your friend?" → "Two days ago"; for "this week": "When is your birthday?" → "This week".
 - Never use the target word or pattern yourself, and never quiz them ("How do you say…?") — it should just be the kind of question a friend asks, whose natural answer happens to use it.
 - Only if no everyday question could naturally lead to the target (for example a bare particle), use the topic of this general opener instead, reworded in your own way: "${target.fallbackOpener.text}" (${target.fallbackOpener.translation})

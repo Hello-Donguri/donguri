@@ -40,6 +40,7 @@ import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { Jyutping, JyutpingInput } from "@/components/vocab/jyutping";
 import { InlineLesson, LessonButton, loadLesson } from "@/components/vocab/word-lesson";
+import { FlagButton } from "@/components/vocab/flag-button";
 import { parseDonguriConfig, formatXp, type AccessoryId } from "@/lib/levels";
 
 type ReviewSessionProps = {
@@ -47,6 +48,9 @@ type ReviewSessionProps = {
   courseSlug: string;
   initialXp: number;
   initialDonguriConfig: unknown;
+  // Words already flagged to revisit (see FlagButton), so each question
+  // shows its flag as it stands.
+  flaggedWordIds: string[];
 };
 
 type Feedback = ChoiceFeedback;
@@ -102,9 +106,11 @@ const ReviewSessionQuestions = ({
   courseSlug,
   initialXp,
   initialDonguriConfig,
+  flaggedWordIds,
 }: ReviewSessionProps) => {
   // Fixed for the whole session — see the same note in TestSession.
   const [quiz] = useState(initialQuiz);
+  const [flagged, setFlagged] = useState(() => new Set(flaggedWordIds));
   const t = useTranslations();
   const router = useRouter();
   const reduceMotion = useReducedMotion();
@@ -454,6 +460,22 @@ const ReviewSessionQuestions = ({
           exit="exit"
           className="flex w-full flex-col items-center"
         >
+          <div className="mb-2 flex w-full justify-end">
+            <FlagButton
+              courseSlug={courseSlug}
+              wordId={question.wordId}
+              flagged={flagged.has(question.wordId)}
+              onChange={(isFlagged) =>
+                setFlagged((current) => {
+                  const next = new Set(current);
+                  if (isFlagged) next.add(question.wordId);
+                  else next.delete(question.wordId);
+                  return next;
+                })
+              }
+            />
+          </div>
+
           {question.kind === "type-form" || question.kind === "form-choice" ? (
             <ClozeCard
               sentence={question.clozeSentence}

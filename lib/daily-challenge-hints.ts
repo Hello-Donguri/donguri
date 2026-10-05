@@ -4,11 +4,10 @@ import OpenAI from "openai";
 import { requireMember } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import { startOfUTCDay } from "@/lib/srs";
-import { challengeLanguage, pickChallengeTarget, type ChallengeTarget } from "@/lib/daily-challenge";
+import { challengeLanguage, levelProfile, pickChallengeTarget, type ChallengeTarget } from "@/lib/daily-challenge";
 
 // A word offered to a learner who's paused mid-reply. No meaning, so they
-// still have to recognise it, and nothing says which one fits — that would
-// give it away.
+// still have to recall what it means and type it themselves.
 export type HintWord = {
   text: string;
   romanization: string | null;
@@ -25,7 +24,7 @@ const MAX_TEXT = 500;
 const HINT_TIMEOUT_MS = 20_000;
 
 // The learnt vocab (not grammar patterns) behind the known-words lines, by
-// term — '今日 (gam1 jat6) — "today"' → 今日. Hints may only be these.
+// term — '今日 (gam1 jat6) — "today"' → 今日. Hints come from these first.
 function knownVocab(target: ChallengeTarget): Map<string, string> {
   return new Map(
     target.knownWords
@@ -34,21 +33,28 @@ function knownVocab(target: ChallengeTarget): Map<string, string> {
   );
 }
 
-function shuffle<T>(items: T[]): T[] {
-  const copy = [...items];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
+// Whether `word` is already in what the learner has typed: as a whole word
+// in Latin text (so "a" doesn't count as typed because "cat" is there), or
+// anywhere for Chinese, which has no spaces between words.
+function alreadyTyped(word: string, draft: string): boolean {
+  if (/\p{Script=Han}/u.test(word)) return draft.includes(word);
+  const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, "iu").test(draft);
+}
+
+// A suggestion from outside their list must be simple: one short word or a
+// tiny phrase, not a sentence that does the work for them.
+function isShortSuggestion(text: string): boolean {
+  return /\p{Script=Han}/u.test(text) ? [...text].length <= 4 : text.split(/\s+/).length <= 2 && text.length <= 20;
 }
 
 // Word hints for a learner who's paused while writing a daily challenge
-// reply: four words they've learnt, shuffled — exactly one that would help
-// them say what they seem to be saying, and three that make no sense there
-// at all. A nudge, not the answer: they still have to recognise the right
-// one and type it themselves. Empty when there's nothing useful to offer or anything fails —
-// hints are optional, so failure just shows nothing.
+// reply: up to four words that would help them carry on with what they
+// seem to be saying, most useful first. Words they've learnt come first;
+// only when too few of those fit are simple everyday words they haven't
+// learnt added, so every hint is one they could really use next. Empty
+// when nothing fits or anything fails — hints are optional, so failure
+// just shows nothing.
 export async function dailyChallengeHints(
   courseSlug: string,
   turns: HintTurn[],
@@ -71,7 +77,6 @@ export async function dailyChallengeHints(
   if (!target) return [];
 
   const vocab = knownVocab(target);
-  if (vocab.size < HINT_COUNT) return [];
 
   const language = challengeLanguage(target.targetLanguage);
   const cantonese = target.targetLanguage === "yue";
@@ -80,7 +85,8 @@ export async function dailyChallengeHints(
     .map((turn) => `${turn.role === "ai" ? "Charles" : "Learner"}: ${turn.text.slice(0, MAX_TEXT)}`)
     .join("\n");
 
-  const prompt = `A beginner learning ${language.target} is replying to their friend Charles in a casual text chat, and has stopped typing — they may have forgotten a word.
+  const learner = levelProfile(target.level).learner;
+  const prompt = `${learner.charAt(0).toUpperCase()}${learner.slice(1)} learning ${language.target} is replying to their friend Charles in a casual text chat, and has stopped typing — they may have forgotten a word.
 
 The chat so far:
 ${chat}
@@ -88,14 +94,17 @@ ${chat}
 What they've typed so far: "${draft.slice(0, MAX_TEXT)}"
 ${cantonese ? "They may type Cantonese in Jyutping: read it as the Cantonese it spells.\n" : ""}
 Words they've learnt:
-${[...vocab.values()].map((line) => `  ${line}`).join("\n")}
+${vocab.size > 0 ? [...vocab.values()].map((line) => `  ${line}`).join("\n") : "  (none yet)"}
 
-Pick ${HINT_COUNT} words, all from that list exactly as written there:
-- ONE that would help them carry on with what they seem to be saying, in reply to Charles's last message.
-- ${HINT_COUNT - 1} that make NO sense in their reply. Check each one: if it could finish their sentence into any sensible answer to Charles — even a different answer from the one they seem to mean — it fits, so don't pick it. Exactly one word may fit.
-Never pick a word that's already in what they've typed.
+First work out what they seem to be trying to say, in reply to Charles's last message. Their last word may be unfinished or not quite right (e.g. "call" when they mean "called" or "name") — then the word they're reaching for is a good hint.
 
-Return only a JSON object: {"words": [{"text": "the word exactly as in the list", "fits": true}]} — exactly ${HINT_COUNT} entries, exactly one with "fits": true.`;
+Suggest up to ${HINT_COUNT} ${language.target} words that would help them carry on that reply — the word that would most naturally come next, or the one they seem to be reaching for. Every word must fit: if it wouldn't make sense in their reply, don't suggest it. Fewer good words are far better than filling the list.
+- Prefer words from their list, written exactly as there ("learnt": true).
+- If fewer than ${HINT_COUNT} words from the list fit, add simple, common everyday ${language.target} words that fit instead ("learnt": false) — single words or a tiny set phrase, never a whole sentence.
+- Never suggest a word that's already in what they've typed.
+- Order them most useful first.
+
+Return only a JSON object: {"words": [{"text": "the word", "learnt": true${cantonese ? ', "romanization": "its Jyutping with tone numbers"' : ""}}]}`;
 
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -111,22 +120,32 @@ Return only a JSON object: {"words": [{"text": "the word exactly as in the list"
     const parsed = JSON.parse(response.choices[0]?.message.content ?? "") as { words?: unknown };
     if (!Array.isArray(parsed.words)) return [];
 
-    // Only words really on their list, and not already typed; the reading
-    // comes from the list, not the model.
+    // Learnt words only when really on their list, with the list's reading;
+    // others only when short. Nothing already typed, nothing twice.
     const seen = new Set<string>();
-    const words = parsed.words.flatMap((entry): (HintWord & { fits: boolean })[] => {
+    const words = parsed.words.flatMap((entry): HintWord[] => {
       if (typeof entry !== "object" || entry === null) return [];
-      const { text, fits } = entry as Record<string, unknown>;
-      if (typeof text !== "string" || !vocab.has(text) || seen.has(text) || draft.includes(text)) return [];
+      const { text: rawText, romanization } = entry as Record<string, unknown>;
+      if (typeof rawText !== "string") return [];
+      const text = rawText.trim();
+      if (!text || seen.has(text) || alreadyTyped(text, draft)) return [];
+
+      const line = vocab.get(text);
+      if (line) {
+        seen.add(text);
+        return [{ text, romanization: line.match(/\(([^)]+)\)/)?.[1] ?? null }];
+      }
+      if (!isShortSuggestion(text)) return [];
       seen.add(text);
-      const line = vocab.get(text)!;
-      const romanization = line.match(/\(([^)]+)\)/)?.[1] ?? null;
-      return [{ text, romanization, fits: fits === true }];
+      return [
+        {
+          text,
+          romanization: cantonese && typeof romanization === "string" && romanization.trim() ? romanization.trim() : null,
+        },
+      ];
     });
 
-    // Without exactly one fitting word it's not a fair nudge — show nothing.
-    if (words.length < 2 || words.filter((word) => word.fits).length !== 1) return [];
-    return shuffle(words).map(({ text, romanization }) => ({ text, romanization }));
+    return words.slice(0, HINT_COUNT);
   } catch (error) {
     console.error("Daily challenge hints failed:", error);
     return [];

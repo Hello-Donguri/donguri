@@ -114,6 +114,9 @@ model CourseEnrollment {
   // Set when the learner leaves the course; null while enrolled. Leaving
   // keeps the row and all progress — see section 45 of supabase/schema.sql.
   unenrolledAt        DateTime? @map("unenrolled_at") @db.Timestamptz(6)
+  // 'beginner', 'intermediate' or 'advanced' — picked on enrolling; sets
+  // how Charles Duck talks to them. See section 52 of supabase/schema.sql.
+  level               String    @default("beginner")
   course              Course    @relation(fields: [courseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   profile             Profile   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
@@ -314,6 +317,9 @@ model UserWordProgress {
   // moment it's learnt (whether or not its post-learn quiz is ever taken),
   // and null once it reaches stage 8 (mastered, no more reviews).
   nextReviewAt   DateTime? @map("next_review_at") @db.Timestamptz(6)
+  // When the learner flagged this word to revisit its lesson (see section
+  // 53 of supabase/schema.sql); null when it isn't flagged.
+  flaggedAt      DateTime? @map("flagged_at") @db.Timestamptz(6)
   profile        Profile   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   word           Word      @relation(fields: [wordId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 

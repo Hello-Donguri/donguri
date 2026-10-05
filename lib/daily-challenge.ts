@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { addDays, startOfUTCDay } from "@/lib/srs";
+import { parseCourseLevel, type CourseLevel } from "@/lib/definitions";
 
 // What a daily-challenge attempt asks the learner to use in their chat with
 // Charles Duck: a vocab word, a grammar point, or one of each (anywhere in
@@ -69,24 +70,34 @@ export function parseGlosses(value: unknown, withRomanization: boolean): WordGlo
 // The "words" field both of Charles's prompts ask for (an example entry,
 // for the JSON shape) and how to fill it in (a line after the shape).
 export function glossesPromptField(targetLanguage: string): string {
-  return targetLanguage === "yue"
-    ? `"words": [{ "text": "你", "romanization": "nei5", "meaning": "you" }]`
-    : `"words": [{ "text": "weekend", "meaning": "週末" }]`;
+  if (targetLanguage === "yue") return `"words": [{ "text": "你", "romanization": "nei5", "meaning": "you" }]`;
+  if (targetLanguage === "fr") return `"words": [{ "text": "jardin", "meaning": "garden" }]`;
+  return `"words": [{ "text": "weekend", "meaning": "週末" }]`;
 }
 
 // How English feedback quotes Cantonese, so a beginner can both say and
 // understand every quoted bit — shared by the chat and the daily review.
 export const CANTONESE_QUOTE_RULE = `Whenever you quote Cantonese — a single word or a whole phrase — write the characters, then in brackets its Jyutping with tone numbers and a short English meaning in quotes, e.g. 飲 (jam2, "drink") or 我鍾意飲茶 (ngo5 zung1 ji3 jam2 caa4, "I like drinking tea"). Never quote Cantonese without its English meaning.`;
 
+// The same for French: the learner reads English, so every bit of French
+// quoted in feedback comes with what it means.
+export const FRENCH_QUOTE_RULE = `Whenever you quote French — a single word or a whole phrase — write it exactly, with its accents, followed by a short English meaning in brackets and quotes, e.g. tailler ("to prune") or j'aurais dû arroser ("I should have watered"). Never quote French without its English meaning.`;
+
 export function glossesPromptRule(targetLanguage: string): string {
+  if (targetLanguage === "fr") {
+    return `"words" lists every word of your message, in order: "text" exactly as it appears in the message (keep elided forms like l', j', qu' joined to their word), "meaning" a short English meaning of that word as used here. Keep a set phrase together if its words don't make sense apart. Leave out punctuation.`;
+  }
   return targetLanguage === "yue"
     ? `"words" lists every word of your message, in order, split into natural words (a word can be more than one character, e.g. 鍾意, 今日): "text" exactly as it appears in the message, "romanization" its Jyutping with tone numbers, "meaning" a short English meaning of that word as used here. Leave out punctuation.`
     : `"words" lists every word of your message, in order: "text" exactly as it appears in the message, "meaning" a short Japanese meaning of that word as used here. Keep a set phrase together if its words don't make sense apart. Leave out punctuation.`;
 }
 
 export type ChallengeTarget = {
-  // The course's target language ("en", "yue") — what Charles chats in.
+  // The course's target language ("en", "yue", "fr") — what Charles chats in.
   targetLanguage: string;
+  // The level the learner picked when they enrolled — how Charles pitches
+  // his messages and feedback (see levelProfile).
+  level: CourseLevel;
   vocab: ChallengeItem | null;
   grammar: ChallengeItem | null;
   fallbackOpener: ChallengeOpener;
@@ -99,6 +110,43 @@ export type ChallengeTarget = {
   knownWords: string[];
 };
 
+// How Charles pitches everything to the learner's level: who he says he's
+// talking to, how he writes his messages, and how he writes feedback. Shared
+// by the chat, the opener, the hints and the end-of-day review, so they all
+// agree. Beginner is how Charles has always talked.
+export function levelProfile(level: CourseLevel) {
+  switch (level) {
+    case "advanced":
+      return {
+        learner: "an advanced learner",
+        chatStyle:
+          "Write the way you'd text a fluent friend: natural, idiomatic and varied — colloquial expressions, idioms and any tense or structure that fits. Don't simplify. 1-3 sentences per reply.",
+        openerStyle:
+          "Natural, idiomatic language, the way you'd text a fluent friend — idioms and colloquial expressions are welcome.",
+        feedbackStyle:
+          "clear, concise English. Grammar terms are fine. Point out nuance, register and more idiomatic ways to say things, not just outright mistakes",
+      };
+    case "intermediate":
+      return {
+        learner: "an intermediate learner",
+        chatStyle:
+          "Write natural, everyday sentences for an intermediate learner: a range of tenses, common idioms and the odd longer sentence are fine, but avoid rare vocabulary and slang. 1-3 sentences per reply.",
+        openerStyle:
+          "Everyday words and natural grammar an intermediate learner knows. A common idiom is fine; no rare words or slang.",
+        feedbackStyle:
+          "clear, friendly English with short sentences. Name a grammar point (e.g. \"past tense\", \"subjunctive\") when it helps them understand",
+      };
+    default:
+      return {
+        learner: "a beginner",
+        chatStyle:
+          "Use very simple, short sentences, like you are talking to a total beginner. Only common, everyday words — no idioms, no rare or advanced vocabulary, no hard grammar. 1-3 short sentences per reply.",
+        openerStyle: "",
+        feedbackStyle: "very simple, beginner-friendly English — short words, short sentences, no grammar jargon",
+      };
+  }
+}
+
 // How many learnt words Charles is shown — the most recent, which are the
 // freshest in the learner's mind, and enough to build answers from without
 // bloating every prompt.
@@ -109,13 +157,31 @@ const MAX_KNOWN_WORDS = 120;
 // the target never needs vocabulary they haven't met — e.g. offer a choice
 // built from known words rather than ask "how will you celebrate?" when
 // they know no words for celebrating. Shared by his opener and his replies.
+// Intermediate and advanced learners know far more than they've learnt in
+// the app, so for them the list is only a hint of what they've been
+// practising, never a limit.
 export function knownWordsPromptRule(target: ChallengeTarget): string {
   if (target.knownWords.length === 0) return "";
+  if (target.level !== "beginner") {
+    return `- The user is ${levelProfile(target.level).learner}. They've recently been practising these words and patterns in the app (newest first) — feel free to bring some of them up, but they know plenty more, so don't limit yourself to them:
+${target.knownWords.map((line) => `  ${line}`).join("\n")}
+- Never quiz them or mention the list.`;
+  }
   return `- The user is a beginner. These are the ${target.knownWords.length} words and patterns they've learnt most recently, newest first — they also know the very basics (I, you, yes, no, like, have, is):
 ${target.knownWords.map((line) => `  ${line}`).join("\n")}
 - Phrase your questions so the user can answer with words from that list plus the target. This changes how you ask, never where you're heading: the steps toward the target should be things they can say — e.g. if they know 食, 飯 and 今日, "Did you eat rice today?" works; "How do you want to celebrate?" doesn't, if they know no words for celebrating.
 - If a step toward the target would need a word they haven't learnt, find another step toward the target that doesn't. Don't fall back on easy questions that lead nowhere (like "Do you like X or Y?" when neither leads to the target). Never quiz them or mention the list.`;
 }
+
+// What makes Charles sound like a real friend rather than a teacher setting
+// up an answer — shared by his opener and his replies. Two traps the target
+// pulls him into: telling the learner what to say ("Ask me about her") to
+// get the pattern out of them, and asking something he'd already know
+// ("Are we at school?") because its answer happens to use the target.
+export const NATURAL_CHAT_RULE = `- Talk exactly like a friend texting. Never tell the user what to say, ask or write — no "Ask me about…", "Tell me about…", "Describe…", "Use … in a sentence". Get them talking only with real questions and comments.
+- Only ask what a friend genuinely wouldn't know: the user's own life, plans, opinions, people they know, things that happened to them. Never ask about things you'd obviously already know — where the two of you are, what you yourself are doing or like, or facts you've just been told. You are not with the user; you're texting from somewhere else.
+- Your own friends are yours: you know them, the user doesn't. You can share news about them, but never ask the user questions about them ("What's Rupert's favourite food?", "Are you and Matilda free?"). Ask about the user's own family, friends and life instead.
+- If the target is about "we", "you" or "they", make it about real people in the user's life — e.g. for "we are not …": "Are you and your sister going to the party?" → "No, we're not going" — never a question about you two being somewhere together. For "his" / "her", ask about someone the user knows: "What does your brother do?" → "His job is …".`;
 
 // One of Charles's animal friends: a traditional English first name and a
 // cute animal, e.g. "Christopher Mouse".
@@ -136,6 +202,8 @@ const ANIMALS = [
 
 // How Charles brings in a third person — shared by his opener and his chat
 // replies, so the friend he names first is the one he keeps talking about.
+// They're his friends, so he tells the learner about them; he asks about
+// the learner's own people (see NATURAL_CHAT_RULE).
 export function friendsPromptRule(target: ChallengeTarget): string {
   const [he, she] = [
     target.friends.find((friend) => friend.pronoun === "he"),
@@ -145,25 +213,36 @@ export function friendsPromptRule(target: ChallengeTarget): string {
   const cantonese = target.targetLanguage === "yue";
   const fullName = (friend: ChallengeFriend) => `${friend.name} ${friend.animal}`;
 
-  return `- Whenever you talk about someone other than you two — and especially when the target is a third-person word or pattern (he, she, they, him, her, his${cantonese ? ", 佢, 佢哋" : ""}) — make it one of your friends: ${fullName(he)} (a he) or ${fullName(she)} (a she), whichever fits; both of them together for "they". Introduce them by full name the first time ("my friend ${fullName(he)}"), then just use he or she.${cantonese ? ` In Cantonese, keep the first name in English letters and write the animal in Cantonese (e.g. "${he.name} + the Cantonese for ${he.animal.toLowerCase()}"), the way people in Hong Kong mix in English names; in the Jyutping, leave the English name as it is.` : ""} Only bring them up when it's natural — never just to mention them.`;
+  return `- Whenever you mention someone from your own life — which can help when the target is a third-person word or pattern (he, she, they, him, her, his${cantonese ? ", 佢, 佢哋" : ""}) — make it one of your friends: ${fullName(he)} (a he) or ${fullName(she)} (a she), whichever fits; both of them together for "they". Share something about them, then ask about the user's side of it (e.g. "My friend ${fullName(she)} just got a new bike! Does anyone in your family cycle?") — never ask the user about your friends. Introduce them by full name the first time ("my friend ${fullName(he)}"), then just use he or she.${cantonese ? ` In Cantonese, keep the first name in English letters and write the animal in Cantonese (e.g. "${he.name} + the Cantonese for ${he.animal.toLowerCase()}"), the way people in Hong Kong mix in English names; in the Jyutping, leave the English name as it is.` : ""} Only bring them up when it's natural — never just to mention them.`;
 }
 
 // The course languages the chat knows how to run in: who Charles is
 // talking to, and how his messages and feedback are written. Anything
 // else falls back to the English course's setup.
 export function challengeLanguage(targetLanguage: string) {
+  if (targetLanguage === "fr") {
+    return {
+      target: "French",
+      learner: "an English speaker",
+      feedbackIn: "English",
+      hasRomanization: false,
+      quoteRule: FRENCH_QUOTE_RULE,
+    };
+  }
   return targetLanguage === "yue"
     ? {
         target: "Cantonese",
         learner: "an English speaker",
         feedbackIn: "English",
         hasRomanization: true,
+        quoteRule: CANTONESE_QUOTE_RULE,
       }
     : {
         target: "English",
         learner: "a Japanese speaker",
         feedbackIn: "Japanese",
         hasRomanization: false,
+        quoteRule: "",
       };
 }
 
@@ -382,7 +461,25 @@ const CANTONESE_OPENERS: Omit<ChallengeOpener, "glosses">[] = [
   { text: "你好！你放假鍾意去邊度玩呀？", romanization: "nei5 hou2! nei5 fong3 gaa3 zung1 ji3 heoi3 bin1 dou6 waan2 aa3?", translation: "Hi! Where do you like to go on your days off?" },
 ];
 
+// The French course's fixed openers: casual, natural French (tu, as
+// friends text), with English.
+const FRENCH_OPENERS: Omit<ChallengeOpener, "glosses">[] = [
+  { text: "Salut ! Tu as passé une bonne journée ?", romanization: null, translation: "Hi! Did you have a good day?" },
+  { text: "Coucou ! Qu'est-ce que tu as fait ce week-end ?", romanization: null, translation: "Hey! What did you do this weekend?" },
+  { text: "Salut ! Tu as des projets pour le week-end ?", romanization: null, translation: "Hi! Do you have any plans for the weekend?" },
+  { text: "Salut ! Tu fais du sport en ce moment ?", romanization: null, translation: "Hi! Are you doing any sport at the moment?" },
+  { text: "Coucou ! Il fait quel temps chez toi aujourd'hui ?", romanization: null, translation: "Hey! What's the weather like where you are today?" },
+  { text: "Salut ! Tu as un jardin, ou des plantes chez toi ?", romanization: null, translation: "Hi! Do you have a garden, or any plants at home?" },
+  { text: "Salut ! Qu'est-ce que tu as mangé de bon aujourd'hui ?", romanization: null, translation: "Hi! What did you eat that was good today?" },
+  { text: "Coucou ! Tu as regardé un bon film récemment ?", romanization: null, translation: "Hey! Have you watched a good film recently?" },
+  { text: "Salut ! Tu préfères la mer ou la montagne ?", romanization: null, translation: "Hi! Do you prefer the sea or the mountains?" },
+  { text: "Salut ! Qu'est-ce que tu fais d'habitude après le travail ?", romanization: null, translation: "Hi! What do you usually do after work?" },
+  { text: "Coucou ! Tu as lu quelque chose d'intéressant cette semaine ?", romanization: null, translation: "Hey! Have you read anything interesting this week?" },
+  { text: "Salut ! Où est-ce que tu aimerais partir en vacances ?", romanization: null, translation: "Hi! Where would you like to go on holiday?" },
+];
+
 function fixedOpeners(targetLanguage: string): ChallengeOpener[] {
+  if (targetLanguage === "fr") return FRENCH_OPENERS.map((opener) => ({ ...opener, glosses: null }));
   return targetLanguage === "yue"
     ? CANTONESE_OPENERS.map((opener) => ({ ...opener, glosses: null }))
     : OPENERS.map(({ english, japanese }) => ({
@@ -464,7 +561,7 @@ export async function pickChallengeTarget(
   challengeDate: Date,
   attemptIndex: number,
 ): Promise<ChallengeTarget | null> {
-  const [words, profile, course, todaysAttempts] = await Promise.all([
+  const [words, profile, course, todaysAttempts, enrollment] = await Promise.all([
     prisma.word.findMany({
       where: {
         active: true,
@@ -482,6 +579,10 @@ export async function pickChallengeTarget(
     prisma.dailyChallengeAttempt.findMany({
       where: { userId, courseId, challengeDate },
       select: { targetTerms: true },
+    }),
+    prisma.courseEnrollment.findUnique({
+      where: { userId_courseId: { userId, courseId } },
+      select: { level: true },
     }),
   ]);
 
@@ -553,6 +654,7 @@ export async function pickChallengeTarget(
 
   return {
     targetLanguage: course.targetLanguage,
+    level: parseCourseLevel(enrollment?.level),
     vocab: mode === "grammar" ? null : toItem(pick(vocab)),
     grammar: mode === "vocab" ? null : toItem(pick(grammar)),
     fallbackOpener: openers[Math.floor(openerRandom() * openers.length)],
