@@ -108,8 +108,16 @@ export function Hero({ t }: { t: TFunction }) {
       href: "#lessons",
       icon: BookOpen,
       title: t("home.routine.learn_title", "Learn"),
-      body: t("home.routine.learn_body", "Three new words, with pictures and sound."),
-      image: { src: "/images/rabbit-reading.webp", width: 905, height: 929, className: "h-24" },
+      body: t(
+        "home.routine.learn_body",
+        "Three new words, with pictures and sound.",
+      ),
+      image: {
+        src: "/images/rabbit-reading.webp",
+        width: 905,
+        height: 929,
+        className: "h-24",
+      },
       card: "border-ai/20 bg-ai-soft/50 hover:border-ai/40",
       badge: "bg-ai text-washi",
       titleText: "text-ai-dark",
@@ -119,7 +127,12 @@ export function Hero({ t }: { t: TFunction }) {
       icon: PencilLine,
       title: t("home.routine.quiz_title", "Quiz"),
       body: t("home.routine.quiz_body", "Test yourself straight away."),
-      image: { src: "/images/rabbit-flash.webp", width: 599, height: 1019, className: "h-28" },
+      image: {
+        src: "/images/rabbit-flash.webp",
+        width: 599,
+        height: 1019,
+        className: "h-28",
+      },
       card: "border-sakura/20 bg-sakura-soft/50 hover:border-sakura/40",
       badge: "bg-sakura text-washi",
       titleText: "text-sakura-dark",
@@ -128,8 +141,16 @@ export function Hero({ t }: { t: TFunction }) {
       href: "#how-it-works",
       icon: Clock,
       title: t("home.routine.review_title", "Review"),
-      body: t("home.routine.review_body", "Words come back just before you'd forget."),
-      image: { src: "/images/donguri-peering.webp", width: 434, height: 834, className: "h-28" },
+      body: t(
+        "home.routine.review_body",
+        "Words come back just before you'd forget.",
+      ),
+      image: {
+        src: "/images/donguri-peering.webp",
+        width: 434,
+        height: 834,
+        className: "h-28",
+      },
       card: "border-kin/30 bg-kin/10 hover:border-kin/50",
       badge: "bg-kin text-ink-on-light",
       titleText: "text-acorn",
@@ -138,8 +159,16 @@ export function Hero({ t }: { t: TFunction }) {
       href: "#daily-challenge",
       icon: MessageCircle,
       title: t("home.routine.chat_title", "Daily chat"),
-      body: t("home.routine.chat_body", "Use it all in a quick chat with Charles Duck."),
-      image: { src: "/images/charles.webp", width: 1254, height: 1254, className: "h-24" },
+      body: t(
+        "home.routine.chat_body",
+        "Use it all in a quick chat with Charles Duck.",
+      ),
+      image: {
+        src: "/images/charles.webp",
+        width: 1254,
+        height: 1254,
+        className: "h-24",
+      },
       card: "border-matcha/20 bg-matcha-soft/50 hover:border-matcha/40",
       badge: "bg-matcha text-washi",
       titleText: "text-matcha-dark",
@@ -195,7 +224,7 @@ export function Hero({ t }: { t: TFunction }) {
           <div className="mx-auto flex w-full max-w-lg flex-col items-center gap-6 lg:relative lg:max-w-none lg:py-14">
             <div className="relative w-full">
               <Image
-                src="/images/ipad2.webp"
+                src="/images/ipad3.webp"
                 alt=""
                 width={1485}
                 height={937}
@@ -220,7 +249,9 @@ export function Hero({ t }: { t: TFunction }) {
                 <li
                   key={feature.title}
                   className={cn(
-                    index % 2 === 0 ? "sm:justify-self-end" : "sm:justify-self-start",
+                    index % 2 === 0
+                      ? "sm:justify-self-end"
+                      : "sm:justify-self-start",
                     "lg:absolute",
                     chipPlacement[index],
                   )}
@@ -259,7 +290,10 @@ export function Hero({ t }: { t: TFunction }) {
               {t("home.routine.heading", "Your daily routine")}
             </h2>
             <p className="mt-1.5 text-sm text-sumi-soft sm:text-base">
-              {t("home.routine.subtext", "Four quick steps. A few minutes a day.")}
+              {t(
+                "home.routine.subtext",
+                "Four quick steps. A few minutes a day.",
+              )}
             </p>
           </div>
 
@@ -284,8 +318,17 @@ export function Hero({ t }: { t: TFunction }) {
                       >
                         {index + 1}
                       </span>
-                      <span className={cn("flex items-center gap-1.5 font-nunito text-xl font-black", area.titleText)}>
-                        <Icon aria-hidden className="h-5 w-5" strokeWidth={2.5} />
+                      <span
+                        className={cn(
+                          "flex items-center gap-1.5 font-nunito text-xl font-black",
+                          area.titleText,
+                        )}
+                      >
+                        <Icon
+                          aria-hidden
+                          className="h-5 w-5"
+                          strokeWidth={2.5}
+                        />
                         {area.title}
                       </span>
                     </div>
