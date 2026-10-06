@@ -10,7 +10,11 @@ import {
 } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import { scheduleWeeklyCrownCheck } from "@/lib/weekly-crown";
-import { jyutpingDictionary, standardiseGlosses, standardiseJyutping } from "@/lib/jyutping-standard";
+import {
+  jyutpingDictionary,
+  standardiseGlosses,
+  standardiseJyutping,
+} from "@/lib/jyutping-standard";
 import { startOfUTCDay, dailyChallengeXp } from "@/lib/srs";
 import { isLatinTypeable } from "@/lib/language";
 import {
@@ -84,7 +88,11 @@ export type ChatReply = {
   // so far, for ticking them off one by one, and the message the grammar
   // was found in — sent back with the next message, since only the model
   // can judge grammar and the chat is otherwise stateless.
-  targets: { vocab: boolean; grammar: boolean; grammarMessage: string | null } | null;
+  targets: {
+    vocab: boolean;
+    grammar: boolean;
+    grammarMessage: string | null;
+  } | null;
   summary: ChallengeSummary | null;
 };
 
@@ -132,16 +140,22 @@ function parseSummary(value: unknown): ChallengeSummary | null {
     return null;
   }
 
-  const tips = summary.tips.filter((tip): tip is string => typeof tip === "string").slice(0, 3);
+  const tips = summary.tips
+    .filter((tip): tip is string => typeof tip === "string")
+    .slice(0, 3);
   const tipsJa = Array.isArray(summary.tipsJa)
-    ? summary.tipsJa.filter((tip): tip is string => typeof tip === "string").slice(0, 3)
+    ? summary.tipsJa
+        .filter((tip): tip is string => typeof tip === "string")
+        .slice(0, 3)
     : [];
 
   return {
     overall: summary.overall,
     overallJa: optionalString(summary.overallJa),
     betterVersion: summary.betterVersion,
-    betterVersionRomanization: optionalString(summary.betterVersionRomanization),
+    betterVersionRomanization: optionalString(
+      summary.betterVersionRomanization,
+    ),
     tips,
     // Paired with `tips` by position, so a mismatched list is dropped
     // rather than showing the wrong translation next to a tip.
@@ -149,9 +163,10 @@ function parseSummary(value: unknown): ChallengeSummary | null {
   };
 }
 
-function isChatReply(
-  value: unknown,
-): value is Omit<ChatReply, "summary" | "targets" | "respondedToYou"> & {
+function isChatReply(value: unknown): value is Omit<
+  ChatReply,
+  "summary" | "targets" | "respondedToYou"
+> & {
   summary?: unknown;
   respondedToYou?: boolean;
   usedGrammar?: boolean;
@@ -165,8 +180,10 @@ function isChatReply(
     typeof reply.translation === "string" &&
     typeof reply.feedback === "string" &&
     typeof reply.usedTarget === "boolean" &&
-    (reply.respondedToYou === undefined || typeof reply.respondedToYou === "boolean") &&
-    (reply.usedGrammar === undefined || typeof reply.usedGrammar === "boolean") &&
+    (reply.respondedToYou === undefined ||
+      typeof reply.respondedToYou === "boolean") &&
+    (reply.usedGrammar === undefined ||
+      typeof reply.usedGrammar === "boolean") &&
     SCORE_FIELDS.every((field) => {
       const score = reply[field];
       return typeof score === "number" && score >= 0 && score <= 10;
@@ -200,7 +217,9 @@ function bareJyutping(text: string): string {
 //   in Jyutping — the word's Jyutping as whole syllables, with or without
 //   tone numbers.
 function containsVocab(sentence: string, item: ChallengeItem): boolean {
-  const values = [item.term, ...item.forms].map((value) => value.trim()).filter(Boolean);
+  const values = [item.term, ...item.forms]
+    .map((value) => value.trim())
+    .filter(Boolean);
 
   const inText = values.some((value) =>
     isLatinTypeable(value)
@@ -232,13 +251,20 @@ function vocabToneMismatch(
 
   for (let start = 0; start + correct.length <= written.length; start++) {
     const window = written.slice(start, start + correct.length);
-    if (!window.every((syllable, index) => toneless(syllable) === toneless(correct[index]))) {
+    if (
+      !window.every(
+        (syllable, index) => toneless(syllable) === toneless(correct[index]),
+      )
+    ) {
       continue;
     }
     const wrongTone = window.some(
-      (syllable, index) => /[1-6]$/.test(syllable) && syllable !== correct[index],
+      (syllable, index) =>
+        /[1-6]$/.test(syllable) && syllable !== correct[index],
     );
-    return wrongTone ? { wrote: window.join(" "), correct: correct.join(" ") } : null;
+    return wrongTone
+      ? { wrote: window.join(" "), correct: correct.join(" ") }
+      : null;
   }
 
   return null;
@@ -254,15 +280,23 @@ function mostlyChinese(texts: string[]): boolean {
   return han > 0 && han * 2 > latin;
 }
 
-function feedbackTexts(parsed: { feedback: string; summary?: unknown }): string[] {
+function feedbackTexts(parsed: {
+  feedback: string;
+  summary?: unknown;
+}): string[] {
   const summary = parseSummary(parsed.summary);
-  return [parsed.feedback, ...(summary ? [summary.overall, ...summary.tips] : [])];
+  return [
+    parsed.feedback,
+    ...(summary ? [summary.overall, ...summary.tips] : []),
+  ];
 }
 
 function describeItem(item: ChallengeItem): string {
   const forms =
     item.forms.length > 0 ? ` — any form counts: ${item.forms.join(", ")}` : "";
-  const romanization = item.romanization ? ` [Jyutping: ${item.romanization}]` : "";
+  const romanization = item.romanization
+    ? ` [Jyutping: ${item.romanization}]`
+    : "";
   const explanation = item.explanation ? `; ${item.explanation}` : "";
   return `"${item.term}"${romanization} (${item.translation}${explanation})${forms}`;
 }
@@ -271,7 +305,8 @@ function describeTarget(target: ChallengeTarget): string {
   if (target.vocab && target.grammar) {
     return `the word ${describeItem(target.vocab)} and the grammar pattern ${describeItem(target.grammar)} — in the same message or in two different messages, whichever comes naturally`;
   }
-  if (target.grammar) return `the grammar pattern ${describeItem(target.grammar)}`;
+  if (target.grammar)
+    return `the grammar pattern ${describeItem(target.grammar)}`;
   return `the word ${describeItem(target.vocab!)}`;
 }
 
@@ -297,8 +332,12 @@ const ATTEMPT_RULE =
 // contains it counts — even a bare "you" or a broken sentence; low quality
 // shows up in the scores instead. Grammar patterns can't be string-matched,
 // so an attempt at one is left to the model.
-function describeTargetUsage(target: ChallengeTarget, state: TargetState): string {
-  if (target.vocab && target.grammar) return describeCombinedUsage(target.grammar, state);
+function describeTargetUsage(
+  target: ChallengeTarget,
+  state: TargetState,
+): string {
+  if (target.vocab && target.grammar)
+    return describeCombinedUsage(target.grammar, state);
 
   if (target.vocab && !state.vocabInLatest) {
     return `The user's latest message does NOT contain the target word, so usedTarget must be false.`;
@@ -312,7 +351,10 @@ function describeTargetUsage(target: ChallengeTarget, state: TargetState): strin
 // A word + grammar chat: the two can land in different messages, and the
 // chat ends once both have been used. The model reports grammar in the
 // latest message as usedGrammar; usedTarget is "both are now used".
-function describeCombinedUsage(grammar: ChallengeItem, state: TargetState): string {
+function describeCombinedUsage(
+  grammar: ChallengeItem,
+  state: TargetState,
+): string {
   const vocabDone = state.vocabEarlier !== null || state.vocabInLatest;
   const word = state.vocabEarlier
     ? `The user already used the target word in an earlier message ("${state.vocabEarlier}").`
@@ -387,8 +429,7 @@ function promptLanguage(target: ChallengeTarget) {
       summaryExtraFields: "",
       readingTheirMessage:
         " They may have written in Jyutping: read it syllable by syllable as the Cantonese it spells, so e.g. 'hai2 uk1 kei5' IS 喺屋企 — they already used it.",
-      feedbackRule:
-        `Write "overall" and every tip in ENGLISH, never Cantonese — only "betterVersion" is Cantonese. ${CANTONESE_QUOTE_RULE}`,
+      feedbackRule: `Write "overall" and every tip in ENGLISH, never Cantonese — only "betterVersion" is Cantonese. ${CANTONESE_QUOTE_RULE}`,
     };
   }
 
@@ -400,7 +441,8 @@ function promptLanguage(target: ChallengeTarget) {
     feedbackLanguage: `Write it in ${level.feedbackStyle}.`,
     feedbackJaField: `,
 	"feedbackJa": "The same feedback in Japanese"`,
-    texting: "This is casual texting, so ignore capital letters and missing end punctuation.",
+    texting:
+      "This is casual texting, so ignore capital letters and missing end punctuation.",
     betterVersion: "",
     betterVersionExtraFields: "",
     readingTheirMessage: "",
@@ -501,7 +543,11 @@ Be honest and strict: 10 means flawless and exactly what a native speaker would 
 Do not score based on spelling alone, and do not invent a correction when the sentence is already natural.`;
 }
 
-type TipCheck = { verdict: "keep" | "fix" | "drop"; text?: unknown; textJa?: unknown };
+type TipCheck = {
+  verdict: "keep" | "fix" | "drop";
+  text?: unknown;
+  textJa?: unknown;
+};
 
 // A second look at the final review's tips — the per-message feedback plus
 // the summary's — before the learner sees them. The chat model sometimes
@@ -522,7 +568,10 @@ async function checkTips(
   const language = challengeLanguage(target.targetLanguage);
   const hasJa = language.feedbackIn === "Japanese";
   const tips = [reply.feedback, ...summary.tips];
-  const tipsJa = [reply.feedbackJa, ...(summary.tipsJa.length ? summary.tipsJa : summary.tips.map(() => null))];
+  const tipsJa = [
+    reply.feedbackJa,
+    ...(summary.tipsJa.length ? summary.tipsJa : summary.tips.map(() => null)),
+  ];
   const betterVersion = summary.betterVersionRomanization
     ? `${summary.betterVersion} (Jyutping: ${summary.betterVersionRomanization})`
     : summary.betterVersion;
@@ -546,12 +595,14 @@ Write any rewritten tip in ${levelProfile(target.level).feedbackStyle}. ${hasJa 
 
   try {
     const response = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL ?? "gpt-5.6-luna",
+      model: process.env.OPENAI_MODEL ?? "gpt-6-luna",
       response_format: { type: "json_object" },
       messages: [{ role: "system", content: prompt }],
     });
     const content = response.choices[0]?.message.content;
-    const checks = content ? (JSON.parse(content) as { checks?: unknown }).checks : null;
+    const checks = content
+      ? (JSON.parse(content) as { checks?: unknown }).checks
+      : null;
     if (
       !Array.isArray(checks) ||
       checks.length !== tips.length ||
@@ -567,15 +618,23 @@ Write any rewritten tip in ${levelProfile(target.level).feedbackStyle}. ${hasJa 
 
     const checked = (checks as TipCheck[]).flatMap((check, index) => {
       if (check.verdict === "drop") return [];
-      if (check.verdict === "keep") return [{ en: tips[index], ja: tipsJa[index] }];
-      return [{ en: optionalString(check.text)!, ja: hasJa ? optionalString(check.textJa) : null }];
+      if (check.verdict === "keep")
+        return [{ en: tips[index], ja: tipsJa[index] }];
+      return [
+        {
+          en: optionalString(check.text)!,
+          ja: hasJa ? optionalString(check.textJa) : null,
+        },
+      ];
     });
 
     // The per-message feedback stays first when it survives; the rest are
     // the summary's tips. Japanese is kept only while every tip has one, so
     // it's never shown against the wrong tip.
     const feedbackKept = checks[0].verdict !== "drop";
-    const [feedback, ...rest] = feedbackKept ? checked : [{ en: "", ja: null }, ...checked];
+    const [feedback, ...rest] = feedbackKept
+      ? checked
+      : [{ en: "", ja: null }, ...checked];
     const restJa = rest.map((tip) => tip.ja);
 
     return {
@@ -608,7 +667,11 @@ export async function sendDailyChallengeMessage(
   const trimmedMessage = message.trim();
 
   if (!trimmedMessage) {
-    return { ok: false, reason: "error", error: "Please write a message first." };
+    return {
+      ok: false,
+      reason: "error",
+      error: "Please write a message first.",
+    };
   }
 
   if (trimmedMessage.length > MAX_MESSAGE_LENGTH) {
@@ -620,7 +683,11 @@ export async function sendDailyChallengeMessage(
   }
 
   const enrollment = await prisma.courseEnrollment.findFirst({
-    where: { userId: user.id, unenrolledAt: null, course: { slug: courseSlug, active: true } },
+    where: {
+      userId: user.id,
+      unenrolledAt: null,
+      course: { slug: courseSlug, active: true },
+    },
     select: { courseId: true },
   });
 
@@ -656,11 +723,14 @@ export async function sendDailyChallengeMessage(
     return {
       ok: false,
       reason: "error",
-      error: "OpenAI is not configured. Add OPENAI_API_KEY to your environment.",
+      error:
+        "OpenAI is not configured. Add OPENAI_API_KEY to your environment.",
     };
   }
 
-  const vocabInMessage = target.vocab ? containsVocab(trimmedMessage, target.vocab) : true;
+  const vocabInMessage = target.vocab
+    ? containsVocab(trimmedMessage, target.vocab)
+    : true;
 
   // A word + grammar chat can use the two in different messages, so where
   // each already stands comes from the earlier turns (see TargetState).
@@ -671,10 +741,14 @@ export async function sendDailyChallengeMessage(
   const state: TargetState = {
     vocabInLatest: vocabInMessage,
     vocabEarlier: combined
-      ? (earlierUserMessages.find((text) => containsVocab(text, target.vocab!)) ?? null)
+      ? (earlierUserMessages.find((text) =>
+          containsVocab(text, target.vocab!),
+        ) ?? null)
       : null,
     grammarEarlier:
-      combined && grammarMessage && earlierUserMessages.includes(grammarMessage.trim())
+      combined &&
+      grammarMessage &&
+      earlierUserMessages.includes(grammarMessage.trim())
         ? grammarMessage.trim()
         : null,
   };
@@ -696,14 +770,19 @@ export async function sendDailyChallengeMessage(
         ),
       },
       ...history.slice(-MAX_HISTORY_TURNS).map((turn) => ({
-        role: turn.role === "assistant" ? ("assistant" as const) : ("user" as const),
+        role:
+          turn.role === "assistant"
+            ? ("assistant" as const)
+            : ("user" as const),
         content: String(turn.content).slice(0, MAX_MESSAGE_LENGTH * 2),
       })),
       { role: "user" as const, content: trimmedMessage },
     ];
-    const ask = async (extra: { role: "system" | "assistant"; content: string }[] = []) => {
+    const ask = async (
+      extra: { role: "system" | "assistant"; content: string }[] = [],
+    ) => {
       const response = await openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL ?? "gpt-5.6-luna",
+        model: process.env.OPENAI_MODEL ?? "gpt-6-luna",
         response_format: { type: "json_object" },
         messages: [...messages, ...extra],
       });
@@ -713,7 +792,11 @@ export async function sendDailyChallengeMessage(
 
     let parsed = await ask();
     if (parsed === null) {
-      return { ok: false, reason: "error", error: "Charles Duck did not send a reply." };
+      return {
+        ok: false,
+        reason: "error",
+        error: "Charles Duck did not send a reply.",
+      };
     }
 
     // The Cantonese chat's feedback must be English (the learner can't read
@@ -728,15 +811,18 @@ export async function sendDailyChallengeMessage(
         { role: "assistant", content: JSON.stringify(parsed) },
         {
           role: "system",
-          content:
-            `Your "feedback", "overall" and "tips" were written in Cantonese. Rewrite the whole JSON object with those in simple ENGLISH. ${CANTONESE_QUOTE_RULE} Keep "text", "romanization", "betterVersion" and the scores as they were.`,
+          content: `Your "feedback", "overall" and "tips" were written in Cantonese. Rewrite the whole JSON object with those in simple ENGLISH. ${CANTONESE_QUOTE_RULE} Keep "text", "romanization", "betterVersion" and the scores as they were.`,
         },
       ]).catch(() => null);
       if (isChatReply(retried)) parsed = retried;
     }
 
     if (!isChatReply(parsed)) {
-      return { ok: false, reason: "error", error: "Charles Duck sent an invalid reply." };
+      return {
+        ok: false,
+        reason: "error",
+        error: "Charles Duck sent an invalid reply.",
+      };
     }
 
     // A word-only target is decided here outright, whatever the model said;
@@ -745,7 +831,9 @@ export async function sendDailyChallengeMessage(
     // match, the grammar by the model (usedGrammar, falling back to
     // usedTarget if it left that out).
     const grammarInLatest =
-      combined && !state.grammarEarlier && (parsed.usedGrammar ?? parsed.usedTarget);
+      combined &&
+      !state.grammarEarlier &&
+      (parsed.usedGrammar ?? parsed.usedTarget);
     const vocabDone = state.vocabEarlier !== null || vocabInMessage;
     const grammarDone = state.grammarEarlier !== null || grammarInLatest;
     const usedTarget = combined
@@ -762,7 +850,10 @@ export async function sendDailyChallengeMessage(
     // the sentence on its own merits, so the cap is enforced here too.
     const relevanceScore =
       parsed.respondedToYou === false
-        ? Math.min(Math.round(parsed.relevanceScore), NON_RESPONSE_RELEVANCE_CAP)
+        ? Math.min(
+            Math.round(parsed.relevanceScore),
+            NON_RESPONSE_RELEVANCE_CAP,
+          )
         : Math.round(parsed.relevanceScore);
 
     reply = {
@@ -776,7 +867,9 @@ export async function sendDailyChallengeMessage(
         challengeLanguage(target.targetLanguage).hasRomanization,
       ),
       feedback: parsed.feedback,
-      feedbackJa: optionalString((parsed as { feedbackJa?: unknown }).feedbackJa),
+      feedbackJa: optionalString(
+        (parsed as { feedbackJa?: unknown }).feedbackJa,
+      ),
       grammarScore: Math.round(parsed.grammarScore),
       naturalnessScore: Math.round(parsed.naturalnessScore),
       relevanceScore,
@@ -787,7 +880,8 @@ export async function sendDailyChallengeMessage(
         ? {
             vocab: vocabDone,
             grammar: grammarDone,
-            grammarMessage: state.grammarEarlier ?? (grammarInLatest ? trimmedMessage : null),
+            grammarMessage:
+              state.grammarEarlier ?? (grammarInLatest ? trimmedMessage : null),
           }
         : null,
       summary: usedTarget ? parseSummary(parsed.summary) : null,
@@ -804,7 +898,9 @@ export async function sendDailyChallengeMessage(
       const summary = reply.summary;
       reply = {
         ...reply,
-        romanization: reply.romanization && standardiseJyutping(reply.text, reply.romanization, dictionary),
+        romanization:
+          reply.romanization &&
+          standardiseJyutping(reply.text, reply.romanization, dictionary),
         glosses: standardiseGlosses(reply.glosses, dictionary),
         summary:
           summary?.betterVersion && summary.betterVersionRomanization
@@ -891,22 +987,37 @@ function revalidateChallengePaths(courseSlug: string) {
 // one back today; skipped attempts don't count as doing a challenge (see
 // section 42 of supabase/schema.sql). The target is re-derived here, never
 // taken from the client.
-export async function skipDailyChallenge(courseSlug: string): Promise<{ ok: boolean }> {
+export async function skipDailyChallenge(
+  courseSlug: string,
+): Promise<{ ok: boolean }> {
   const user = await requireMember();
 
   const enrollment = await prisma.courseEnrollment.findFirst({
-    where: { userId: user.id, unenrolledAt: null, course: { slug: courseSlug, active: true } },
+    where: {
+      userId: user.id,
+      unenrolledAt: null,
+      course: { slug: courseSlug, active: true },
+    },
     select: { courseId: true },
   });
   if (!enrollment) return { ok: false };
 
   const today = startOfUTCDay(new Date());
   const attemptsToday = await prisma.dailyChallengeAttempt.count({
-    where: { userId: user.id, courseId: enrollment.courseId, challengeDate: today },
+    where: {
+      userId: user.id,
+      courseId: enrollment.courseId,
+      challengeDate: today,
+    },
   });
   if (attemptsToday >= MAX_DAILY_CHALLENGE_ATTEMPTS) return { ok: false };
 
-  const target = await pickChallengeTarget(user.id, enrollment.courseId, today, attemptsToday);
+  const target = await pickChallengeTarget(
+    user.id,
+    enrollment.courseId,
+    today,
+    attemptsToday,
+  );
   if (!target) return { ok: false };
 
   await prisma.dailyChallengeAttempt.create({

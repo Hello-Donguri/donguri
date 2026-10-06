@@ -4,7 +4,12 @@ import OpenAI from "openai";
 import { requireMember } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import { startOfUTCDay } from "@/lib/srs";
-import { challengeLanguage, levelProfile, pickChallengeTarget, type ChallengeTarget } from "@/lib/daily-challenge";
+import {
+  challengeLanguage,
+  levelProfile,
+  pickChallengeTarget,
+  type ChallengeTarget,
+} from "@/lib/daily-challenge";
 
 // A word offered to a learner who's paused mid-reply. No meaning, so they
 // still have to recall what it means and type it themselves.
@@ -39,13 +44,18 @@ function knownVocab(target: ChallengeTarget): Map<string, string> {
 function alreadyTyped(word: string, draft: string): boolean {
   if (/\p{Script=Han}/u.test(word)) return draft.includes(word);
   const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, "iu").test(draft);
+  return new RegExp(
+    `(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`,
+    "iu",
+  ).test(draft);
 }
 
 // A suggestion from outside their list must be simple: one short word or a
 // tiny phrase, not a sentence that does the work for them.
 function isShortSuggestion(text: string): boolean {
-  return /\p{Script=Han}/u.test(text) ? [...text].length <= 4 : text.split(/\s+/).length <= 2 && text.length <= 20;
+  return /\p{Script=Han}/u.test(text)
+    ? [...text].length <= 4
+    : text.split(/\s+/).length <= 2 && text.length <= 20;
 }
 
 // Word hints for a learner who's paused while writing a daily challenge
@@ -64,16 +74,29 @@ export async function dailyChallengeHints(
   if (!process.env.OPENAI_API_KEY || !draft.trim()) return [];
 
   const enrollment = await prisma.courseEnrollment.findFirst({
-    where: { userId: user.id, unenrolledAt: null, course: { slug: courseSlug, active: true } },
+    where: {
+      userId: user.id,
+      unenrolledAt: null,
+      course: { slug: courseSlug, active: true },
+    },
     select: { courseId: true },
   });
   if (!enrollment) return [];
 
   const today = startOfUTCDay(new Date());
   const attemptsToday = await prisma.dailyChallengeAttempt.count({
-    where: { userId: user.id, courseId: enrollment.courseId, challengeDate: today },
+    where: {
+      userId: user.id,
+      courseId: enrollment.courseId,
+      challengeDate: today,
+    },
   });
-  const target = await pickChallengeTarget(user.id, enrollment.courseId, today, attemptsToday);
+  const target = await pickChallengeTarget(
+    user.id,
+    enrollment.courseId,
+    today,
+    attemptsToday,
+  );
   if (!target) return [];
 
   const vocab = knownVocab(target);
@@ -82,7 +105,10 @@ export async function dailyChallengeHints(
   const cantonese = target.targetLanguage === "yue";
   const chat = turns
     .slice(-MAX_TURNS)
-    .map((turn) => `${turn.role === "ai" ? "Charles" : "Learner"}: ${turn.text.slice(0, MAX_TEXT)}`)
+    .map(
+      (turn) =>
+        `${turn.role === "ai" ? "Charles" : "Learner"}: ${turn.text.slice(0, MAX_TEXT)}`,
+    )
     .join("\n");
 
   const learner = levelProfile(target.level).learner;
@@ -110,14 +136,16 @@ Return only a JSON object: {"words": [{"text": "the word", "learnt": true${canto
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const response = await openai.chat.completions.create(
       {
-        model: process.env.OPENAI_MODEL ?? "gpt-5.6-luna",
+        model: process.env.OPENAI_MODEL ?? "gpt-6-luna",
         response_format: { type: "json_object" },
         reasoning_effort: "low",
         messages: [{ role: "system", content: prompt }],
       },
       { signal: AbortSignal.timeout(HINT_TIMEOUT_MS), maxRetries: 0 },
     );
-    const parsed = JSON.parse(response.choices[0]?.message.content ?? "") as { words?: unknown };
+    const parsed = JSON.parse(response.choices[0]?.message.content ?? "") as {
+      words?: unknown;
+    };
     if (!Array.isArray(parsed.words)) return [];
 
     // Learnt words only when really on their list, with the list's reading;
@@ -140,7 +168,10 @@ Return only a JSON object: {"words": [{"text": "the word", "learnt": true${canto
       return [
         {
           text,
-          romanization: cantonese && typeof romanization === "string" && romanization.trim() ? romanization.trim() : null,
+          romanization:
+            cantonese && typeof romanization === "string" && romanization.trim()
+              ? romanization.trim()
+              : null,
         },
       ];
     });

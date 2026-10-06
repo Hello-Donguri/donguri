@@ -55,7 +55,7 @@ async function generateReview(
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const response = await openai.chat.completions.create(
     {
-      model: process.env.OPENAI_MODEL ?? "gpt-5.6-luna",
+      model: process.env.OPENAI_MODEL ?? "gpt-6-luna",
       response_format: { type: "json_object" },
       messages: [
         {
@@ -71,14 +71,14 @@ Look across all of them together, not one at a time, and write:
 Write in ${level.feedbackStyle}. Be warm and encouraging but honest; don't invent problems that didn't happen.
 
 ${
-            language.feedbackIn === "Japanese"
-              ? `Also write "feedbackJa" and "focusJa". ${JAPANESE_FEEDBACK_RULE}
+  language.feedbackIn === "Japanese"
+    ? `Also write "feedbackJa" and "focusJa". ${JAPANESE_FEEDBACK_RULE}
 
 Return only a JSON object: { "feedback": "...", "focus": "...", "feedbackJa": "...", "focusJa": "..." }`
-              : `Write both in ENGLISH, never ${language.target} — the learner is an English speaker. ${language.quoteRule}
+    : `Write both in ENGLISH, never ${language.target} — the learner is an English speaker. ${language.quoteRule}
 
 Return only a JSON object: { "feedback": "...", "focus": "..." }`
-          }`,
+}`,
         },
       ],
     },
@@ -88,7 +88,9 @@ Return only a JSON object: { "feedback": "...", "focus": "..." }`
   const parsed: unknown = JSON.parse(
     response.choices[0]?.message.content ?? "",
   );
-  const review = parsed as Partial<Record<keyof DailyChallengeReview, unknown>> | null;
+  const review = parsed as Partial<
+    Record<keyof DailyChallengeReview, unknown>
+  > | null;
   if (
     typeof review?.feedback !== "string" ||
     typeof review.focus !== "string"

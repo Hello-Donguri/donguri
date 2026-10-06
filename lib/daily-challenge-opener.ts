@@ -1,7 +1,11 @@
 import "server-only";
 import OpenAI from "openai";
 import { cacheLife } from "next/cache";
-import { jyutpingDictionary, standardiseGlosses, standardiseJyutping } from "@/lib/jyutping-standard";
+import {
+  jyutpingDictionary,
+  standardiseGlosses,
+  standardiseJyutping,
+} from "@/lib/jyutping-standard";
 import {
   challengeLanguage,
   friendsPromptRule,
@@ -31,7 +35,9 @@ function describeItem(kind: string, item: ChallengeItem): string {
 
 // Just the first word of the profile's full name; null when there isn't
 // one, so Charles never greets anyone by an email handle.
-export function firstNameOf(fullName: string | null | undefined): string | null {
+export function firstNameOf(
+  fullName: string | null | undefined,
+): string | null {
   const first = fullName?.trim().split(/\s+/)[0];
   return first ? first : null;
 }
@@ -40,17 +46,24 @@ export function firstNameOf(fullName: string | null | undefined): string | null 
 // your day?" → "Hi Will! How was your day?", "やあ！…" → "やあ、Will！…",
 // "你好！…" → "你好，Will！…". Left as it is when it doesn't open with a
 // greeting.
-function personalise(opener: ChallengeOpener, firstName: string | null): ChallengeOpener {
+function personalise(
+  opener: ChallengeOpener,
+  firstName: string | null,
+): ChallengeOpener {
   if (!firstName) return opener;
 
-  const english = (text: string) => text.replace(/^(Hi|Hey|Hello)([!,])/, `$1 ${firstName}$2`);
+  const english = (text: string) =>
+    text.replace(/^(Hi|Hey|Hello)([!,])/, `$1 ${firstName}$2`);
   const cjk = (text: string, comma: string) =>
     text.replace(/^([^！!、，。]{1,6})([！!])/, `$1${comma}${firstName}$2`);
 
   return opener.romanization
     ? {
         text: cjk(opener.text, "，"),
-        romanization: opener.romanization.replace(/^([^!,?.]+)!/, `$1, ${firstName}!`),
+        romanization: opener.romanization.replace(
+          /^([^!,?.]+)!/,
+          `$1, ${firstName}!`,
+        ),
         translation: english(opener.translation),
         glosses: opener.glosses,
       }
@@ -62,7 +75,10 @@ function personalise(opener: ChallengeOpener, firstName: string | null): Challen
       };
 }
 
-function buildOpenerPrompt(target: ChallengeTarget, firstName: string | null): string {
+function buildOpenerPrompt(
+  target: ChallengeTarget,
+  firstName: string | null,
+): string {
   const language = challengeLanguage(target.targetLanguage);
   const targets = [
     target.vocab && describeItem("Word", target.vocab),
@@ -76,15 +92,18 @@ function buildOpenerPrompt(target: ChallengeTarget, firstName: string | null): s
   const level = levelProfile(target.level);
   // Beginners keep each language's own word rules below; other levels get
   // the level's.
-  const words = (beginnerRule: string) => `- ${level.openerStyle || beginnerRule}`;
+  const words = (beginnerRule: string) =>
+    `- ${level.openerStyle || beginnerRule}`;
   const style = french
     ? `- Write natural, everyday French as friends text it, using "tu", with correct accents.
 ${words("Only very common, everyday words a total beginner knows. No slang, no idioms, no hard grammar.")}`
     : cantonese
-    ? `- Write in natural, colloquial Hong Kong Cantonese as people really text it, in traditional characters (係, 唔, 嘅, 咗, 喺, 佢, 乜嘢 — not Mandarin forms like 是, 不, 的, 了, 在, 他, 什麼).
+      ? `- Write in natural, colloquial Hong Kong Cantonese as people really text it, in traditional characters (係, 唔, 嘅, 咗, 喺, 佢, 乜嘢 — not Mandarin forms like 是, 不, 的, 了, 在, 他, 什麼).
 ${words("Only very common, everyday words a total beginner knows. No slang, no idioms, no hard grammar.")}
 - In the Jyutping, use the everyday Hong Kong spoken readings, not formal reading-aloud ones — e.g. 生日 is saang1 jat6, not sang1 jat6.`
-    : words(`Only very common, everyday words a total beginner knows. No idioms, no slang, no phrasal verbs like "been up to", no hard grammar.`);
+      : words(
+          `Only very common, everyday words a total beginner knows. No idioms, no slang, no phrasal verbs like "been up to", no hard grammar.`,
+        );
   const fields = french
     ? `{
 	"plan": "Private notes, never shown, one short sentence: the question you'll ask and how its natural answer uses the target",
@@ -93,14 +112,14 @@ ${words("Only very common, everyday words a total beginner knows. No slang, no i
 	${glossesPromptField(target.targetLanguage)}
 }`
     : cantonese
-    ? `{
+      ? `{
 	"plan": "Private notes, never shown, one short sentence: the question you'll ask and how its natural answer uses the target",
 	"text": "Charles Duck's opening message, in Cantonese characters",
 	"romanization": "The same message in Jyutping with tone numbers — exactly one syllable per Chinese character, keeping the punctuation",
 	"translation": "A natural, casual English translation of the same message",
 	${glossesPromptField(target.targetLanguage)}
 }`
-    : `{
+      : `{
 	"plan": "Private notes, never shown, one short sentence: the question you'll ask and how its natural answer uses the target",
 	"text": "Charles Duck's opening message",
 	"translation": "A natural, casual Japanese translation of the same message",
@@ -145,7 +164,7 @@ async function generateOpener(
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const response = await openai.chat.completions.create(
     {
-      model: process.env.OPENAI_MODEL ?? "gpt-5.6-luna",
+      model: process.env.OPENAI_MODEL ?? "gpt-6-luna",
       response_format: { type: "json_object" },
       // A two-sentence opener doesn't need long deliberation, and the
       // learner is waiting on it.
@@ -155,9 +174,15 @@ async function generateOpener(
     { signal: AbortSignal.timeout(OPENER_TIMEOUT_MS), maxRetries: 0 },
   );
 
-  const parsed: unknown = JSON.parse(response.choices[0]?.message.content ?? "");
-  const opener = parsed as Partial<Record<keyof ChallengeOpener, unknown>> | null;
-  const needsRomanization = challengeLanguage(target.targetLanguage).hasRomanization;
+  const parsed: unknown = JSON.parse(
+    response.choices[0]?.message.content ?? "",
+  );
+  const opener = parsed as Partial<
+    Record<keyof ChallengeOpener, unknown>
+  > | null;
+  const needsRomanization = challengeLanguage(
+    target.targetLanguage,
+  ).hasRomanization;
   if (
     typeof opener?.text !== "string" ||
     typeof opener.translation !== "string" ||
@@ -169,15 +194,21 @@ async function generateOpener(
   }
 
   const text = opener.text.trim();
-  const romanization = needsRomanization ? (opener.romanization as string).trim() : null;
-  const glosses = parseGlosses((parsed as { words?: unknown } | null)?.words, needsRomanization);
+  const romanization = needsRomanization
+    ? (opener.romanization as string).trim()
+    : null;
+  const glosses = parseGlosses(
+    (parsed as { words?: unknown } | null)?.words,
+    needsRomanization,
+  );
   // Course words back to the readings the course teaches (see
   // standardiseJyutping).
   const dictionary = needsRomanization ? await jyutpingDictionary() : [];
 
   return {
     text,
-    romanization: romanization && standardiseJyutping(text, romanization, dictionary),
+    romanization:
+      romanization && standardiseJyutping(text, romanization, dictionary),
     translation: opener.translation.trim(),
     glosses: standardiseGlosses(glosses, dictionary),
   };
@@ -192,7 +223,8 @@ export async function getChallengeOpener(
   target: ChallengeTarget,
   firstName: string | null,
 ): Promise<ChallengeOpener> {
-  if (!process.env.OPENAI_API_KEY) return personalise(target.fallbackOpener, firstName);
+  if (!process.env.OPENAI_API_KEY)
+    return personalise(target.fallbackOpener, firstName);
 
   try {
     return await generateOpener(target, buildOpenerPrompt(target, firstName));
