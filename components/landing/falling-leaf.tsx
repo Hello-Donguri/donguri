@@ -77,15 +77,19 @@ function Leaf({ delayMs, fallSeconds, pauseMs, className, swing }: LeafProps) {
 }
 
 // A few leaves drifting down through the hero at once, as if from a tree
-// above the page (see Leaf). Fills its (positioned) parent, sits behind the
-// content, and never takes clicks. Nothing at all for visitors who've asked
-// for reduced motion.
+// above the page (see Leaf). Fills its (positioned) parent — and reaches up
+// over the hero's top padding (pt-12 / sm:pt-14), so they come out from
+// right under the header — sits behind the content, and never takes clicks.
+// Nothing at all for visitors who've asked for reduced motion.
 export function FallingLeaf() {
   const reduceMotion = useReducedMotion();
   if (reduceMotion) return null;
 
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-x-0 -top-12 bottom-0 overflow-hidden sm:-top-14"
+    >
       {LEAVES.map((leaf, index) => (
         <Leaf key={index} {...leaf} />
       ))}

@@ -20,7 +20,7 @@ export function StartFreeButton({
 }) {
   return (
     <form action={startAsGuest} className={cn(fullWidth && "w-full")}>
-      <Button type="submit" size="lg" fullWidth={fullWidth} className={cn("h-14 px-8 text-base shadow-sm", className)}>
+      <Button type="submit" size="lg" fullWidth={fullWidth} className={cn("h-14 cursor-pointer px-8 text-base shadow-sm", className)}>
         {note ? (
           <span className="flex flex-col items-center leading-tight">
             <span>{label}</span>
