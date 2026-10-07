@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Image from "next/image";
+import { ArrowRight } from "lucide-react";
 import { getCourseHome, getCourseTitle, getLearntWords } from "@/lib/dal";
 import { getTranslator } from "@/lib/i18n/server";
 import { STAGE_LEVELS, STAGES, stageLabels } from "@/lib/srs";
@@ -54,8 +56,11 @@ export default async function LearntWordsPage({ params }: PageProps) {
   );
 }
 
-// How many learnt words sit at each level, Seed up to Master Oak — a tile
-// each, with the numbered stages within it, above a bar showing the mix.
+// How many learnt words sit at each level, Seed up to Master Oak, drawn
+// like the home page's routine cards: a coloured tile each, its tilted
+// badge growing bigger as the word does, with the numbered stages inside
+// and a little arrow on to the next. A peeking Donguri cheers on the
+// Master Oaks, and a chunky bar shows the mix at a glance.
 function LevelBreakdown({
   words,
   locale,
@@ -85,40 +90,82 @@ function LevelBreakdown({
   });
 
   return (
-    <section aria-label={t("word_list.breakdown", "Your words by level")} className="flex flex-col gap-3">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {levels.map((level) => {
+    <section aria-label={t("word_list.breakdown", "Your words by level")} className="flex flex-col gap-4">
+      <ol className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-5">
+        {levels.map((level, index) => {
           const style = LEVEL_STYLE[level.level];
+          const isMaster = level.level === "master";
           return (
-            <div key={level.level} className="rounded-2xl border border-card-border bg-washi-soft p-4">
-              <div className="flex items-center gap-2.5">
-                <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", style.pill)}>
-                  <style.icon aria-hidden className="h-4.5 w-4.5" strokeWidth={2.25} />
-                </span>
-                <p className="min-w-0 font-nunito text-base font-extrabold leading-tight text-sumi">{level.name}</p>
+            <li key={level.level} className="relative">
+              <div
+                className={cn(
+                  "group relative flex h-full flex-col overflow-hidden rounded-3xl border p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md sm:p-5",
+                  style.tile,
+                )}
+              >
+                <div className="flex items-end justify-between gap-2">
+                  <span
+                    className={cn(
+                      "flex shrink-0 items-center justify-center rounded-2xl shadow-sm transition-transform duration-300 group-hover:rotate-0 group-hover:scale-110",
+                      style.badge,
+                      style.chip,
+                    )}
+                  >
+                    <style.icon aria-hidden className={style.iconSize} strokeWidth={2.25} />
+                  </span>
+                  <p className={cn("font-nunito text-4xl leading-none font-black tabular-nums sm:text-5xl", style.number)}>
+                    {level.total}
+                  </p>
+                </div>
+
+                <p className="mt-3 font-nunito text-lg font-black leading-tight text-sumi">{level.name}</p>
+
+                {level.stages.length > 0 && (
+                  <ul className="mt-2 flex flex-wrap gap-1.5">
+                    {level.stages.map((stage) => (
+                      <li
+                        key={stage.name}
+                        className="rounded-full bg-raised/80 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-sumi-soft ring-1 ring-card-border"
+                      >
+                        {stage.name} <strong className="font-black text-sumi">{stage.count}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {/* Donguri, delighted by the Master Oaks. */}
+                {isMaster && (
+                  <Image
+                    src="/images/donguri-peering.webp"
+                    alt=""
+                    width={434}
+                    height={834}
+                    className="pointer-events-none absolute -right-2 -bottom-6 h-20 w-auto -rotate-12 transition-transform duration-300 group-hover:-translate-y-2 sm:h-24"
+                  />
+                )}
               </div>
-              <p className="mt-3 font-nunito text-3xl font-black tabular-nums text-sumi">{level.total}</p>
-              {level.stages.length > 0 && (
-                <ul className="mt-1.5 flex flex-wrap gap-x-2.5 gap-y-1 text-xs text-sumi-soft">
-                  {level.stages.map((stage) => (
-                    <li key={stage.name} className="tabular-nums">
-                      {stage.name}: <strong className="font-semibold text-sumi">{stage.count}</strong>
-                    </li>
-                  ))}
-                </ul>
+
+              {/* On to the next level — between the tiles on wide screens. */}
+              {index < levels.length - 1 && (
+                <span
+                  aria-hidden
+                  className="absolute top-1/2 -right-4 z-10 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-card-border bg-raised text-sumi-soft shadow-sm lg:flex"
+                >
+                  <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.75} />
+                </span>
               )}
-            </div>
+            </li>
           );
         })}
-      </div>
+      </ol>
 
-      {/* The mix at a glance. */}
-      <div aria-hidden className="flex h-2.5 overflow-hidden rounded-full bg-sumi/10">
+      {/* The mix at a glance: chunky, with a gap between each level. */}
+      <div aria-hidden className="flex h-4 gap-1 overflow-hidden rounded-full bg-sumi/10 p-0.5">
         {levels.map((level) =>
           level.total > 0 ? (
             <span
               key={level.level}
-              className={cn("h-full", LEVEL_STYLE[level.level].pill)}
+              className={cn("h-full rounded-full", LEVEL_STYLE[level.level].chip)}
               style={{ width: `${(level.total / words.length) * 100}%` }}
             />
           ) : null,
