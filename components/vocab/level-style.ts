@@ -3,13 +3,21 @@ import type { StageLevel } from "@/lib/srs";
 
 // Each review level's look: acorn brown for a seed, greens as it grows,
 // gold once it's a Master Oak. `pill` is the small badge on a word card;
-// `tile`, `chip`, `badge` and `number` style the learnt-words breakdown,
+// `tile`, `chip`, `badge` and `number` style the learnt-words garden,
 // where the badge grows with the level. Its own module, not a client one,
 // so both the word list (client) and the breakdown (server) can use it.
 // Written out in full so Tailwind finds the classes.
 export const LEVEL_STYLE: Record<
   StageLevel,
-  { pill: string; icon: typeof Bean; tile: string; chip: string; badge: string; iconSize: string; number: string }
+  {
+    pill: string;
+    icon: typeof Bean;
+    tile: string;
+    chip: string;
+    badge: string;
+    iconSize: string;
+    number: string;
+  }
 > = {
   seed: {
     pill: "bg-acorn-soft text-acorn",

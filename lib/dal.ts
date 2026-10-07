@@ -771,20 +771,25 @@ export const getLearntWords = cache(async (courseSlug: string): Promise<LearntWo
 });
 
 // How many words are flagged and learnt in this course — the counts on the
-// course page's shortcuts to those two lists.
+// course page's shortcuts to those two lists. One query for both: the
+// course page already runs many in parallel against a remote database, and
+// each extra one queues for a pooled connection.
 export const getWordListCounts = cache(async (courseSlug: string) => {
   const { user, course } = await requireEnrolledCourse(courseSlug);
-  const inCourse = { active: true, languageDeck: { courseId: course.id, active: true } };
 
-  const [flagged, learnt] = await Promise.all([
-    prisma.userWordProgress.count({
-      where: { userId: user.id, flaggedAt: { not: null }, word: inCourse },
-    }),
-    prisma.userWordProgress.count({
-      where: { userId: user.id, skipped: false, word: inCourse },
-    }),
-  ]);
-  return { flagged, learnt };
+  const [row] = await prisma.$queryRaw<{ flagged: bigint; learnt: bigint }[]>`
+    select
+      count(*) filter (where p.flagged_at is not null) as flagged,
+      count(*) filter (where not p.skipped) as learnt
+    from public.user_word_progress p
+    join public.words w on w.id = p.word_id
+    join public.language_decks d on d.id = w.language_deck_id
+    where p.user_id = ${user.id}::uuid
+      and w.active
+      and d.active
+      and d.course_id = ${course.id}::uuid
+  `;
+  return { flagged: Number(row?.flagged ?? 0), learnt: Number(row?.learnt ?? 0) };
 });
 
 type LanguageDeckWordRow = {
@@ -1046,24 +1051,15 @@ export const getPublicDeckDetail = cache(
 // `path`), and daily challenge attempts completed.
 export const getDailyActivityCounts = cache(
   async (courseSlug: string): Promise<DailyActivityCount[]> => {
-    const { user, course, enrollment } =
-      await requireEnrolledCourse(courseSlug);
+    const { user, course } = await requireEnrolledCourse(courseSlug);
 
-    // The streak's own date range is anchored on the last day it was
-    // actually extended, but the chart itself always runs through today —
-    // even before today has any activity of its own — so a day with
-    // nothing logged yet still shows up as an empty bar to fill in, rather
-    // than silently disappearing from the chart until something is learned.
+    // Always the last 7 days, through today — however long the streak (the
+    // chart shows the streak count itself separately). Today is included
+    // even before it has any activity, so a day with nothing logged yet
+    // shows up as an empty bar to fill in, rather than disappearing from
+    // the chart until something is learned.
     const today = startOfUTCDay(new Date());
-    const lastActive = enrollment.lastActivityDate
-      ? startOfUTCDay(enrollment.lastActivityDate)
-      : today;
-    const streakStart =
-      enrollment.currentStreak > 0
-        ? addDays(lastActive, -(enrollment.currentStreak - 1))
-        : lastActive;
-    const weekStart = addDays(today, -6);
-    const rangeStart = streakStart < weekStart ? streakStart : weekStart;
+    const rangeStart = addDays(today, -6);
     const rangeEnd = today;
     const rangeEndExclusive = addDays(rangeEnd, 1);
 

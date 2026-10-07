@@ -174,7 +174,7 @@ export function WordList(props: WordListProps) {
             : t("word_list.none_here", "No words here yet.")}
         </p>
       ) : (
-        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {words.map((word) => (
             <WordCard
               key={word.id}
@@ -220,19 +220,26 @@ function WordCard({
       : stage.levelName;
 
   return (
+    // A bright card, with the home page's blue and pink for vocabulary and
+    // grammar; its level shows in the pill.
     <li className="relative rounded-2xl border border-card-border bg-raised shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       <LessonButton
         courseSlug={courseSlug}
         wordId={word.id}
-        className="flex h-full w-full cursor-pointer flex-col items-start p-4 pr-12 text-left"
+        className="flex h-full w-full cursor-pointer flex-col items-start p-3.5 pr-11 text-left"
       >
-        <span className="rounded-full bg-sumi/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-sumi-soft">
+        <span
+          className={cn(
+            "mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest",
+            word.path === "grammar" ? "bg-sakura-soft text-sakura-dark" : "bg-ai-soft text-ai-dark",
+          )}
+        >
           {word.path === "grammar"
             ? t("course_home.grammar", "Grammar")
             : t("course_home.vocabulary", "Vocabulary")}
         </span>
 
-        <span className="mt-2 block max-w-full truncate font-nunito text-2xl font-extrabold leading-tight text-sumi">
+        <span className="mt-1.5 block max-w-full truncate font-nunito text-xl font-extrabold leading-tight text-sumi">
           {word.term}
         </span>
         {word.romanization && (
@@ -247,8 +254,8 @@ function WordCard({
         <span
           title={stepLabel}
           className={cn(
-            "mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold",
-            level.pill,
+            "mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold shadow-sm",
+            level.chip,
           )}
         >
           <level.icon aria-hidden className="h-3 w-3" strokeWidth={2.5} />
@@ -278,8 +285,8 @@ function WordCard({
         }
         title={flagged ? t("flag.unflag_short", "Remove flag") : t("flag.flag", "Flag for later")}
         className={cn(
-          "absolute top-3 right-3 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition",
-          flagged ? "bg-kin/25 text-acorn hover:bg-kin/35" : "text-sumi-soft/60 hover:bg-sumi/5 hover:text-sumi",
+          "absolute top-2.5 right-2.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition",
+          flagged ? "bg-kin text-ink-on-light shadow-sm hover:bg-kin/80" : "text-sumi-soft/60 hover:bg-sumi/5 hover:text-sumi",
         )}
       >
         <Flag aria-hidden className={cn("h-4 w-4", flagged && "fill-current")} strokeWidth={2.25} />

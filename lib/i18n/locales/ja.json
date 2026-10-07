@@ -1009,6 +1009,7 @@
   "word_type.preposition": "前置詞",
   "word_type.pronoun": "代名詞",
   "word_type.verb": "動詞",
+  "xp_counter.earned_aria": "+{{xp}} XP",
   "xp_counter.level": "",
   "xp_counter.xp": "",
   "xp_gain.plus": "+{{amount}}",

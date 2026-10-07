@@ -1009,6 +1009,7 @@
   "word_type.preposition": "Preposition",
   "word_type.pronoun": "Pronoun",
   "word_type.verb": "Verb",
+  "xp_counter.earned_aria": "+{{xp}} XP",
   "xp_counter.level": "Lv {{level}}",
   "xp_counter.xp": "XP",
   "xp_gain.plus": "+{{amount}}",

@@ -1,7 +1,7 @@
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Flag, Library } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import type { TFunction } from "@/lib/i18n/translate";
-import { cn } from "@/lib/utils";
 
 // The course page's two ways back into what's been learnt, always shown:
 // the lessons flagged during reviews, and every word learnt so far — each
@@ -20,22 +20,26 @@ export function WordShortcuts({
   const cards = [
     {
       href: `/dashboard/courses/${courseSlug}/flagged`,
-      icon: <Flag aria-hidden className="h-5 w-5 fill-current" strokeWidth={2.25} />,
-      chip: "bg-kin/25 text-acorn",
+      image: { src: "/images/flag2.webp", width: 1143, height: 1141 },
       title: t("word_list.flagged_title", "Flagged lessons"),
       count: flaggedCount,
       body:
         flaggedCount > 0
           ? t("word_list.flagged_card", "Lessons you flagged to come back to.")
-          : t("word_list.flagged_card_empty", "Flag a word during a review to find it here."),
+          : t(
+              "word_list.flagged_card_empty",
+              "Flag a word during a review to find it here.",
+            ),
     },
     {
       href: `/dashboard/courses/${courseSlug}/learnt`,
-      icon: <Library aria-hidden className="h-5 w-5" strokeWidth={2.25} />,
-      chip: "bg-ai-soft text-ai-dark",
+      image: { src: "/images/books.webp", width: 375, height: 263 },
       title: t("word_list.revisit_title", "Revisit learnt words"),
       count: learntCount,
-      body: t("word_list.revisit_card", "Every word and grammar point you've learnt."),
+      body: t(
+        "word_list.revisit_card",
+        "Every word and grammar point you've learnt.",
+      ),
     },
   ];
 
@@ -48,9 +52,13 @@ export function WordShortcuts({
           prefetch
           className="group flex items-center gap-4 rounded-2xl border border-card-border bg-washi-soft p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-5"
         >
-          <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", card.chip)}>
-            {card.icon}
-          </span>
+          <Image
+            src={card.image.src}
+            alt=""
+            width={card.image.width}
+            height={card.image.height}
+            className="h-14 w-14 shrink-0 -rotate-6 object-contain transition-transform duration-300 group-hover:rotate-3 group-hover:scale-110"
+          />
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-2 font-nunito text-lg font-extrabold leading-tight text-sumi">
               {card.title}
@@ -58,7 +66,9 @@ export function WordShortcuts({
                 {card.count}
               </span>
             </span>
-            <span className="mt-0.5 block text-sm text-sumi-soft">{card.body}</span>
+            <span className="mt-0.5 block text-sm text-sumi-soft">
+              {card.body}
+            </span>
           </span>
           <ArrowRight
             aria-hidden

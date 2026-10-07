@@ -17,8 +17,8 @@ export type GardenLevel = {
 // The learnt-words page's header: "your word garden". Donguri, the total so
 // far and a line of encouragement, beside a block for each level, Seed to
 // Master Oak — its badge growing bigger level by level, a big count, its
-// name and what it means. A level with no words yet is shown faded rather
-// than with a token count. Kept short, so the words themselves start near
+// name and what it means, each in its own colour. A level with no words
+// yet is shown faded. Kept short, so the words themselves start near
 // the top of the page.
 export function WordGarden({
   levels,
@@ -37,10 +37,10 @@ export function WordGarden({
 }) {
   return (
     <section className="relative isolate">
-      <div aria-hidden className="absolute -inset-1.5 -z-10 rotate-[0.5deg] rounded-[2.1rem] bg-matcha-soft" />
-      <div className="grid gap-5 rounded-4xl border border-card-border bg-raised p-4 shadow-md sm:p-5 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)] lg:items-center lg:gap-6">
-        {/* Donguri, the total and a cheer. */}
-        <div className="flex items-center gap-3.5">
+      <div aria-hidden className="absolute -inset-1.5 -z-10 rotate-[0.5deg] rounded-[2.1rem] bg-acorn-soft" />
+      <div className="grid gap-4 overflow-hidden rounded-4xl border border-card-border bg-raised p-3 shadow-md sm:p-4 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)] lg:items-stretch lg:gap-5">
+        {/* Donguri, the total and a cheer, on a green panel. */}
+        <div className="flex items-center gap-3.5 rounded-3xl bg-matcha-soft px-4 py-3">
           <Image
             src="/images/mascot.png"
             alt=""
@@ -49,7 +49,7 @@ export function WordGarden({
             className="profile-bob h-16 w-auto shrink-0 sm:h-20"
           />
           <div className="min-w-0">
-            <p className="font-nunito text-xs font-extrabold uppercase tracking-[0.16em] text-acorn">{title}</p>
+            <p className="font-nunito text-xs font-extrabold uppercase tracking-[0.16em] text-matcha-dark">{title}</p>
             <p className="flex items-baseline gap-2">
               <span className="font-nunito text-4xl leading-tight font-black tabular-nums text-sumi">{totalWords}</span>
               <span className="font-nunito text-sm font-bold text-sumi-soft">{totalLabel}</span>
@@ -59,7 +59,7 @@ export function WordGarden({
         </div>
 
         {/* A block per level. */}
-        <div>
+        <div className="flex flex-col justify-center lg:py-1 lg:pr-1">
           <ol className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             {levels.map((level) => {
               const style = LEVEL_STYLE[level.level];
@@ -71,7 +71,9 @@ export function WordGarden({
                   title={tooltip || undefined}
                   className={cn(
                     "flex items-center gap-2.5 rounded-2xl border px-3 py-2.5 transition",
-                    empty ? "border-dashed border-card-border bg-washi-soft/50" : style.tile,
+                    style.tile,
+                    // Not reached yet: its colour, faded.
+                    empty && "opacity-55",
                   )}
                 >
                   {/* A fixed-size spot, so the blocks line up however big
@@ -81,7 +83,7 @@ export function WordGarden({
                       className={cn(
                         "flex items-center justify-center rounded-xl shadow-sm",
                         style.badge,
-                        empty ? "bg-sumi/5 text-sumi-soft/50 shadow-none" : style.chip,
+                        style.chip,
                       )}
                     >
                       <style.icon aria-hidden className={style.iconSize} strokeWidth={2.25} />
@@ -91,12 +93,12 @@ export function WordGarden({
                     <span
                       className={cn(
                         "block font-nunito text-2xl leading-none font-black tabular-nums",
-                        empty ? "text-sumi-soft/50" : style.number,
+                        style.number,
                       )}
                     >
                       {level.total}
                     </span>
-                    <span className={cn("mt-0.5 block font-nunito text-sm leading-tight font-black", empty ? "text-sumi-soft" : "text-sumi")}>
+                    <span className="mt-0.5 block font-nunito text-sm leading-tight font-black text-sumi">
                       {level.name}
                     </span>
                     <span className="block truncate text-[11px] text-sumi-soft">{level.caption}</span>
