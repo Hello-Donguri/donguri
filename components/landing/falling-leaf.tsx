@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
+import { usePrefersReducedMotion } from "@/lib/use-prefers-reduced-motion";
 
 // How far across its area a leaf may start, in percent of the width —
 // kept in from the right edge so the leaf and its swing stay in view.
@@ -82,7 +83,7 @@ function Leaf({ delayMs, fallSeconds, pauseMs, className, swing }: LeafProps) {
 // right under the header — sits behind the content, and never takes clicks.
 // Nothing at all for visitors who've asked for reduced motion.
 export function FallingLeaf() {
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = usePrefersReducedMotion();
   if (reduceMotion) return null;
 
   return (

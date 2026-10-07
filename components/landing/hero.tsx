@@ -138,7 +138,7 @@ export function Hero({ t }: { t: TFunction }) {
       titleText: "text-sakura-dark",
     },
     {
-      href: "#how-it-works",
+      href: "#reviews",
       icon: Clock,
       title: t("home.routine.review_title", "Review"),
       body: t(

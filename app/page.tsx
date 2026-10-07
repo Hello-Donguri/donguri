@@ -12,11 +12,8 @@ import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
 import { getTranslator } from "@/lib/i18n/server";
 import { getMembershipPriceLabel } from "@/lib/billing";
 import { Hero } from "@/components/landing/hero";
-import { HowItWorks } from "@/components/landing/how-it-works";
-import { Lessons } from "@/components/landing/lessons";
-import { Practice } from "@/components/landing/practice";
-import { ReviewSchedule } from "@/components/landing/review-schedule";
-import { DailyChallenge } from "@/components/landing/daily-challenge";
+import { Decks } from "@/components/landing/decks";
+import { Story } from "@/components/landing/story/story";
 import { Progress } from "@/components/landing/progress";
 import { ForJapaneseSpeakers } from "@/components/landing/for-japanese-speakers";
 import { Faq } from "@/components/landing/faq";
@@ -69,11 +66,8 @@ export default async function Home() {
 
       <main className="flex-1">
         <Hero t={t} />
-        <HowItWorks t={t} />
-        <Lessons t={t} />
-        <Practice t={t} />
-        <ReviewSchedule t={t} />
-        <DailyChallenge t={t} />
+        <Decks t={t} />
+        <Story t={t} />
         <Progress t={t} />
         <ForJapaneseSpeakers t={t} priceLabel={priceLabel} />
         <Faq t={t} />
@@ -85,7 +79,7 @@ export default async function Home() {
         <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 text-sm text-sumi-soft sm:flex-row sm:justify-between">
           <p>{t("footer.tagline", "Hello Donguri — English learning designed for Japanese speakers.")}</p>
           <nav className="flex gap-5">
-            <a href="#how-it-works" className="transition hover:text-sumi">
+            <a href="#lessons" className="transition hover:text-sumi">
               {t("home.footer.how", "How it works")}
             </a>
             <a href="#pricing" className="transition hover:text-sumi">
