@@ -42,13 +42,30 @@ export const STAGE_LEVELS: { level: StageLevel; nameEn: string; nameJa: string }
 
 export const MAX_STAGE = 8;
 
-// Every stage's name in one language, with its level — what the word
-// lists show on each card.
-export function stageLabels(locale: string): { name: string; level: StageLevel }[] {
-  return STAGES.map((stage) => ({
-    name: locale === "ja" ? stage.nameJa : stage.nameEn,
-    level: stage.level,
-  }));
+// Every stage in one language, for the word lists: its full name ("Seed
+// 2"), its level and that level's name ("Seed"), and which step of the
+// level it is — Seed has 3 steps and Sapling 2; Oak Tree's two stages share
+// one name, so it (like Master Oak) counts as a single step.
+export function stageLabels(locale: string): {
+  name: string;
+  level: StageLevel;
+  levelName: string;
+  step: number;
+  steps: number;
+}[] {
+  return STAGES.map((stage) => {
+    const level = STAGE_LEVELS.find((entry) => entry.level === stage.level)!;
+    const names = [
+      ...new Set(STAGES.filter((other) => other.level === stage.level).map((other) => other.nameEn)),
+    ];
+    return {
+      name: locale === "ja" ? stage.nameJa : stage.nameEn,
+      level: stage.level,
+      levelName: locale === "ja" ? level.nameJa : level.nameEn,
+      step: names.indexOf(stage.nameEn) + 1,
+      steps: names.length,
+    };
+  });
 }
 
 export function stageInfo(stage: number) {

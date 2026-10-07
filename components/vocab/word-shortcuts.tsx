@@ -21,7 +21,7 @@ export function WordShortcuts({
     {
       href: `/dashboard/courses/${courseSlug}/flagged`,
       icon: <Flag aria-hidden className="h-5 w-5 fill-current" strokeWidth={2.25} />,
-      chip: "bg-shu/10 text-shu",
+      chip: "bg-kin/25 text-acorn",
       title: t("word_list.flagged_title", "Flagged lessons"),
       count: flaggedCount,
       body:

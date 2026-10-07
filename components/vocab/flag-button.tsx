@@ -43,7 +43,7 @@ export function FlagButton({ courseSlug, wordId, flagged, onChange, className }:
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition",
         flagged
-          ? "bg-shu/10 text-shu hover:bg-shu/15"
+          ? "bg-kin/25 text-acorn hover:bg-kin/35"
           : "text-sumi-soft hover:bg-sumi/5 hover:text-sumi",
         className,
       )}
