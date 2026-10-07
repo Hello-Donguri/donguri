@@ -376,18 +376,6 @@ export default async function CourseHomePage({ params }: PageProps) {
         {/* Primary learning actions */}
         <section className="rounded-3xl border border-card-border bg-washi-soft p-4 sm:p-5">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {/* REVIEW */}
-            {/* Live: the count goes up the moment each word comes due
-                (see ReviewCard). Re-keyed so a fresh server count resets it. */}
-            <ReviewCard
-              key={`${reviewQueue.dueCount}:${reviewQueue.upcomingDue[0]?.getTime() ?? 0}`}
-              courseSlug={slug}
-              dueCount={reviewQueue.dueCount}
-              upcomingDue={reviewQueue.upcomingDue}
-              nextDueAt={reviewQueue.nextDueAt}
-              locked={profile.is_guest}
-            />
-
             {/* LEARN — turns into a browse-decks prompt once the active
                 decks have nothing new left (or none are active), and is
                 locked once the free words are used up. */}
@@ -462,6 +450,18 @@ export default async function CourseHomePage({ params }: PageProps) {
                 {learnCardContent}
               </BrowseDecksTrigger>
             )}
+
+            {/* REVIEW */}
+            {/* Live: the count goes up the moment each word comes due
+                (see ReviewCard). Re-keyed so a fresh server count resets it. */}
+            <ReviewCard
+              key={`${reviewQueue.dueCount}:${reviewQueue.upcomingDue[0]?.getTime() ?? 0}`}
+              courseSlug={slug}
+              dueCount={reviewQueue.dueCount}
+              upcomingDue={reviewQueue.upcomingDue}
+              nextDueAt={reviewQueue.nextDueAt}
+              locked={profile.is_guest}
+            />
 
             {/* DAILY CHALLENGE */}
             {challengesDone ? (
