@@ -17,7 +17,7 @@ type FlagButtonProps = {
 };
 
 // Flags a word to come back to its lesson later — it's then listed on the
-// course page (see FlaggedLessons). Controlled, so a review keeps each
+// flagged lessons list (see WordList). Controlled, so a review keeps each
 // word's flag as the learner moves between questions.
 export function FlagButton({ courseSlug, wordId, flagged, onChange, className }: FlagButtonProps) {
   const t = useTranslations();

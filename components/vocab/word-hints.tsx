@@ -103,11 +103,11 @@ function hintsUsedUp(base: string, draft: string, words: HintWord[]): boolean {
   return !midHint;
 }
 
-// When the learner stops typing mid-reply for PAUSE_MS, up to four words
-// that would help them carry on appear above the reply box — ones they've
-// learnt first, then simple everyday words if too few of those fit (see
-// dailyChallengeHints). A gentle reminder rather than the answer: no
-// meanings, and nothing to tap — they type it themselves.
+// When the learner stops typing mid-reply for PAUSE_MS, four words appear
+// above the reply box — one or two that would help them carry on, the rest
+// that don't fit, shuffled (see dailyChallengeHints), and the box says so.
+// A nudge rather than the answer: no meanings, and nothing to tap — they
+// pick out the one that fits and type it themselves.
 // They go once the learner has typed another word — or, partway through
 // typing one of the hints, once that whole hint is in (see hintsUsedUp) —
 // or when the reply is sent or emptied, or they're dismissed.
@@ -189,7 +189,7 @@ export function WordHints({
           <div className="mb-2 flex items-center justify-between gap-2">
             <p className="flex items-center gap-1.5 text-xs font-semibold text-sumi-soft">
               <Lightbulb aria-hidden className="h-3.5 w-3.5 fill-kin/30 text-kin" />
-              {t("word_hints.title", "Stuck? Maybe one of these…")}
+              {t("word_hints.title", "Stuck? One of these fits — but not all of them. Can you spot it?")}
             </p>
             <button
               type="button"

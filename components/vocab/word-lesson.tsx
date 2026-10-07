@@ -487,7 +487,7 @@ export const InlineLesson = ({ courseSlug, wordId }: { courseSlug: string; wordI
 // learn card in a dialog, loaded on first open (and kept for re-opens of
 // the same word). The native <dialog> handles focus trapping and Escape.
 // `children` and `className` replace the trigger's own label and look —
-// e.g. a flagged lesson's card on the course page (see FlaggedLessons).
+// e.g. a word's card on the flagged and learnt lists (see WordList).
 export const LessonButton = ({
   courseSlug,
   wordId,

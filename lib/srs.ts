@@ -72,18 +72,21 @@ export function streakBonusXp(currentStreak: number): number {
 // message(s) where the learner used the challenge target (see
 // sendDailyChallengeMessage in lib/actions/daily-challenge.ts), added up
 // into a total out of 40. Finishing always earns the base 1 XP; from
-// DAILY_CHALLENGE_XP_START it's 2 XP, then 1 more for every
-// DAILY_CHALLENGE_XP_STEP points, up to 6 for the score itself, and a
-// perfect 40 adds a bonus on top:
-//   total < 28 → 1 XP, 28-29 → 2, 30-31 → 3, 32-33 → 4, 34-35 → 5,
-//   36-39 → 6, 40 → 6 + 1 = 7
+// DAILY_CHALLENGE_XP_START it goes up in the bands below:
+//   total < 28 → 1 XP, 28-30 → 2, 31-33 → 3, 34-36 → 4, 37-38 → 5,
+//   39-40 → 6
 export const DAILY_CHALLENGE_MAX_TOTAL = 40;
 export const DAILY_CHALLENGE_XP_START = 28;
-export const DAILY_CHALLENGE_XP_STEP = 2;
 export const DAILY_CHALLENGE_BASE_XP = 1;
-export const DAILY_CHALLENGE_MAX_SCORE_XP = 6;
-export const DAILY_CHALLENGE_PERFECT_BONUS_XP = 1;
-export const DAILY_CHALLENGE_MAX_XP = DAILY_CHALLENGE_MAX_SCORE_XP + DAILY_CHALLENGE_PERFECT_BONUS_XP;
+// The lowest total for each XP above the base, highest first.
+const DAILY_CHALLENGE_XP_FROM: { min: number; xp: number }[] = [
+  { min: 39, xp: 6 },
+  { min: 37, xp: 5 },
+  { min: 34, xp: 4 },
+  { min: 31, xp: 3 },
+  { min: DAILY_CHALLENGE_XP_START, xp: 2 },
+];
+export const DAILY_CHALLENGE_MAX_XP = DAILY_CHALLENGE_XP_FROM[0].xp;
 // A "good" single score — only used to colour scores in the UI now.
 export const DAILY_CHALLENGE_GOOD_SCORE = 7;
 
@@ -110,21 +113,11 @@ export function dailyChallengeXp(scores: DailyChallengeScores, respondedToYou = 
   if (!respondedToYou) return DAILY_CHALLENGE_BASE_XP;
 
   const total = dailyChallengeTotal(scores);
-  const scoreXp =
-    total < DAILY_CHALLENGE_XP_START
-      ? DAILY_CHALLENGE_BASE_XP
-      : Math.min(
-          DAILY_CHALLENGE_BASE_XP +
-            1 +
-            Math.floor((total - DAILY_CHALLENGE_XP_START) / DAILY_CHALLENGE_XP_STEP),
-          DAILY_CHALLENGE_MAX_SCORE_XP,
-        );
-  const bonus = total === DAILY_CHALLENGE_MAX_TOTAL ? DAILY_CHALLENGE_PERFECT_BONUS_XP : 0;
-  return scoreXp + bonus;
+  return DAILY_CHALLENGE_XP_FROM.find((band) => total >= band.min)?.xp ?? DAILY_CHALLENGE_BASE_XP;
 }
 
-// The totals that earn each XP amount, lowest first — e.g. 0-27 → 1, 28-29
-// → 2, … 40 → 7. Worked out from dailyChallengeXp itself, so the UI's XP
+// The totals that earn each XP amount, lowest first — e.g. 0-27 → 1, 28-30
+// → 2, … 39-40 → 6. Worked out from dailyChallengeXp itself, so the UI's XP
 // table and ladder can't drift from the real rule.
 export type DailyChallengeXpBand = { min: number; max: number; xp: number };
 

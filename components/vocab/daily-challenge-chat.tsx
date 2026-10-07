@@ -29,15 +29,14 @@ import type {
 import {
   DAILY_CHALLENGE_BASE_XP,
   DAILY_CHALLENGE_MAX_TOTAL,
-  DAILY_CHALLENGE_PERFECT_BONUS_XP,
+  DAILY_CHALLENGE_MAX_XP,
   DAILY_CHALLENGE_XP_START,
-  DAILY_CHALLENGE_XP_STEP,
   dailyChallengeTotal,
   dailyChallengeXpBands,
   type DailyChallengeXpBand,
 } from "@/lib/srs";
 import { Button } from "@/components/ui/button";
-import { Languages, SkipForward } from "lucide-react";
+import { Languages, SkipForward, ThumbsUp } from "lucide-react";
 import { WordHints, WordHintsToggle, useWordHintsSetting } from "@/components/vocab/word-hints";
 import { useChallengeInProgress } from "@/components/vocab/challenge-leave-guard";
 import { useLocale, useTranslations } from "@/components/i18n/locale-provider";
@@ -877,14 +876,13 @@ function DailyChallengeChat({
             <div className="border-t border-card-border pt-4">
               <p className="text-sm text-sumi-soft">
                 {t(
-                  "daily_challenge.xp_rule_intro_bands",
-                  "Your four scores are added up to a total out of {{max}}. Finishing always earns {{base}} XP. From {{start}} you earn more, going up 1 XP for every {{step}} points, and a perfect {{max}}/{{max}} adds a +{{bonus}} bonus. If your last message doesn't answer Charles, you only get the {{base}} XP.",
+                  "daily_challenge.xp_rule_intro_table",
+                  "Your four scores are added up to a total out of {{max}}. Finishing always earns {{base}} XP, and from {{start}} you earn more, up to {{top}} XP — see the table. If your last message doesn't answer Charles, you only get the {{base}} XP.",
                   {
                     max: DAILY_CHALLENGE_MAX_TOTAL,
                     base: DAILY_CHALLENGE_BASE_XP,
                     start: DAILY_CHALLENGE_XP_START,
-                    step: DAILY_CHALLENGE_XP_STEP,
-                    bonus: DAILY_CHALLENGE_PERFECT_BONUS_XP,
+                    top: DAILY_CHALLENGE_MAX_XP,
                   },
                 )}
               </p>
@@ -992,14 +990,31 @@ function TargetBanner({
               <span
                 title={item.explanation ?? undefined}
                 className={cn(
-                  "flex min-w-0 flex-col rounded-xl px-3 py-1.5 shadow-sm ring-1 transition-colors",
+                  "relative flex min-w-0 flex-col rounded-xl px-3 py-1.5 shadow-sm transition-colors",
                   // Ticked off as soon as it's used — only shown mid-chat
                   // when there are two to get through.
                   done && items.length > 1 && !isComplete
-                    ? "bg-matcha-soft ring-matcha/50"
-                    : "bg-washi/80 ring-matcha/15",
+                    ? "bg-matcha-soft ring-2 ring-matcha"
+                    : "bg-washi/80 ring-1 ring-matcha/15",
                 )}
               >
+                {/* A bright sticker slapped on the corner the moment one of
+                    the two targets is used, so it's clear that part's done. */}
+                <AnimatePresence>
+                  {done && items.length > 1 && !isComplete && (
+                    <motion.span
+                      aria-hidden
+                      initial={{ scale: 0, rotate: -45 }}
+                      animate={{ scale: 1, rotate: -8 }}
+                      exit={{ scale: 0, opacity: 0 }}
+                      transition={{ type: "spring", stiffness: 420, damping: 12 }}
+                      className="absolute -top-3 -right-3 z-10 inline-flex items-center gap-1 rounded-full border-2 border-washi bg-kin px-2 py-0.5 font-nunito text-xs font-black text-ink-on-light shadow-md"
+                    >
+                      <ThumbsUp className="h-3.5 w-3.5 fill-current" strokeWidth={2.5} />
+                      {t("daily_challenge.target_done_badge", "Nice!")}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
                 <strong className="flex items-center gap-1 text-sm font-semibold leading-snug text-sumi">
                   {done && items.length > 1 && (
                     <CheckIcon className="h-3.5 w-3.5 shrink-0 text-matcha-dark" />
@@ -1438,7 +1453,7 @@ function ScoreTile({
   );
 }
 
-// One row per XP band, from a perfect score down to the catch-all "under
+// One row per XP band, from the top band down to the catch-all "under
 // 28" row (see dailyChallengeXpBands), so it can't drift from the real rule.
 function XpTable() {
   const t = useTranslations();
@@ -1457,7 +1472,8 @@ function XpTable() {
       <tbody>
         {bands.map((band) => {
           const isBase = band.min === 0;
-          const isPerfect = band.min === DAILY_CHALLENGE_MAX_TOTAL;
+          // The top band, in gold.
+          const isPerfect = band.max === DAILY_CHALLENGE_MAX_TOTAL;
           return (
             <tr key={band.min} className="border-t border-card-border/60">
               <td className="py-1.5 tabular-nums text-sumi">
@@ -1482,17 +1498,6 @@ function XpTable() {
                 >
                   +{band.xp} XP
                 </span>
-                {isPerfect && (
-                  <span className="ml-1.5 text-xs text-sumi-soft">
-                    {t(
-                      "daily_challenge.xp_table_bonus",
-                      "incl. +{{bonus}} bonus",
-                      {
-                        bonus: DAILY_CHALLENGE_PERFECT_BONUS_XP,
-                      },
-                    )}
-                  </span>
-                )}
               </td>
             </tr>
           );

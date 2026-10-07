@@ -8,7 +8,7 @@ import {
   getDailyActivityCounts,
   getDailyChallengeStatus,
   getEnrolledCourseCount,
-  getFlaggedWords,
+  getWordListCounts,
   getLearningAllowance,
   getCourseStreak,
   getWeeklyStats,
@@ -43,7 +43,7 @@ import { FakeButton } from "@/components/ui/fake-button";
 import { ReviewCard } from "@/components/vocab/review-card";
 import { CountBadge } from "@/components/ui/count-badge";
 import { SleepingDuck } from "@/components/icons/SleepingDuck";
-import { FlaggedLessons } from "@/components/vocab/flagged-lessons";
+import { WordShortcuts } from "@/components/vocab/word-shortcuts";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -80,7 +80,7 @@ async function loadCourseHome(slug: string) {
     challengeStatus,
     enrolledCourseCount,
     allowance,
-    flaggedWords,
+    wordCounts,
   ] = await Promise.all([
     getCourseDecks(slug),
     getCourseStreak(slug),
@@ -92,7 +92,7 @@ async function loadCourseHome(slug: string) {
     getDailyChallengeStatus(slug),
     getEnrolledCourseCount(),
     getLearningAllowance(),
-    getFlaggedWords(slug),
+    getWordListCounts(slug),
   ]);
 
   const isAdmin = profile.role === "admin";
@@ -118,7 +118,7 @@ async function loadCourseHome(slug: string) {
     challengeStatus,
     enrolledCourseCount,
     allowance,
-    flaggedWords,
+    wordCounts,
     isAdmin,
     reviewQueueDebug,
     badges,
@@ -146,7 +146,7 @@ export default async function CourseHomePage({ params }: PageProps) {
       challengeStatus,
       enrolledCourseCount,
       allowance,
-      flaggedWords,
+      wordCounts,
       isAdmin,
       reviewQueueDebug,
       badges,
@@ -488,8 +488,14 @@ export default async function CourseHomePage({ params }: PageProps) {
           </div>
         </section>
 
-        {/* Lessons flagged during a review — only drawn when there are some. */}
-        <FlaggedLessons courseSlug={slug} words={flaggedWords} />
+        {/* Back into what's been learnt: flagged lessons and every learnt
+            word, always shown, each opening its full list. */}
+        <WordShortcuts
+          courseSlug={slug}
+          flaggedCount={wordCounts.flagged}
+          learntCount={wordCounts.learnt}
+          t={t}
+        />
 
         <ActivityOverviewCard
           dailyActivity={dailyActivity}

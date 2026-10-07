@@ -50,6 +50,15 @@ function alreadyTyped(word: string, draft: string): boolean {
   ).test(draft);
 }
 
+function shuffle<T>(items: T[]): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
 // A suggestion from outside their list must be simple: one short word or a
 // tiny phrase, not a sentence that does the work for them.
 function isShortSuggestion(text: string): boolean {
@@ -59,12 +68,13 @@ function isShortSuggestion(text: string): boolean {
 }
 
 // Word hints for a learner who's paused while writing a daily challenge
-// reply: up to four words that would help them carry on with what they
-// seem to be saying, most useful first. Words they've learnt come first;
-// only when too few of those fit are simple everyday words they haven't
-// learnt added, so every hint is one they could really use next. Empty
-// when nothing fits or anything fails — hints are optional, so failure
-// just shows nothing.
+// reply: four words, shuffled — one or two that would help them carry on
+// with what they seem to be saying, and the rest that don't fit, so they
+// have to work out which one does (the hint box says so). Words they've
+// learnt come first, both for the ones that fit and the ones that don't;
+// simple everyday words fill in when there aren't enough. Empty when none
+// fits or anything fails — hints are optional, so failure just shows
+// nothing.
 export async function dailyChallengeHints(
   courseSlug: string,
   turns: HintTurn[],
@@ -124,13 +134,13 @@ ${vocab.size > 0 ? [...vocab.values()].map((line) => `  ${line}`).join("\n") : "
 
 First work out what they seem to be trying to say, in reply to Charles's last message. Their last word may be unfinished or not quite right (e.g. "call" when they mean "called" or "name") — then the word they're reaching for is a good hint.
 
-Suggest up to ${HINT_COUNT} ${language.target} words that would help them carry on that reply — the word that would most naturally come next, or the one they seem to be reaching for. Every word must fit: if it wouldn't make sense in their reply, don't suggest it. Fewer good words are far better than filling the list.
-- Prefer words from their list, written exactly as there ("learnt": true).
-- If fewer than ${HINT_COUNT} words from the list fit, add simple, common everyday ${language.target} words that fit instead ("learnt": false) — single words or a tiny set phrase, never a whole sentence.
-- Never suggest a word that's already in what they've typed.
-- Order them most useful first.
+Pick exactly ${HINT_COUNT} ${language.target} words for them to choose from:
+- 1 or 2 that FIT ("fits": true): words that would help them carry on that reply — the word that would most naturally come next, or the one they seem to be reaching for.
+- The rest DON'T FIT ("fits": false): words that make no sense in their reply. Check each one: if it could finish their sentence into any sensible answer to Charles, it fits — don't use it as a non-fitting word.
+- For both, prefer words from their list, written exactly as there ("learnt": true). When there aren't enough on the list, use simple, common everyday ${language.target} words ("learnt": false) — single words or a tiny set phrase, never a whole sentence.
+- Never pick a word that's already in what they've typed.
 
-Return only a JSON object: {"words": [{"text": "the word", "learnt": true${cantonese ? ', "romanization": "its Jyutping with tone numbers"' : ""}}]}`;
+Return only a JSON object: {"words": [{"text": "the word", "learnt": true, "fits": true${cantonese ? ', "romanization": "its Jyutping with tone numbers"' : ""}}]} — exactly ${HINT_COUNT} entries.`;
 
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -151,9 +161,10 @@ Return only a JSON object: {"words": [{"text": "the word", "learnt": true${canto
     // Learnt words only when really on their list, with the list's reading;
     // others only when short. Nothing already typed, nothing twice.
     const seen = new Set<string>();
-    const words = parsed.words.flatMap((entry): HintWord[] => {
+    const words = parsed.words.flatMap((entry): (HintWord & { fits: boolean })[] => {
       if (typeof entry !== "object" || entry === null) return [];
-      const { text: rawText, romanization } = entry as Record<string, unknown>;
+      const { text: rawText, romanization, fits: rawFits } = entry as Record<string, unknown>;
+      const fits = rawFits === true;
       if (typeof rawText !== "string") return [];
       const text = rawText.trim();
       if (!text || seen.has(text) || alreadyTyped(text, draft)) return [];
@@ -161,7 +172,7 @@ Return only a JSON object: {"words": [{"text": "the word", "learnt": true${canto
       const line = vocab.get(text);
       if (line) {
         seen.add(text);
-        return [{ text, romanization: line.match(/\(([^)]+)\)/)?.[1] ?? null }];
+        return [{ text, romanization: line.match(/\(([^)]+)\)/)?.[1] ?? null, fits }];
       }
       if (!isShortSuggestion(text)) return [];
       seen.add(text);
@@ -172,11 +183,16 @@ Return only a JSON object: {"words": [{"text": "the word", "learnt": true${canto
             cantonese && typeof romanization === "string" && romanization.trim()
               ? romanization.trim()
               : null,
+          fits,
         },
       ];
     });
 
-    return words.slice(0, HINT_COUNT);
+    // At least one has to fit, or it's a puzzle with no answer. Shuffled,
+    // so where the right one sits gives nothing away.
+    const offered = words.slice(0, HINT_COUNT);
+    if (offered.length < 2 || !offered.some((word) => word.fits)) return [];
+    return shuffle(offered).map(({ text, romanization }) => ({ text, romanization }));
   } catch (error) {
     console.error("Daily challenge hints failed:", error);
     return [];

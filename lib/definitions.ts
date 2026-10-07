@@ -552,13 +552,21 @@ export type CourseSummary = {
 // A course the learner isn't in — `previouslyEnrolled` when they left it,
 // so rejoining picks their progress back up.
 // A word or grammar point the learner flagged (from a review) to revisit
-// its lesson — listed on the course page, newest first.
+// its lesson — listed on its own page, newest first.
 export type FlaggedWord = {
   id: string;
   term: string;
   translation: string;
   romanization: string | null;
   path: string;
+};
+
+// A word or grammar point the learner has learnt, for the "revisit learnt
+// words" list: where it's got to in reviews (1-8, see STAGES in
+// lib/srs.ts) and whether it's flagged.
+export type LearntWord = FlaggedWord & {
+  stage: number;
+  flagged: boolean;
 };
 
 // The level a learner picks when they enroll in a course — sets how Charles

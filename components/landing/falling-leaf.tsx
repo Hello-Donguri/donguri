@@ -12,6 +12,14 @@ const MAX_LEFT = 82;
 
 const randomLeft = () => MIN_LEFT + Math.random() * (MAX_LEFT - MIN_LEFT);
 
+// The leaf pictures, one picked at random for each fall.
+const LEAF_IMAGES = [
+  { src: "/images/leaf.webp", width: 335, height: 303 },
+  { src: "/images/leaf2.webp", width: 480, height: 544 },
+];
+
+const randomImage = () => Math.floor(Math.random() * LEAF_IMAGES.length);
+
 // Each leaf's own character, so they never fall in step: when it first
 // appears, how long a fall takes, the pause before its next one, its size,
 // and how wide it swings (a negative swing sets off the other way).
@@ -29,12 +37,12 @@ type LeafProps = (typeof LEAVES)[number];
 // the browser after load, so the server and client renders agree.
 function Leaf({ delayMs, fallSeconds, pauseMs, className, swing }: LeafProps) {
   // Each fall is its own run: a fresh key restarts the animation, at a new
-  // random `left`.
-  const [fall, setFall] = useState<{ id: number; left: number } | null>(null);
+  // random `left` and picture.
+  const [fall, setFall] = useState<{ id: number; left: number; image: number } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    timer.current = setTimeout(() => setFall({ id: 0, left: randomLeft() }), delayMs);
+    timer.current = setTimeout(() => setFall({ id: 0, left: randomLeft(), image: randomImage() }), delayMs);
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
@@ -44,7 +52,7 @@ function Leaf({ delayMs, fallSeconds, pauseMs, className, swing }: LeafProps) {
 
   const nextFall = () => {
     timer.current = setTimeout(
-      () => setFall((current) => ({ id: (current?.id ?? 0) + 1, left: randomLeft() })),
+      () => setFall((current) => ({ id: (current?.id ?? 0) + 1, left: randomLeft(), image: randomImage() })),
       pauseMs,
     );
   };
@@ -72,7 +80,13 @@ function Leaf({ delayMs, fallSeconds, pauseMs, className, swing }: LeafProps) {
       }}
       onAnimationComplete={nextFall}
     >
-      <Image src="/images/leaf.webp" alt="" width={335} height={303} className="h-auto w-full" />
+      <Image
+        src={LEAF_IMAGES[fall.image].src}
+        alt=""
+        width={LEAF_IMAGES[fall.image].width}
+        height={LEAF_IMAGES[fall.image].height}
+        className="h-auto w-full"
+      />
     </motion.div>
   );
 }

@@ -110,6 +110,17 @@ export type SendDailyChallengeMessageResult =
     };
 
 const MAX_HISTORY_TURNS = 16;
+// How hard the model thinks before Charles replies (and before the tips are
+// proofread). "low" keeps replies quick — at the model's default the
+// learner waited noticeably longer for each message, as the opener and
+// hints once did — while the rules in the prompt still carry the quality.
+// Set OPENAI_CHAT_REASONING_EFFORT to "medium" or "high" to trade speed back
+// for more deliberate replies.
+const CHAT_REASONING_EFFORT = (process.env.OPENAI_CHAT_REASONING_EFFORT ?? "low") as
+  | "minimal"
+  | "low"
+  | "medium"
+  | "high";
 const MAX_MESSAGE_LENGTH = 500;
 const SCORE_FIELDS = [
   "grammarScore",
@@ -597,6 +608,7 @@ Write any rewritten tip in ${levelProfile(target.level).feedbackStyle}. ${hasJa 
     const response = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL ?? "gpt-6-luna",
       response_format: { type: "json_object" },
+      reasoning_effort: CHAT_REASONING_EFFORT,
       messages: [{ role: "system", content: prompt }],
     });
     const content = response.choices[0]?.message.content;
@@ -682,27 +694,32 @@ export async function sendDailyChallengeMessage(
     };
   }
 
+  // The enrollment and today's attempt count in one round trip — every
+  // message waits on these before Charles can start replying.
+  const today = startOfUTCDay(new Date());
   const enrollment = await prisma.courseEnrollment.findFirst({
     where: {
       userId: user.id,
       unenrolledAt: null,
       course: { slug: courseSlug, active: true },
     },
-    select: { courseId: true },
+    select: {
+      courseId: true,
+      course: {
+        select: {
+          _count: {
+            select: { dailyChallengeAttempts: { where: { userId: user.id, challengeDate: today } } },
+          },
+        },
+      },
+    },
   });
 
   if (!enrollment) {
     return { ok: false, reason: "not_enrolled" };
   }
 
-  const today = startOfUTCDay(new Date());
-  const attemptsToday = await prisma.dailyChallengeAttempt.count({
-    where: {
-      userId: user.id,
-      courseId: enrollment.courseId,
-      challengeDate: today,
-    },
-  });
+  const attemptsToday = enrollment.course._count.dailyChallengeAttempts;
 
   if (attemptsToday >= MAX_DAILY_CHALLENGE_ATTEMPTS) {
     return { ok: false, reason: "limit_reached" };
@@ -784,6 +801,7 @@ export async function sendDailyChallengeMessage(
       const response = await openai.chat.completions.create({
         model: process.env.OPENAI_MODEL ?? "gpt-6-luna",
         response_format: { type: "json_object" },
+        reasoning_effort: CHAT_REASONING_EFFORT,
         messages: [...messages, ...extra],
       });
       const content = response.choices[0]?.message.content;

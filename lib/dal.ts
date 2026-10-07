@@ -19,6 +19,7 @@ import type {
   DailyChallengeStatus,
   EnrolledCourseSummary,
   FlaggedWord,
+  LearntWord,
   CourseStreakInfo,
   WeeklyStats,
   LeaderboardEntry,
@@ -743,6 +744,46 @@ export const getFlaggedWords = cache(async (courseSlug: string): Promise<Flagged
   });
 
   return rows.map((row) => row.word);
+});
+
+// Every word and grammar point the learner has learnt in this course,
+// newest first — skipped words ("I already know this") left out, like
+// inactive words and decks.
+export const getLearntWords = cache(async (courseSlug: string): Promise<LearntWord[]> => {
+  const { user, course } = await requireEnrolledCourse(courseSlug);
+
+  const rows = await prisma.userWordProgress.findMany({
+    where: {
+      userId: user.id,
+      skipped: false,
+      word: { active: true, languageDeck: { courseId: course.id, active: true } },
+    },
+    orderBy: { introducedAt: "desc" },
+    select: {
+      stage: true,
+      flaggedAt: true,
+      word: { select: { id: true, term: true, translation: true, romanization: true, path: true } },
+    },
+  });
+
+  return rows.map((row) => ({ ...row.word, stage: row.stage, flagged: row.flaggedAt !== null }));
+});
+
+// How many words are flagged and learnt in this course — the counts on the
+// course page's shortcuts to those two lists.
+export const getWordListCounts = cache(async (courseSlug: string) => {
+  const { user, course } = await requireEnrolledCourse(courseSlug);
+  const inCourse = { active: true, languageDeck: { courseId: course.id, active: true } };
+
+  const [flagged, learnt] = await Promise.all([
+    prisma.userWordProgress.count({
+      where: { userId: user.id, flaggedAt: { not: null }, word: inCourse },
+    }),
+    prisma.userWordProgress.count({
+      where: { userId: user.id, skipped: false, word: inCourse },
+    }),
+  ]);
+  return { flagged, learnt };
 });
 
 type LanguageDeckWordRow = {

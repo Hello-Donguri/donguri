@@ -127,6 +127,14 @@ function alternativeReadings(stored: string, leniency: AnswerLeniency): string[]
   return readings.length > 1 ? readings : [];
 }
 
+// Jyutping typed with its syllables run together ("gam1go3sing1") split
+// at each tone number ("gam1 go3 sing1"), so it compares equal to the
+// stored, spaced reading. Only where the tone number is followed by
+// another syllable — a lone "4" or "kei4" is left as it is.
+function spaceJyutpingSyllables(typed: string): string {
+  return typed.replace(/([1-6])(?=[a-z])/gi, "$1 ");
+}
+
 // Jyutping with its tone digits taken out ("nei5 hou2" → "nei hou"), for
 // telling a tone slip apart from a wrong word.
 function withoutTones(jyutping: string): string {
@@ -531,7 +539,10 @@ export async function submitTypedAnswer(
     ...word.alternateAnswers.map((alt) => alt.value),
   ].join(",");
   const leniency = { vocab: word.path === "vocab" };
-  const { correct, fullAnswer } = matchTypedAnswer(typedAnswer, acceptedAnswers, leniency);
+  // Jyutping may come in with no spaces between syllables — the tone
+  // numbers already mark where each one ends.
+  const answer = useRomanizedAnswer ? spaceJyutpingSyllables(typedAnswer) : typedAnswer;
+  const { correct, fullAnswer } = matchTypedAnswer(answer, acceptedAnswers, leniency);
   // A comma list shows just its first reading; slash alternatives
   // ("they / them") are shown whole, since they're one answer.
   const correctAnswer = storedAnswer.split(",")[0].trim();
@@ -540,7 +551,7 @@ export async function submitTypedAnswer(
     correct || isRetry
       ? null
       : retryFor(
-          typedAnswer,
+          answer,
           acceptedAnswers,
           leniency,
           word.languageDeck.course.targetLanguage,
