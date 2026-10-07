@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getCourseHome, getCourseTitle, getFlaggedWords } from "@/lib/dal";
 import { getTranslator } from "@/lib/i18n/server";
+import { stageLabels } from "@/lib/srs";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
 import { WordList } from "@/components/vocab/word-list";
@@ -19,7 +20,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 // from the shortcut on the course page.
 export default async function FlaggedLessonsPage({ params }: PageProps) {
   const { slug } = await params;
-  const [{ course }, words, { t }] = await Promise.all([
+  const [{ course }, words, { t, locale }] = await Promise.all([
     getCourseHome(slug),
     getFlaggedWords(slug),
     getTranslator(),
@@ -44,7 +45,7 @@ export default async function FlaggedLessonsPage({ params }: PageProps) {
         </PageSubtitle>
       </div>
 
-      <WordList courseSlug={slug} mode="flagged" words={words} />
+      <WordList courseSlug={slug} mode="flagged" words={words} stages={stageLabels(locale)} />
     </div>
   );
 }

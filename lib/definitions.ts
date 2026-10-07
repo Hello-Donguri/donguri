@@ -553,19 +553,19 @@ export type CourseSummary = {
 // so rejoining picks their progress back up.
 // A word or grammar point the learner flagged (from a review) to revisit
 // its lesson — listed on its own page, newest first.
+// `stage`: where it's got to in reviews, 1-8 (see STAGES in lib/srs.ts).
 export type FlaggedWord = {
   id: string;
   term: string;
   translation: string;
   romanization: string | null;
   path: string;
+  stage: number;
 };
 
 // A word or grammar point the learner has learnt, for the "revisit learnt
-// words" list: where it's got to in reviews (1-8, see STAGES in
-// lib/srs.ts) and whether it's flagged.
+// words" list — and whether it's flagged.
 export type LearntWord = FlaggedWord & {
-  stage: number;
   flagged: boolean;
 };
 

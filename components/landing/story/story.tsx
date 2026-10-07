@@ -58,15 +58,15 @@ export function Story({ t }: { t: TFunction }) {
         labels={{
           // The real stages and waits — STAGES in lib/srs.ts.
           stages: [
-            { name: t("home.review.stage_basic", "Basic 1"), wait: t("home.review.wait_15m", "15 minutes") },
-            { name: t("home.review.stage_1", "Beginner 1"), wait: t("home.review.wait_4h", "4 hours") },
-            { name: t("home.review.stage_2", "Beginner 2"), wait: t("home.review.wait_1d", "1 day") },
-            { name: t("home.review.stage_3", "Beginner 3"), wait: t("home.review.wait_3d", "3 days") },
-            { name: t("home.review.stage_4", "Intermediate 1"), wait: t("home.review.wait_1w", "1 week") },
-            { name: t("home.review.stage_5", "Intermediate 2"), wait: t("home.review.wait_2w", "2 weeks") },
-            { name: t("home.review.stage_6", "Expert 1"), wait: t("home.review.wait_1m", "1 month") },
+            { name: t("home.review.stage_basic", "Seed 1"), wait: t("home.review.wait_15m", "15 minutes") },
+            { name: t("home.review.stage_1", "Seed 2"), wait: t("home.review.wait_4h", "4 hours") },
+            { name: t("home.review.stage_2", "Seed 3"), wait: t("home.review.wait_1d", "1 day") },
+            { name: t("home.review.stage_3", "Sapling 1"), wait: t("home.review.wait_3d", "3 days") },
+            { name: t("home.review.stage_4", "Sapling 2"), wait: t("home.review.wait_1w", "1 week") },
+            { name: t("home.review.stage_5", "Oak Tree"), wait: t("home.review.wait_2w", "2 weeks") },
+            { name: t("home.review.stage_6", "Oak Tree"), wait: t("home.review.wait_1m", "1 month") },
           ],
-          mastered: t("home.review.mastered", "Mastered"),
+          mastered: t("home.review.mastered", "Master Oak"),
         }}
       />
 

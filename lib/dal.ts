@@ -739,11 +739,12 @@ export const getFlaggedWords = cache(async (courseSlug: string): Promise<Flagged
     },
     orderBy: { flaggedAt: "desc" },
     select: {
+      stage: true,
       word: { select: { id: true, term: true, translation: true, romanization: true, path: true } },
     },
   });
 
-  return rows.map((row) => row.word);
+  return rows.map((row) => ({ ...row.word, stage: row.stage }));
 });
 
 // Every word and grammar point the learner has learnt in this course,

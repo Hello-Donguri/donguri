@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { BookOpen, Flag, Search, X } from "lucide-react";
 import type { FlaggedWord, LearntWord } from "@/lib/definitions";
+import type { StageLevel } from "@/lib/srs";
+import { LEVEL_STYLE } from "@/components/vocab/level-style";
 import { setWordFlag } from "@/lib/actions/vocab";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { LessonButton } from "@/components/vocab/word-lesson";
@@ -12,11 +14,16 @@ import { cn } from "@/lib/utils";
 // Past this many words, a search box helps find one.
 const SEARCH_FROM = 9;
 
-type WordListProps = { courseSlug: string } & (
+// Each review stage's name in the learner's language ("Seed 2", "タネ 2"),
+// and the level it belongs to — stages 1-8, in order.
+export type StageLabel = { name: string; level: StageLevel };
+
+type WordListProps = { courseSlug: string; stages: StageLabel[] } & (
   | { mode: "flagged"; words: FlaggedWord[] }
-  // `stageNames`: each review stage's name, 1-8, in the learner's language.
-  | { mode: "learnt"; words: LearntWord[]; stageNames: string[] }
+  | { mode: "learnt"; words: LearntWord[] }
 );
+
+
 
 // A course's flagged lessons, or every word learnt in it — one card per
 // word, opening its lesson in the same dialog as the review's "See the
@@ -97,8 +104,8 @@ export function WordList(props: WordListProps) {
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {words.map((word) => {
             const flagged = isFlagged(word);
-            const stage = mode === "learnt" ? (word as LearntWord).stage : null;
-            const mastered = stage === 8;
+            const stage = props.stages[Math.min(Math.max(word.stage, 1), props.stages.length) - 1];
+            const level = LEVEL_STYLE[stage.level];
             return (
               <li
                 key={word.id}
@@ -132,16 +139,16 @@ export function WordList(props: WordListProps) {
                       </span>
                     )}
                     <span className="block truncate text-xs text-sumi-soft">{word.translation}</span>
-                    {stage !== null && props.mode === "learnt" && (
-                      <span
-                        className={cn(
-                          "mt-1 inline-block rounded-full px-2 py-px text-[10px] font-semibold",
-                          mastered ? "bg-kin/25 text-sumi" : "bg-sumi/5 text-sumi-soft",
-                        )}
-                      >
-                        {props.stageNames[stage - 1]}
-                      </span>
-                    )}
+                    {/* Its review level — Seed 1 up to Master Oak. */}
+                    <span
+                      className={cn(
+                        "mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold",
+                        level.pill,
+                      )}
+                    >
+                      <level.icon aria-hidden className="h-3 w-3" strokeWidth={2.5} />
+                      {stage.name}
+                    </span>
                   </span>
                 </LessonButton>
 

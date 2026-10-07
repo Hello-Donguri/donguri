@@ -68,7 +68,7 @@ function ReviewLadder({ progress, labels }: { progress: MotionValue<number>; lab
         <ol className="relative flex flex-col gap-1.5">
           {labels.stages.map((stage, index) => (
             <li
-              key={stage.name}
+              key={index}
               className={cn(
                 "flex h-9 items-center gap-3 rounded-xl pr-3 transition-colors duration-300",
                 index === reached && "bg-kin/15",

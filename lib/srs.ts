@@ -16,18 +16,40 @@ export { SET_SIZE, QUESTIONS_PER_LEARNT_WORD };
 // before the first longer gap. Stage 8 ("Mastered") has no interval — it's
 // terminal, same meaning as the old `status: "known"`. Stages were shifted
 // up by one when Basic 1 was added (section 47 of supabase/schema.sql).
+// Each stage's name grows with the word, acorn to oak: Seed 1-3, Sapling
+// 1-2, Oak Tree (both of the longest waits), then Master Oak once it's
+// mastered. `level` groups them, for the learnt-words breakdown.
 export const STAGES = [
-  { stage: 1, nameEn: "Basic 1", nameJa: "基本 1", intervalHours: 0.25, wrongGoesTo: 1 },
-  { stage: 2, nameEn: "Beginner 1", nameJa: "初心者 1", intervalHours: 4, wrongGoesTo: 1 },
-  { stage: 3, nameEn: "Beginner 2", nameJa: "初心者 2", intervalHours: 24, wrongGoesTo: 2 },
-  { stage: 4, nameEn: "Beginner 3", nameJa: "初心者 3", intervalHours: 24 * 3, wrongGoesTo: 2 },
-  { stage: 5, nameEn: "Intermediate 1", nameJa: "中級者 1", intervalHours: 24 * 7, wrongGoesTo: 3 },
-  { stage: 6, nameEn: "Intermediate 2", nameJa: "中級者 2", intervalHours: 24 * 14, wrongGoesTo: 3 },
-  { stage: 7, nameEn: "Expert 1", nameJa: "上級者 1", intervalHours: 24 * 30, wrongGoesTo: 5 },
-  { stage: 8, nameEn: "Mastered", nameJa: "マスター", intervalHours: null, wrongGoesTo: null },
+  { stage: 1, level: "seed", nameEn: "Seed 1", nameJa: "タネ 1", intervalHours: 0.25, wrongGoesTo: 1 },
+  { stage: 2, level: "seed", nameEn: "Seed 2", nameJa: "タネ 2", intervalHours: 4, wrongGoesTo: 1 },
+  { stage: 3, level: "seed", nameEn: "Seed 3", nameJa: "タネ 3", intervalHours: 24, wrongGoesTo: 2 },
+  { stage: 4, level: "sapling", nameEn: "Sapling 1", nameJa: "若木 1", intervalHours: 24 * 3, wrongGoesTo: 2 },
+  { stage: 5, level: "sapling", nameEn: "Sapling 2", nameJa: "若木 2", intervalHours: 24 * 7, wrongGoesTo: 3 },
+  { stage: 6, level: "oak", nameEn: "Oak Tree", nameJa: "立派な木", intervalHours: 24 * 14, wrongGoesTo: 3 },
+  { stage: 7, level: "oak", nameEn: "Oak Tree", nameJa: "立派な木", intervalHours: 24 * 30, wrongGoesTo: 5 },
+  { stage: 8, level: "master", nameEn: "Master Oak", nameJa: "どんぐりマスター", intervalHours: null, wrongGoesTo: null },
 ] as const;
 
+export type StageLevel = (typeof STAGES)[number]["level"];
+
+// The four levels, in order, with their names.
+export const STAGE_LEVELS: { level: StageLevel; nameEn: string; nameJa: string }[] = [
+  { level: "seed", nameEn: "Seed", nameJa: "タネ" },
+  { level: "sapling", nameEn: "Sapling", nameJa: "若木" },
+  { level: "oak", nameEn: "Oak Tree", nameJa: "立派な木" },
+  { level: "master", nameEn: "Master Oak", nameJa: "どんぐりマスター" },
+];
+
 export const MAX_STAGE = 8;
+
+// Every stage's name in one language, with its level — what the word
+// lists show on each card.
+export function stageLabels(locale: string): { name: string; level: StageLevel }[] {
+  return STAGES.map((stage) => ({
+    name: locale === "ja" ? stage.nameJa : stage.nameEn,
+    level: stage.level,
+  }));
+}
 
 export function stageInfo(stage: number) {
   return STAGES[Math.min(Math.max(stage, 1), MAX_STAGE) - 1];
