@@ -13,13 +13,19 @@ export function Logo({
   return (
     <Link
       href="/"
-      className={`inline-flex items-center gap-2 font-nunito font-bold tracking-tight ${className}`}
+      className={`inline-flex items-center gap-2.5 font-nunito font-black tracking-tight ${className}`}
     >
-      {/* Light mode sits on the sage header: cream chip, ink wordmark (the
-          red would be too faint on sage). Dark mode keeps the red. */}
-      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-washi-soft text-lg text-washi ring-1 ring-header-border dark:bg-shu dark:ring-0">
-        <img src="/images/mascot.png" alt="Duck" className="h-8 w-8" />
-      </span>
+      {/* The icon fills its square edge to edge, so it's clipped to a circle
+          with a thin ring to hold its shape on the sage header. */}
+      <img
+        src="/images/logo.svg"
+        alt=""
+        width={36}
+        height={36}
+        className="h-9 w-9 shrink-0 rounded-full ring-1 ring-header-border"
+      />
+      {/* Light mode sits on the sage header, where the red would be too
+          faint, so the wordmark is ink; dark mode keeps the red. */}
       <span className={`text-xl text-sumi dark:text-shu ${wordmarkClassName}`}>Hello Donguri</span>
     </Link>
   );

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Flag, Search } from "lucide-react";
+import { Search } from "lucide-react";
+import { FlagIcon } from "@/components/vocab/flag-icon";
 import type { FlaggedWord, LearntWord } from "@/lib/definitions";
 import type { StageLevel } from "@/lib/srs";
 import { LEVEL_STYLE } from "@/components/vocab/level-style";
@@ -132,14 +133,14 @@ export function WordList(props: WordListProps) {
                       active
                         ? cn(
                             "border-transparent shadow-sm",
-                            style ? style.chip : option.key === "flagged" ? "bg-kin text-ink-on-light" : "bg-sumi text-washi",
+                            style ? style.chip : option.key === "flagged" ? "bg-kin/30 text-acorn ring-1 ring-kin/60" : "bg-sumi text-washi",
                           )
                         : "border-card-border bg-raised text-sumi-soft hover:text-sumi",
                     )}
                   >
                     {style && <style.icon aria-hidden className="h-4 w-4" strokeWidth={2.25} />}
                     {option.key === "flagged" && (
-                      <Flag aria-hidden className={cn("h-4 w-4", active && "fill-current")} strokeWidth={2.25} />
+                      <FlagIcon on className="h-4" />
                     )}
                     {option.name}
                     <span className={cn("tabular-nums", active ? "opacity-80" : "text-sumi-soft/70")}>{count}</span>
@@ -286,10 +287,10 @@ function WordCard({
         title={flagged ? t("flag.unflag_short", "Remove flag") : t("flag.flag", "Flag for later")}
         className={cn(
           "absolute top-2.5 right-2.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition",
-          flagged ? "bg-kin text-ink-on-light shadow-sm hover:bg-kin/80" : "text-sumi-soft/60 hover:bg-sumi/5 hover:text-sumi",
+          flagged ? "bg-kin/25 ring-1 ring-kin/60 hover:bg-kin/35" : "hover:bg-sumi/5",
         )}
       >
-        <Flag aria-hidden className={cn("h-4 w-4", flagged && "fill-current")} strokeWidth={2.25} />
+        <FlagIcon on={flagged} className="h-5" />
       </button>
     </li>
   );

@@ -73,6 +73,9 @@ type SectionHeadingProps = {
   subtext?: string;
   center?: boolean;
   accent?: Accent;
+  // "h1" when the heading tops its own page (the FAQ, about and contact
+  // pages) rather than a home-page section.
+  as?: "h1" | "h2";
   className?: string;
 };
 
@@ -82,14 +85,15 @@ export function SectionHeading({
   subtext,
   center = true,
   accent = "ai",
+  as: Heading = "h2",
   className,
 }: SectionHeadingProps) {
   return (
     <div className={cn("flex flex-col", center && "items-center text-center", className)}>
       {eyebrow && <Eyebrow accent={accent}>{eyebrow}</Eyebrow>}
-      <h2 className="mt-4 max-w-2xl font-nunito text-3xl font-extrabold tracking-tight text-sumi text-balance sm:text-4xl">
+      <Heading className="mt-4 max-w-2xl font-nunito text-3xl font-extrabold tracking-tight text-sumi text-balance sm:text-4xl">
         {heading}
-      </h2>
+      </Heading>
       {subtext && (
         <p className={cn("mt-3 text-lg text-sumi-soft text-pretty", center && "max-w-2xl")}>
           {subtext}

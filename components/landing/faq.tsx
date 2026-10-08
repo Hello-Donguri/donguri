@@ -2,6 +2,7 @@ import { Plus } from "lucide-react";
 import { Section, SectionHeading } from "@/components/landing/section";
 import type { TFunction } from "@/lib/i18n/translate";
 
+// The FAQ page (/faq) — once a home-page section, now its own page.
 export function Faq({ t }: { t: TFunction }) {
   const faqs = [
     {
@@ -56,8 +57,9 @@ export function Faq({ t }: { t: TFunction }) {
   ];
 
   return (
-    <Section id="faq">
+    <Section className="sm:pt-20">
       <SectionHeading
+        as="h1"
         eyebrow={t("home.faq.eyebrow", "Questions")}
         heading={t("home.faq.heading", "Good to know before you start.")}
       />

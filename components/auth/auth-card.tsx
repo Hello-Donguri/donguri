@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/logo";
-import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
+import { LanguageSelector } from "@/components/i18n/language-selector";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
 import PeeringDonguriAcorn from "@/components/auth/peering-donguri";
 
@@ -16,7 +16,7 @@ export function AuthCard({ title, subtitle, children, footer }: AuthCardProps) {
     <div className="flex min-h-screen flex-col items-center justify-center bg-washi px-6 py-12">
       <div className="mb-8 flex items-center gap-3">
         <Logo />
-        <LocaleSwitcher />
+        <LanguageSelector />
       </div>
       <div className="w-full max-w-sm rounded-2xl border border-card-border bg-washi-soft p-8 shadow-sm">
         <PageTitle>{title}</PageTitle>

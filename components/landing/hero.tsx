@@ -14,6 +14,8 @@ import { FallingLeaf } from "@/components/landing/falling-leaf";
 import { ICON_CHIP, type Accent } from "@/components/landing/section";
 import { cn } from "@/lib/utils";
 import type { TFunction } from "@/lib/i18n/translate";
+import PeekabooAcorn from "../icons/PeekabooAcorn";
+import IdleAcorn from "../icons/IdleAcorn";
 
 // The headline with one word picked out — "Grows" — on a slightly tilted
 // acorn-coloured patch, like a sticker pressed on. The word comes from its
@@ -267,14 +269,15 @@ export function Hero({ t }: { t: TFunction }) {
       {/* The mascots stand behind the panel, so only their top halves peek
           over its edge. */}
       <div className="relative mx-auto mt-32 max-w-6xl lg:mt-40">
-        <Image
+        <IdleAcorn className="bob absolute bottom-full left-12" size={120} />
+        {/* <Image
           src="/images/mascot.png"
           alt=""
           width={1224}
           height={1285}
           priority
           className="profile-bob absolute bottom-full left-4 h-32 w-auto translate-y-[34%] sm:left-10 sm:h-40"
-        />
+        /> */}
         <Image
           src="/images/charles.webp"
           alt=""

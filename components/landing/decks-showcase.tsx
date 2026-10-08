@@ -175,9 +175,15 @@ const BADGE: Record<MockDeck["kind"], string> = {
   mixed: "bg-sakura-soft text-sakura-dark",
 };
 
-// How tall the section is, in screens — a little over one screen of
-// scrolling per level.
-const SCREENS = 4;
+// How tall the section is, in screens.
+const SCREENS = 3;
+
+// Where in the pinned scroll (0-1) each level takes over. Neither end
+// lingers: Beginner is already on screen while the section scrolls into
+// view, so it hands over almost as soon as the section pins, and Expert
+// only stays long enough for its cards to deal in before the page carries
+// on. Intermediate and Advanced share the middle.
+const LEVEL_STARTS = [0, 0.04, 0.42, 0.82];
 
 // Each level's colour: its step on the staircase, and the big disc behind
 // the cards. Written out in full so Tailwind finds them.
@@ -245,13 +251,13 @@ export function DecksShowcase({ labels }: { labels: DecksLabels }) {
 
   useMotionValueEvent(scrollYProgress, "change", (value) => {
     if (reduceMotion) return;
-    const next =
-      LEVELS[Math.min(LEVELS.length - 1, Math.floor(value * LEVELS.length))];
+    const index = LEVEL_STARTS.findLastIndex((start) => value >= start);
+    const next = LEVELS[Math.max(0, index)];
     if (next !== level) setLevel(next);
   });
 
-  // A step scrolls to the middle of its level's stretch, so the scroll and
-  // the staircase never disagree.
+  // A label scrolls to the middle of its level's stretch (Beginner, to the
+  // very start), so the scroll and the labels never disagree.
   const pick = (key: DeckLevelKey) => {
     const section = ref.current;
     if (reduceMotion || !section) {
@@ -260,8 +266,10 @@ export function DecksShowcase({ labels }: { labels: DecksLabels }) {
     }
     const stretch = section.offsetHeight - window.innerHeight;
     const index = LEVELS.indexOf(key);
+    const from = LEVEL_STARTS[index];
+    const to = LEVEL_STARTS[index + 1] ?? 1;
     window.scrollTo({
-      top: section.offsetTop + ((index + 0.5) / LEVELS.length) * stretch,
+      top: section.offsetTop + (index === 0 ? 0 : (from + to) / 2) * stretch,
       behavior: "smooth",
     });
   };

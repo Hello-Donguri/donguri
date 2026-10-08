@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" viewBox="0 0 1254 1254">
+  <!-- Generator: Adobe Illustrator 29.6.1, SVG Export Plug-In . SVG Version: 2.1.1 Build 9)  -->
+  <defs>
+    <style>
+      .st0, .st1, .st2 {
+        fill: none;
+      }
+
+      .st3 {
+        fill: url(#linear-gradient5);
+      }
+
+      .st3, .st4 {
+        stroke-width: 29px;
+      }
+
+      .st3, .st4, .st5, .st2, .st6 {
+        stroke: #4b2a17;
+      }
+
+      .st4 {
+        fill: url(#linear-gradient2);
+      }
+
+      .st7 {
+        fill: #c8d7ff;
+      }
+
+      .st5 {
+        fill: url(#linear-gradient3);
+      }
+
+      .st5, .st6, .st8, .st9 {
+        stroke-linejoin: round;
+        stroke-width: 28px;
+      }
+
+      .st1 {
+        stroke: #4b2813;
+        stroke-width: 23px;
+      }
+
+      .st1, .st2 {
+        stroke-linecap: round;
+      }
+
+      .st10 {
+        fill: url(#radial-gradient);
+      }
+
+      .st11 {
+        clip-path: url(#clippath-1);
+      }
+
+      .st2 {
+        stroke-width: 31px;
+      }
+
+      .st12 {
+        fill: #381806;
+      }
+
+      .st6 {
+        fill: url(#linear-gradient);
+      }
+
+      .st13 {
+        fill: url(#radial-gradient1);
+      }
+
+      .st14 {
+        fill: #20264f;
+      }
+
+      .st8 {
+        fill: url(#linear-gradient4);
+      }
+
+      .st8, .st9 {
+        stroke: #482a19;
+      }
+
+      .st9 {
+        fill: url(#linear-gradient1);
+      }
+
+      .st15 {
+        clip-path: url(#clippath);
+      }
+    </style>
+    <clipPath id="clippath">
+      <rect class="st0" x="-1000" y="-1000" width="1627" height="3254"/>
+    </clipPath>
+    <linearGradient id="linear-gradient" x1="-2364.9" y1="579.6" x2="-2237.9" y2="-140.8" gradientTransform="translate(-1651.8 1202.8) rotate(-180)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fef8ea"/>
+      <stop offset=".6" stop-color="#fcf3df"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient1" x1="-2305.3" y1="722.7" x2="-2228.8" y2="288.9" gradientTransform="translate(-1651.8 1202.8) rotate(-180)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e2b47d"/>
+      <stop offset=".9" stop-color="#bf9667"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient2" x1="-2425" y1="222.1" x2="-2132.6" y2="222.1" gradientTransform="translate(-1651.8 1202.8) rotate(-180)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fcf3df"/>
+      <stop offset=".6" stop-color="#f3e9d2"/>
+    </linearGradient>
+    <radialGradient id="radial-gradient" cx="-2278.8" cy="288.8" fx="-2278.8" fy="288.8" r="61" gradientTransform="translate(-1672.7 1229.7) rotate(-180)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4f5e90"/>
+      <stop offset=".9" stop-color="#4b5a8e"/>
+      <stop offset="1" stop-color="#4b5a8e"/>
+    </radialGradient>
+    <clipPath id="clippath-1">
+      <rect class="st0" x="627" y="-1000" width="1627" height="3254"/>
+    </clipPath>
+    <linearGradient id="linear-gradient3" x1="540.9" y1="579.6" x2="667.8" y2="-140.8" gradientTransform="translate(0 1202.8) scale(1 -1)" xlink:href="#linear-gradient"/>
+    <linearGradient id="linear-gradient4" x1="600.5" y1="722.7" x2="677" y2="288.9" gradientTransform="translate(0 1202.8) scale(1 -1)" xlink:href="#linear-gradient1"/>
+    <linearGradient id="linear-gradient5" x1="480.8" y1="222.1" x2="773.2" y2="222.1" gradientTransform="translate(0 1202.8) scale(1 -1)" xlink:href="#linear-gradient2"/>
+    <radialGradient id="radial-gradient1" cx="627" cy="288.8" fx="627" fy="288.8" r="61" gradientTransform="translate(20.9 1229.7) scale(1 -1)" xlink:href="#radial-gradient"/>
+  </defs>
+  <g class="st15">
+    <g id="mascot-art">
+      <g id="body">
+        <path id="body-shape" class="st6" d="M101.8,1258.2c-32.9-110.7-33.9-380.1,119.2-578.7,213.6,42.3,598.3,42.3,811.9,0,156.7,198.6,157.8,468.7,119.9,579"/>
+      </g>
+      <g id="cap">
+        <path id="cap-shape" class="st9" d="M627,188.1h-33.8c-41.6,0-56.7,15-49.3,56.8l10.7,46.1c1.7,9.1-4.6,17.8-13.8,19-142.8,19-278.8,91.8-351.8,200.2-38.3,56.9-57.2,123.9-36,156.8,11,16.8,28.9,29.7,47.7,37.8,122.8,53.1,729.8,53.1,852.6,0,18.8-8.1,36.7-21,47.7-37.8,21.2-32.9,2.3-99.9-36-156.8-73-108.4-209-181.2-351.8-200.2-9.2-1.2-15.5-9.9-13.8-19l10.7-46.1c7.4-41.8-7.7-56.8-49.3-56.8h-33.8Z"/>
+      </g>
+      <g id="cap-grooves">
+        <path id="cap-groove-top" class="st1" d="M852.5,411.6c-129.4,25.8-321.6,25.8-451,0"/>
+        <path id="cap-groove-middle" class="st1" d="M945.6,502.2c-181.8,42.4-455.4,42.4-637.2,0"/>
+        <path id="cap-groove-bottom" class="st1" d="M993.2,600.6c-207.4,47.2-524.9,47.2-732.4,0"/>
+      </g>
+      <g id="eyes">
+        <ellipse id="left-eye" class="st12" cx="803" cy="834.4" rx="34.8" ry="34.6"/>
+        <ellipse id="right-eye" class="st12" cx="453" cy="834.4" rx="34.8" ry="34.6"/>
+      </g>
+      <g id="muzzle">
+        <path id="muzzle-ring" class="st4" d="M627,844.1c-77.4,0-146.2,65.5-146.2,142.6s68.8,130.6,146.2,130.6,146.2-53.5,146.2-130.6-68.8-142.6-146.2-142.6Z"/>
+      </g>
+      <g id="nose">
+        <ellipse id="nose-surround" class="st14" cx="627" cy="906.6" rx="79.7" ry="79.4"/>
+        <path id="nose-colour" class="st10" d="M656.4,855c-53.9-26.5-107.2,25.8-81.8,79.5,5,10.7,13.7,19.3,24.4,24.3,53.9,25.2,106.5-27.8,79.8-81.5-4.8-9.7-12.7-17.6-22.5-22.4h0Z"/>
+      </g>
+      <g id="arms">
+        <path id="left-arm" class="st2" d="M999.4,1091.6c1.9,69.3-20.3,117.4-68.6,122.2-43.5,3.8-62.8-44.3-56.1-91.4"/>
+        <path id="right-arm" class="st2" d="M254.7,1091.6c-1.9,69.3,20.3,117.4,68.6,122.2,43.5,3.8,62.8-44.3,56.1-91.4"/>
+      </g>
+    </g>
+  </g>
+  <g class="st11">
+    <g id="mascot-art1" data-name="mascot-art">
+      <g id="body1" data-name="body">
+        <path id="body-shape1" data-name="body-shape" class="st5" d="M1152.2,1258.2c32.9-110.7,33.9-380.1-119.2-578.7-213.6,42.3-598.3,42.3-811.9,0-156.7,198.6-157.8,468.7-119.9,579"/>
+      </g>
+      <g id="cap1" data-name="cap">
+        <path id="cap-shape1" data-name="cap-shape" class="st8" d="M627,188.1h33.8c41.6,0,56.7,15,49.3,56.8l-10.7,46.1c-1.7,9.1,4.6,17.8,13.8,19,142.8,19,278.8,91.8,351.8,200.2,38.3,56.9,57.2,123.9,36,156.8-11,16.8-28.9,29.7-47.7,37.8-122.8,53.1-729.8,53.1-852.6,0-18.8-8.1-36.7-21-47.7-37.8-21.2-32.9-2.3-99.9,36-156.8,73-108.4,209-181.2,351.8-200.2,9.2-1.2,15.5-9.9,13.8-19l-10.7-46.1c-7.4-41.8,7.7-56.8,49.3-56.8h33.8Z"/>
+      </g>
+      <g id="cap-grooves1" data-name="cap-grooves">
+        <path id="cap-groove-top1" data-name="cap-groove-top" class="st1" d="M401.5,411.6c129.4,25.8,321.6,25.8,451,0"/>
+        <path id="cap-groove-middle1" data-name="cap-groove-middle" class="st1" d="M308.4,502.2c181.8,42.4,455.4,42.4,637.2,0"/>
+        <path id="cap-groove-bottom1" data-name="cap-groove-bottom" class="st1" d="M260.8,600.6c207.4,47.2,524.9,47.2,732.4,0"/>
+      </g>
+      <g id="eyes1" data-name="eyes">
+        <ellipse id="left-eye1" data-name="left-eye" class="st12" cx="451" cy="834.4" rx="34.8" ry="34.6"/>
+        <ellipse id="right-eye1" data-name="right-eye" class="st12" cx="801" cy="834.4" rx="34.8" ry="34.6"/>
+      </g>
+      <g id="muzzle1" data-name="muzzle">
+        <path id="muzzle-ring1" data-name="muzzle-ring" class="st3" d="M627,844.1c77.4,0,146.2,65.5,146.2,142.6s-68.8,130.6-146.2,130.6-146.2-53.5-146.2-130.6,68.8-142.6,146.2-142.6Z"/>
+      </g>
+      <g id="nose1" data-name="nose">
+        <ellipse id="nose-surround1" data-name="nose-surround" class="st14" cx="627" cy="906.6" rx="79.7" ry="79.4"/>
+        <path id="nose-colour1" data-name="nose-colour" class="st13" d="M597.6,855c53.9-26.5,107.2,25.8,81.8,79.5-5,10.7-13.7,19.3-24.4,24.3-53.9,25.2-106.5-27.8-79.8-81.5,4.8-9.7,12.7-17.6,22.5-22.4h0Z"/>
+        <ellipse id="nose-shine" class="st7" cx="648.3" cy="876.8" rx="10.6" ry="12.9" transform="translate(-442.1 884) rotate(-53.9)"/>
+      </g>
+      <g id="arms1" data-name="arms">
+        <path id="left-arm1" data-name="left-arm" class="st2" d="M254.6,1091.6c-1.9,69.3,20.3,117.4,68.6,122.2,43.5,3.8,62.8-44.3,56.1-91.4"/>
+        <path id="right-arm1" data-name="right-arm" class="st2" d="M999.3,1091.6c1.9,69.3-20.3,117.4-68.6,122.2-43.5,3.8-62.8-44.3-56.1-91.4"/>
+      </g>
+    </g>
+  </g>
+</svg>

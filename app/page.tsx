@@ -2,13 +2,10 @@
 // The original app homepage is preserved below, commented out, so it can be
 // restored by deleting the /* ... */ wrapper and the new code beneath it.
 
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Logo } from "@/components/logo";
 import { getProfile, getSession } from "@/lib/dal";
-import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
+import { SiteHeader } from "@/components/landing/site-header";
+import { SiteFooter } from "@/components/landing/site-footer";
 import { getTranslator } from "@/lib/i18n/server";
 import { getMembershipPriceLabel } from "@/lib/billing";
 import { Hero } from "@/components/landing/hero";
@@ -16,7 +13,6 @@ import { Decks } from "@/components/landing/decks";
 import { Story } from "@/components/landing/story/story";
 import { Progress } from "@/components/landing/progress";
 import { ForJapaneseSpeakers } from "@/components/landing/for-japanese-speakers";
-import { Faq } from "@/components/landing/faq";
 import { FinalCta } from "@/components/landing/final-cta";
 
 export default async function Home() {
@@ -42,27 +38,7 @@ export default async function Home() {
 
   return (
     <div className="flex min-h-screen flex-col bg-washi">
-      <header className="border-b border-header-border bg-header">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-5 sm:px-6">
-          <Logo />
-
-          <nav className="flex items-center gap-1 sm:gap-3">
-            <Link
-              href="/login"
-              className="rounded-full px-3 py-2 text-sm font-medium text-sumi-soft transition hover:text-sumi sm:px-4"
-            >
-              {t("nav.log_in", "Log in")}
-            </Link>
-
-            <Button href="/signup" size="sm">
-              {t("nav.sign_up", "Sign up")}
-            </Button>
-
-            <ThemeToggle className="ml-1" />
-            <LocaleSwitcher />
-          </nav>
-        </div>
-      </header>
+      <SiteHeader />
 
       <main className="flex-1">
         <Hero t={t} />
@@ -70,27 +46,11 @@ export default async function Home() {
         <Story t={t} />
         <Progress t={t} />
         <ForJapaneseSpeakers t={t} priceLabel={priceLabel} />
-        <Faq t={t} />
       </main>
 
       <FinalCta t={t} />
 
-      <footer className="border-t border-sumi/10 px-6 py-10">
-        <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 text-sm text-sumi-soft sm:flex-row sm:justify-between">
-          <p>{t("footer.tagline", "Hello Donguri — English learning designed for Japanese speakers.")}</p>
-          <nav className="flex gap-5">
-            <a href="#lessons" className="transition hover:text-sumi">
-              {t("home.footer.how", "How it works")}
-            </a>
-            <a href="#pricing" className="transition hover:text-sumi">
-              {t("home.footer.pricing", "Pricing")}
-            </a>
-            <a href="#faq" className="transition hover:text-sumi">
-              {t("home.footer.faq", "FAQ")}
-            </a>
-          </nav>
-        </div>
-      </footer>
+      <SiteFooter t={t} />
     </div>
   );
 }

@@ -1,10 +1,10 @@
 "use client";
 
 import { useTransition } from "react";
-import { Flag } from "lucide-react";
 import { setWordFlag } from "@/lib/actions/vocab";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { cn } from "@/lib/utils";
+import { FlagIcon } from "@/components/vocab/flag-icon";
 
 type FlagButtonProps = {
   courseSlug: string;
@@ -48,7 +48,7 @@ export function FlagButton({ courseSlug, wordId, flagged, onChange, className }:
         className,
       )}
     >
-      <Flag aria-hidden className={cn("h-3.5 w-3.5", flagged && "fill-current")} strokeWidth={2.25} />
+      <FlagIcon on={flagged} className="h-4" />
       {flagged ? t("flag.flagged", "Flagged") : t("flag.flag", "Flag for later")}
     </button>
   );

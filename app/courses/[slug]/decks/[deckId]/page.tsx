@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
+import { LanguageSelector } from "@/components/i18n/language-selector";
 import { DeckPreview } from "@/components/vocab/deck-preview";
 import { getPublicDeckDetail, getSession } from "@/lib/dal";
 import { getTranslator } from "@/lib/i18n/server";
@@ -47,28 +46,30 @@ export default async function PublicDeckPage({ params }: PageProps) {
     <div className="flex min-h-screen flex-col bg-washi">
       <header className="border-b border-header-border bg-header">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-5 sm:px-6">
-          <Logo />
+          <Logo wordmarkClassName="sr-only sm:not-sr-only" />
 
-          <nav className="flex items-center gap-1 sm:gap-3">
+          <nav className="flex items-center gap-2">
+            <LanguageSelector />
             {user ? (
               <Button href={dashboardHref} size="sm">
                 {t("public_deck.open_in_dashboard", "Open in dashboard")}
               </Button>
             ) : (
               <>
-                <Link
+                <Button
                   href={`/login?next=${encodeURIComponent(dashboardHref)}`}
-                  className="rounded-full px-3 py-2 text-sm font-medium text-sumi-soft transition hover:text-sumi sm:px-4"
+                  variant="outline"
+                  size="sm"
+                  className="px-3.5 sm:px-4"
                 >
                   {t("nav.log_in", "Log in")}
-                </Link>
-                <Button href="/signup" size="sm">
+                </Button>
+                <Button href="/signup" size="sm" className="px-3.5 sm:px-4">
                   {t("nav.sign_up", "Sign up")}
                 </Button>
               </>
             )}
-            <ThemeToggle className="ml-1" />
-            <LocaleSwitcher />
+            <ThemeToggle />
           </nav>
         </div>
       </header>

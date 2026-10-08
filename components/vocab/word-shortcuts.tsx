@@ -20,7 +20,7 @@ export function WordShortcuts({
   const cards = [
     {
       href: `/dashboard/courses/${courseSlug}/flagged`,
-      image: { src: "/images/flag2.webp", width: 1143, height: 1141 },
+      image: { src: "/images/flag3.webp", width: 640, height: 583 },
       title: t("word_list.flagged_title", "Flagged lessons"),
       count: flaggedCount,
       body:

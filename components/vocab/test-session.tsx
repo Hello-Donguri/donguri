@@ -31,10 +31,10 @@ import {
 } from "@/components/vocab/session-ui";
 import { WordImage } from "@/components/ui/word-image";
 import { XpCounter } from "@/components/xp/xp-counter";
+import { SessionResults } from "@/components/vocab/session-results";
 import { LevelUpModal } from "@/components/donguri/level-up-modal";
 import { markLevelUpSeen } from "@/lib/actions/donguri";
 import { Button } from "@/components/ui/button";
-import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { Jyutping, JyutpingInput } from "@/components/vocab/jyutping";
 import { LessonButton, lessonAccent } from "@/components/vocab/word-lesson";
@@ -92,6 +92,10 @@ export const TestSession = ({
   const [score, setScore] = useState({ correct: 0, incorrect: 0 });
   const [finished, setFinished] = useState(false);
   const [xp, setXp] = useState(initialXp);
+  // XP when the quiz began, fixed: the page re-renders once it's over (the
+  // header refresh) and hands down the new total as `initialXp`, which would
+  // make "XP earned" drop to zero.
+  const [startXp] = useState(initialXp);
   const [bonusAwarded, setBonusAwarded] = useState(false);
   const [streakBonus, setStreakBonus] = useState(0);
   const [equippedAccessory, setEquippedAccessory] = useState<AccessoryId | null>(
@@ -318,66 +322,45 @@ export const TestSession = ({
     const perfectScore = totalAnswers > 0 && score.incorrect === 0;
 
     return (
-      <section className="mx-auto flex w-full max-w-lg flex-col items-center rounded-3xl border border-card-border bg-washi-soft px-6 py-14 text-center shadow-sm sm:px-10">
-        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-matcha-soft text-3xl text-matcha-dark">
-          {perfectScore ? "★" : "✓"}
-        </span>
-
-        <PageTitle className="mt-5">
-          {perfectScore
+      <SessionResults
+        perfect={perfectScore}
+        title={
+          perfectScore
             ? t("test_session.perfect_score", "Perfect score!")
-            : t("test_session.lovely_work", "Lovely work today!")}
-        </PageTitle>
-
-        <PageSubtitle className="mt-2 max-w-sm">
-          {t(
-            "test_session.results_subtitle",
-            "Every practice session helps these words stick a little better.",
-          )}
-        </PageSubtitle>
-
-        <div className="mt-6 flex flex-col items-center gap-2">
-          <XpCounter value={xp} />
-          {bonusAwarded && (
-            <span className="text-sm font-medium text-matcha-dark">
-              {t("test_session.perfect_bonus", "+5 bonus for a perfect quiz!")}
-            </span>
-          )}
-          {streakBonus > 0 && (
-            <span className="text-sm font-medium text-matcha-dark">
-              {t("test_session.streak_bonus", "+{{amount}} streak bonus!", {
-                amount: formatXp(streakBonus),
-              })}
-            </span>
-          )}
-        </div>
-
-        <div className="mt-7 grid w-full grid-cols-2 gap-3">
-          <div className="rounded-2xl bg-matcha-soft px-4 py-5">
-            <p className="text-2xl font-semibold text-matcha-dark">{score.correct}</p>
-            <p className="mt-1 text-sm text-matcha-dark/80">
-              {t("test_session.correct", "Correct")}
-            </p>
-          </div>
-
-          <div className="rounded-2xl bg-ai-soft px-4 py-5">
-            <p className="text-2xl font-semibold text-ai-dark">{score.incorrect}</p>
-            <p className="mt-1 text-sm text-ai-dark/80">
-              {t("test_session.to_practise_again", "To practise again")}
-            </p>
-          </div>
-        </div>
-
-        <Button
-          href={`/dashboard/courses/${courseSlug}`}
-          prefetch
-          size="lg"
-          fullWidth
-          className="mt-8 shadow-sm hover:-translate-y-0.5 hover:shadow-md"
-        >
-          {t("test_session.back_to_course", "Back to course")}
-        </Button>
-
+            : t("test_session.lovely_work", "Lovely work today!")
+        }
+        subtitle={t(
+          "test_session.results_subtitle",
+          "Every practice session helps these words stick a little better.",
+        )}
+        earned={xp - startXp}
+        earnedLabel={t("test_session.xp_earned", "earned this quiz")}
+        xp={xp}
+        perfectBonus={bonusAwarded ? t("test_session.perfect_bonus", "+5 bonus for a perfect quiz!") : null}
+        streakBonus={
+          streakBonus > 0
+            ? t("test_session.streak_bonus", "+{{amount}} streak bonus!", { amount: formatXp(streakBonus) })
+            : null
+        }
+        tiles={[
+          {
+            image: "/images/mascot.png",
+            count: score.correct,
+            label: t("test_session.correct", "Correct"),
+            tile: "bg-matcha-soft",
+            text: "text-matcha-dark",
+          },
+          {
+            image: "/images/rabbit-flash.webp",
+            count: score.incorrect,
+            label: t("test_session.to_practise_again", "To practise again"),
+            tile: "bg-ai-soft",
+            text: "text-ai-dark",
+          },
+        ]}
+        backHref={`/dashboard/courses/${courseSlug}`}
+        backLabel={t("test_session.back_to_course", "Back to course")}
+      >
         {levelUpInfo && (
           <LevelUpModal
             newLevel={levelUpInfo.newLevel}
@@ -394,7 +377,7 @@ export const TestSession = ({
             }}
           />
         )}
-      </section>
+      </SessionResults>
     );
   }
 

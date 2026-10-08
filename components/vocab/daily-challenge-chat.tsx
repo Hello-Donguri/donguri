@@ -47,6 +47,7 @@ import { Jyutping, JyutpingInput } from "@/components/vocab/jyutping";
 import { GlossedJyutping, GlossedText } from "@/components/vocab/glossed-text";
 import { RainbowAvatar } from "@/components/donguri/rainbow-avatar";
 import { ScoreBar } from "@/components/vocab/score-bar";
+import { ChallengeIntroModal } from "@/components/vocab/challenge-intro-modal";
 import type { AccessoryId } from "@/lib/levels";
 
 // How long Charles's quack plays before his reply appears.
@@ -191,6 +192,9 @@ function DailyChallengeChat({
   const [translatedIds, setTranslatedIds] = useState<Set<number>>(
     () => new Set(),
   );
+  // The target intro opens with every new attempt (see ChallengeIntroModal);
+  // the target strip's icon brings it back.
+  const [introOpen, setIntroOpen] = useState(true);
   const [isReplying, startReply] = useTransition();
   const [isSkipping, startSkip] = useTransition();
   const skipDialogRef = useRef<HTMLDialogElement>(null);
@@ -385,6 +389,11 @@ function DailyChallengeChat({
     });
   }
 
+  function closeIntro() {
+    setIntroOpen(false);
+    if (!isComplete) inputRef.current?.focus({ preventScroll: true });
+  }
+
   function toggleTranslation(id: number) {
     setTranslatedIds((current) => {
       const next = new Set(current);
@@ -535,7 +544,9 @@ function DailyChallengeChat({
               used={latestTargets}
               onSkip={handleSkip}
               skipDisabled={isCharlesTyping || isSkipping || isAdvancing}
+              onShowIntro={() => setIntroOpen(true)}
             />
+            <ChallengeIntroModal open={introOpen} target={target} onClose={closeIntro} />
             <SkipChallengeDialog
               dialogRef={skipDialogRef}
               pending={isSkipping}
@@ -927,6 +938,7 @@ function TargetBanner({
   used,
   onSkip,
   skipDisabled,
+  onShowIntro,
 }: {
   target: ChallengeTarget;
   isComplete: boolean;
@@ -935,6 +947,8 @@ function TargetBanner({
   // "Too hard? Skip" — moves on to the day's next challenge.
   onSkip: () => void;
   skipDisabled: boolean;
+  // Reopens the target intro (see ChallengeIntroModal).
+  onShowIntro: () => void;
 }) {
   const t = useTranslations();
   const items = [
@@ -952,13 +966,20 @@ function TargetBanner({
           : "border-matcha/20 bg-matcha-soft/60",
       )}
     >
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-washi/80 text-matcha-dark shadow-sm">
-        {isComplete ? (
+      {isComplete ? (
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-washi/80 text-matcha-dark shadow-sm">
           <CheckIcon className="h-5 w-5" />
-        ) : (
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={onShowIntro}
+          aria-label={t("challenge_intro.reopen", "Show today's target")}
+          className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-washi/80 text-matcha-dark shadow-sm transition hover:bg-washi hover:ring-2 hover:ring-matcha/40"
+        >
           <TargetIcon className="h-5 w-5" />
-        )}
-      </span>
+        </button>
+      )}
       <div className="min-w-0 flex-1">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-matcha-dark">
           {isComplete

@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Check, Flame, Star } from "lucide-react";
-import { Confetti } from "@/components/ui/confetti";
+import { SessionResults } from "@/components/vocab/session-results";
 import { useRouter } from "next/navigation";
 import {
   submitAnswer,
@@ -29,15 +28,12 @@ import {
   type ChoiceFeedback,
 } from "@/components/vocab/session-ui";
 import { WordImage } from "@/components/ui/word-image";
-import { XpCounter } from "@/components/xp/xp-counter";
 import { XpGainToast, type XpGain } from "@/components/xp/xp-gain-toast";
 import { LiveScore } from "@/components/vocab/live-score";
-import { XpEarned } from "@/components/xp/xp-earned";
 import { announceReviewQueueChanged } from "@/lib/review-sync";
 import { LevelUpModal } from "@/components/donguri/level-up-modal";
 import { markLevelUpSeen } from "@/lib/actions/donguri";
 import { Button } from "@/components/ui/button";
-import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { Jyutping, JyutpingInput } from "@/components/vocab/jyutping";
 import { InlineLesson, LessonButton, loadLesson } from "@/components/vocab/word-lesson";
@@ -313,164 +309,45 @@ const ReviewSessionQuestions = ({
     const perfectScore = totalAnswers > 0 && score.incorrect === 0;
 
     return (
-      // A celebration: confetti (a shower for a perfect review, a sprinkle
-      // otherwise), the badge on a spinning sunburst, the XP spun up, the
-      // bonuses slapped on as stickers, and the mascots bobbing in their
-      // tiles — on a raised card with a tilted backing, like the home page.
-      <section className="relative isolate mx-auto w-full max-w-lg">
-        <div aria-hidden className="absolute -inset-2 -z-10 -rotate-1 rounded-[2rem] bg-matcha-soft" />
-        <div className="relative flex flex-col items-center overflow-hidden rounded-3xl border border-card-border bg-raised px-6 py-14 text-center shadow-lg sm:px-10">
-        {!reduceMotion && <Confetti pieces={perfectScore ? 48 : 18} delay={0.2} />}
-
-        <span className="relative flex h-24 w-24 items-center justify-center">
-          {/* A slowly turning sunburst behind the badge. */}
-          {!reduceMotion && (
-            <motion.span
-              aria-hidden
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1, rotate: 360 }}
-              transition={{
-                scale: { type: "spring", stiffness: 200, damping: 12, delay: 0.1 },
-                opacity: { duration: 0.3, delay: 0.1 },
-                rotate: { duration: 14, ease: "linear", repeat: Infinity },
-              }}
-              className="absolute inset-0"
-            >
-              {Array.from({ length: 8 }, (_, ray) => (
-                <span
-                  key={ray}
-                  className={`absolute top-1/2 left-1/2 h-3 w-12 -translate-y-1/2 origin-left rounded-full ${
-                    perfectScore ? "bg-kin/40" : "bg-matcha/25"
-                  }`}
-                  style={{ rotate: `${ray * 45}deg` }}
-                />
-              ))}
-            </motion.span>
-          )}
-          <motion.span
-            initial={reduceMotion ? false : { scale: 0, rotate: -40 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ type: "spring", stiffness: 320, damping: 10 }}
-            className={`relative flex h-16 w-16 items-center justify-center rounded-full shadow-md ${
-              perfectScore ? "bg-kin text-ink-on-light" : "bg-matcha text-washi"
-            }`}
-          >
-            {perfectScore ? (
-              <Star aria-hidden className="h-8 w-8 fill-current" />
-            ) : (
-              <Check aria-hidden className="h-8 w-8" strokeWidth={3} />
-            )}
-          </motion.span>
-        </span>
-
-        <motion.div
-          initial={reduceMotion ? false : { scale: 0.7, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 300, damping: 12, delay: 0.15 }}
-        >
-        <PageTitle className="mt-3">
-          {perfectScore
+      <SessionResults
+        perfect={perfectScore}
+        title={
+          perfectScore
             ? t("review_session.perfect_review", "Perfect review!")
-            : t("review_session.review_complete", "Review complete!")}
-        </PageTitle>
-        </motion.div>
-
-        <PageSubtitle className="mt-2 max-w-sm">
-          {t(
-            "review_session.results_subtitle",
-            "These words will come back around on their own schedule.",
-          )}
-        </PageSubtitle>
-
-        {/* What this review earned, counting up — then the running total. */}
-        <div className="mt-6 flex flex-col items-center gap-2">
-          <XpEarned value={Math.max(0, xp - startXp)} />
-          <p className="text-sm font-medium text-sumi-soft">
-            {t("review_session.xp_earned", "earned this review")}
-          </p>
-          <XpCounter value={xp} className="mt-2" />
-          {/* The bonuses, slapped on like stickers once the XP has spun up. */}
-          {(bonusAwarded || streakBonus > 0) && (
-            <div className="mt-2 flex flex-wrap justify-center gap-2">
-              {bonusAwarded && (
-                <motion.span
-                  initial={reduceMotion ? false : { scale: 0, rotate: -30 }}
-                  animate={{ scale: 1, rotate: -4 }}
-                  transition={{ type: "spring", stiffness: 380, damping: 11, delay: 2 }}
-                  className="inline-flex items-center gap-1.5 rounded-full border-2 border-raised bg-kin px-3.5 py-1.5 font-nunito text-sm font-black text-ink-on-light shadow-md"
-                >
-                  <Star aria-hidden className="h-4 w-4 fill-current" />
-                  {t("review_session.perfect_bonus", "+5 bonus for a perfect review!")}
-                </motion.span>
-              )}
-              {streakBonus > 0 && (
-                <motion.span
-                  initial={reduceMotion ? false : { scale: 0, rotate: 30 }}
-                  animate={{ scale: 1, rotate: 3 }}
-                  transition={{ type: "spring", stiffness: 380, damping: 11, delay: 2.25 }}
-                  className="inline-flex items-center gap-1.5 rounded-full border-2 border-raised bg-sakura px-3.5 py-1.5 font-nunito text-sm font-black text-washi shadow-md"
-                >
-                  <Flame aria-hidden className="h-4 w-4 fill-current" />
-                  {t("test_session.streak_bonus", "+{{amount}} streak bonus!", {
-                    amount: formatXp(streakBonus),
-                  })}
-                </motion.span>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Each tile pops in with its mascot, just after the XP count. */}
-        <div className="mt-7 grid w-full grid-cols-2 gap-3">
-          {[
-            {
-              image: CORRECT_MASCOT,
-              count: score.correct,
-              label: t("test_session.correct", "Correct"),
-              tile: "bg-matcha-soft",
-              text: "text-matcha-dark",
-            },
-            {
-              image: QUEUE_MASCOT,
-              count: score.incorrect,
-              label: t("review_session.back_in_queue", "Back in your queue soon"),
-              tile: "bg-ai-soft",
-              text: "text-ai-dark",
-            },
-          ].map((item, index) => (
-            <motion.div
-              key={item.label}
-              initial={reduceMotion ? false : { opacity: 0, scale: 0.85, y: 12 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ type: "spring", stiffness: 320, damping: 18, delay: 0.9 + index * 0.15 }}
-              className={`flex flex-col items-center rounded-2xl px-4 pb-5 pt-4 ${item.tile}`}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element -- a decorative mascot, sized by CSS. */}
-              <img
-                src={item.image}
-                alt=""
-                aria-hidden
-                className={`h-20 w-auto object-contain drop-shadow-sm ${reduceMotion ? "" : "profile-bob"}`}
-                style={{ animationDelay: `${index * -1.4}s` }}
-              />
-              <p className={`mt-2 font-nunito text-3xl font-extrabold ${item.text}`}>{item.count}</p>
-              <p className={`mt-0.5 text-sm font-medium ${item.text} opacity-80`}>{item.label}</p>
-            </motion.div>
-          ))}
-        </div>
-
-        <Button
-          href={`/dashboard/courses/${courseSlug}`}
-          prefetch
-          size="lg"
-          fullWidth
-          className="mt-8 shadow-sm hover:-translate-y-0.5 hover:shadow-md"
-        >
-          {t("test_session.back_to_course", "Back to course")}
-        </Button>
-
-        </div>
-
+            : t("review_session.review_complete", "Review complete!")
+        }
+        subtitle={t(
+          "review_session.results_subtitle",
+          "These words will come back around on their own schedule.",
+        )}
+        earned={xp - startXp}
+        earnedLabel={t("review_session.xp_earned", "earned this review")}
+        xp={xp}
+        perfectBonus={bonusAwarded ? t("review_session.perfect_bonus", "+5 bonus for a perfect review!") : null}
+        streakBonus={
+          streakBonus > 0
+            ? t("test_session.streak_bonus", "+{{amount}} streak bonus!", { amount: formatXp(streakBonus) })
+            : null
+        }
+        tiles={[
+          {
+            image: CORRECT_MASCOT,
+            count: score.correct,
+            label: t("test_session.correct", "Correct"),
+            tile: "bg-matcha-soft",
+            text: "text-matcha-dark",
+          },
+          {
+            image: QUEUE_MASCOT,
+            count: score.incorrect,
+            label: t("review_session.back_in_queue", "Back in your queue soon"),
+            tile: "bg-ai-soft",
+            text: "text-ai-dark",
+          },
+        ]}
+        backHref={`/dashboard/courses/${courseSlug}`}
+        backLabel={t("test_session.back_to_course", "Back to course")}
+      >
         {levelUpInfo && (
           <LevelUpModal
             newLevel={levelUpInfo.newLevel}
@@ -487,7 +364,7 @@ const ReviewSessionQuestions = ({
             }}
           />
         )}
-      </section>
+      </SessionResults>
     );
   }
 

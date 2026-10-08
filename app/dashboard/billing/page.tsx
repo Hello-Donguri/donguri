@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import Image from "next/image";
-import { BookOpen, CalendarDays, Check, Languages, MessageCircle, Repeat2 } from "lucide-react";
+import {
+  BookOpen,
+  CalendarDays,
+  Check,
+  Languages,
+  MessageCircle,
+  Repeat2,
+} from "lucide-react";
 import { cacheLife } from "next/cache";
 import { requireRegisteredProfile } from "@/lib/dal";
 import { getMembershipDisplayPrice } from "@/lib/billing";
@@ -53,9 +60,13 @@ export default async function BillingPage({ searchParams }: PageProps) {
   const priceLabel = `${new Intl.NumberFormat(locale, {
     style: "currency",
     currency: price.currency.toUpperCase(),
-  }).format(price.amount)}/${price.interval === "month" ? t("billing.per_month", "month") : price.interval}`;
+  }).format(
+    price.amount,
+  )}/${price.interval === "month" ? t("billing.per_month", "month") : price.interval}`;
   const formatDate = (date: Date | null) =>
-    date ? new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(date) : "";
+    date
+      ? new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(date)
+      : "";
   // Had a membership before (now ended) — welcomed back rather than
   // pitched to.
   const returning = Boolean(subscription?.status);
@@ -70,19 +81,28 @@ export default async function BillingPage({ searchParams }: PageProps) {
     },
     {
       icon: MessageCircle,
-      title: t("billing.feature_challenge", "Daily chat challenges with Charles Duck"),
+      title: t(
+        "billing.feature_challenge",
+        "Daily chat challenges with Charles Duck",
+      ),
       tile: "border-matcha/20 bg-matcha-soft/50",
       chip: "bg-matcha text-washi",
     },
     {
       icon: Languages,
-      title: t("billing.feature_feedback", "Feedback on your English in Japanese and English"),
+      title: t(
+        "billing.feature_feedback",
+        "Feedback on your English in Japanese and English",
+      ),
       tile: "border-sakura/20 bg-sakura-soft/50",
       chip: "bg-sakura text-washi",
     },
     {
       icon: Repeat2,
-      title: t("billing.feature_reviews", "Spaced-repetition reviews so words stick"),
+      title: t(
+        "billing.feature_reviews",
+        "Spaced-repetition reviews so words stick",
+      ),
       tile: "border-kin/30 bg-kin/10",
       chip: "bg-kin text-ink-on-light",
     },
@@ -94,7 +114,10 @@ export default async function BillingPage({ searchParams }: PageProps) {
         <div>
           <PageTitle>{t("billing.heading", "Membership")}</PageTitle>
           <PageSubtitle>
-            {t("billing.subtitle", "Your Donguri membership, payment details and invoices.")}
+            {t(
+              "billing.subtitle",
+              "Your Donguri membership, payment details and invoices.",
+            )}
           </PageSubtitle>
         </div>
       )}
@@ -109,21 +132,33 @@ export default async function BillingPage({ searchParams }: PageProps) {
 
       {profile.hasAccess && subscription ? (
         <section className="relative max-w-2xl">
-          <div aria-hidden className="absolute -inset-2 -z-10 -rotate-1 rounded-[2.25rem] bg-matcha-soft" />
+          <div
+            aria-hidden
+            className="absolute -inset-2 -z-10 -rotate-1 rounded-[2.25rem] bg-matcha-soft"
+          />
           <div className="flex flex-col gap-5 rounded-4xl border border-card-border bg-raised p-6 shadow-lg sm:p-7">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-acorn-soft p-2">
-                  <DonguriMascot className="profile-bob h-full w-auto" aria-hidden />
+                  <DonguriMascot
+                    className="profile-bob h-full w-auto"
+                    aria-hidden
+                  />
                 </span>
                 <div>
                   <h2 className="text-xl font-extrabold text-sumi">
                     {t("billing.plan_name", "Donguri Membership")}
                   </h2>
-                  <p className="font-nunito text-sm font-bold text-matcha-dark">{priceLabel}</p>
+                  <p className="font-nunito text-sm font-bold text-matcha-dark">
+                    {priceLabel}
+                  </p>
                 </div>
               </div>
-              <StatusBadge status={status} cancelling={subscription.cancelAtPeriodEnd} t={t} />
+              <StatusBadge
+                status={status}
+                cancelling={subscription.cancelAtPeriodEnd}
+                t={t}
+              />
             </div>
 
             <div
@@ -134,34 +169,59 @@ export default async function BillingPage({ searchParams }: PageProps) {
             >
               <CalendarDays
                 aria-hidden
-                className={cn("mt-0.5 h-4 w-4 shrink-0", status === "past_due" ? "text-shu" : "text-acorn")}
+                className={cn(
+                  "mt-0.5 h-4 w-4 shrink-0",
+                  status === "past_due" ? "text-shu" : "text-acorn",
+                )}
                 strokeWidth={2.25}
               />
               <p>
                 {status === "trialing"
                   ? subscription.cancelAtPeriodEnd
-                    ? t("billing.trial_cancelling", "Your free trial ends on {{date}} and won't renew. You won't be charged.", {
-                        date: formatDate(subscription.trialEnd),
-                      })
-                    : t("billing.trial_active", "Your free trial ends on {{date}}. After that you'll be charged {{price}} unless you cancel before then.", {
-                        date: formatDate(subscription.trialEnd),
-                        price: priceLabel,
-                      })
+                    ? t(
+                        "billing.trial_cancelling",
+                        "Your free trial ends on {{date}} and won't renew. You won't be charged.",
+                        {
+                          date: formatDate(subscription.trialEnd),
+                        },
+                      )
+                    : t(
+                        "billing.trial_active",
+                        "Your free trial ends on {{date}}. After that you'll be charged {{price}} unless you cancel before then.",
+                        {
+                          date: formatDate(subscription.trialEnd),
+                          price: priceLabel,
+                        },
+                      )
                   : status === "past_due"
-                    ? t("billing.past_due", "Your last payment didn't go through. Please update your payment method to keep your access.")
+                    ? t(
+                        "billing.past_due",
+                        "Your last payment didn't go through. Please update your payment method to keep your access.",
+                      )
                     : subscription.cancelAtPeriodEnd
-                      ? t("billing.cancelling", "Your membership ends on {{date}} and won't renew.", {
-                          date: formatDate(subscription.currentPeriodEnd),
-                        })
-                      : t("billing.renews", "Your membership renews on {{date}}.", {
-                          date: formatDate(subscription.currentPeriodEnd),
-                        })}
+                      ? t(
+                          "billing.cancelling",
+                          "Your membership ends on {{date}} and won't renew.",
+                          {
+                            date: formatDate(subscription.currentPeriodEnd),
+                          },
+                        )
+                      : t(
+                          "billing.renews",
+                          "Your membership renews on {{date}}.",
+                          {
+                            date: formatDate(subscription.currentPeriodEnd),
+                          },
+                        )}
               </p>
             </div>
 
             <div className="flex flex-col gap-3 border-t border-dashed border-card-border pt-5 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-sumi-soft">
-                {t("billing.portal_hint", "Update your card, download invoices or cancel on Stripe's secure page.")}
+                {t(
+                  "billing.portal_hint",
+                  "Update your card, download invoices or cancel on Stripe's secure page.",
+                )}
               </p>
               <BillingActionButton
                 action={openBillingPortal}
@@ -180,29 +240,50 @@ export default async function BillingPage({ searchParams }: PageProps) {
           <span className="text-2xl" aria-hidden>
             🌰
           </span>
-          {t("billing.admin_access", "You have full access as an admin — no membership needed.")}
+          {t(
+            "billing.admin_access",
+            "You have full access as an admin — no membership needed.",
+          )}
         </p>
       ) : (
         <section className="relative mx-auto w-full max-w-4xl">
-          <div aria-hidden className="absolute -inset-2 -z-10 rotate-1 rounded-[2.25rem] bg-acorn-soft" />
+          <div
+            aria-hidden
+            className="absolute -inset-2 -z-10 rotate-1 rounded-[2.25rem] bg-acorn-soft"
+          />
           <div className="overflow-hidden rounded-4xl border border-card-border bg-raised shadow-lg">
             <div className="relative bg-matcha-soft px-6 pt-10 pb-10 sm:px-10">
               <div className="relative z-10 mx-auto flex max-w-xl flex-col items-center text-center">
-                <DonguriMascot className="profile-bob mb-4 h-24 w-auto sm:h-28" aria-hidden />
-                <Eyebrow accent="matcha">{t("billing.plan_name", "Donguri Membership")}</Eyebrow>
+                <DonguriMascot
+                  className="profile-bob mb-4 h-24 w-auto sm:h-28"
+                  aria-hidden
+                />
+                <Eyebrow accent="matcha">
+                  {t("billing.plan_name", "Donguri Membership")}
+                </Eyebrow>
 
                 <h2 className="mt-4 font-nunito text-4xl font-black leading-[1.06] tracking-tight text-sumi text-balance sm:text-5xl">
                   {returning
-                    ? t("billing.resubscribe_title", "Pick up where you left off")
+                    ? t(
+                        "billing.resubscribe_title",
+                        "Pick up where you left off",
+                      )
                     : t("billing.join_title", "Get Donguri Pro")}
                 </h2>
 
                 <p className="mt-4 max-w-xl text-lg text-sumi-soft text-pretty">
                   {returning
-                    ? t("billing.resubscribe_body", "Your membership has ended. Resubscribe to get back to your courses — your progress is saved.")
-                    : t("billing.join_body", "Learn every word and grammar point, and chat with Charles Duck every day. {{price}}, and you can cancel anytime.", {
-                        price: priceLabel,
-                      })}
+                    ? t(
+                        "billing.resubscribe_body",
+                        "Your membership has ended. Resubscribe to get back to your courses — your progress is saved.",
+                      )
+                    : t(
+                        "billing.join_body",
+                        "Learn every word and grammar point, and chat with Charles Duck every day. {{price}}, and you can cancel anytime.",
+                        {
+                          price: priceLabel,
+                        },
+                      )}
                 </p>
               </div>
 
@@ -232,8 +313,17 @@ export default async function BillingPage({ searchParams }: PageProps) {
                     feature.tile,
                   )}
                 >
-                  <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-full", feature.chip)}>
-                    <feature.icon aria-hidden className="h-5 w-5" strokeWidth={2.25} />
+                  <span
+                    className={cn(
+                      "flex h-11 w-11 shrink-0 items-center justify-center rounded-full",
+                      feature.chip,
+                    )}
+                  >
+                    <feature.icon
+                      aria-hidden
+                      className="h-5 w-5"
+                      strokeWidth={2.25}
+                    />
                   </span>
                   {feature.title}
                 </li>
@@ -248,9 +338,14 @@ export default async function BillingPage({ searchParams }: PageProps) {
                   size="lg"
                   fullWidth
                   className="h-14 px-8 text-base"
-                  pendingText={t("billing.redirecting", "Taking you to secure checkout…")}
+                  pendingText={t(
+                    "billing.redirecting",
+                    "Taking you to secure checkout…",
+                  )}
                 >
-                  {t("billing.subscribe", "Subscribe for {{price}}", { price: priceLabel })}
+                  {t("billing.subscribe", "Subscribe for {{price}}", {
+                    price: priceLabel,
+                  })}
                 </BillingActionButton>
               </div>
 
@@ -261,7 +356,11 @@ export default async function BillingPage({ searchParams }: PageProps) {
                   t("billing.point_stripe", "Secure payment with Stripe"),
                 ].map((point) => (
                   <li key={point} className="inline-flex items-center gap-1.5">
-                    <Check aria-hidden className="h-4 w-4 text-matcha" strokeWidth={3} />
+                    <Check
+                      aria-hidden
+                      className="h-4 w-4 text-matcha"
+                      strokeWidth={3}
+                    />
                     {point}
                   </li>
                 ))}
@@ -289,11 +388,19 @@ function StatusBadge({
       : status === "past_due"
         ? [t("billing.status_past_due", "Payment failed"), "bg-shu/15 text-shu"]
         : cancelling
-          ? [t("billing.status_cancelling", "Cancelling"), "bg-washi-soft text-sumi-soft"]
-          : [t("billing.status_active", "Active"), "bg-matcha-soft text-matcha-dark"];
+          ? [
+              t("billing.status_cancelling", "Cancelling"),
+              "bg-washi-soft text-sumi-soft",
+            ]
+          : [
+              t("billing.status_active", "Active"),
+              "bg-matcha-soft text-matcha-dark",
+            ];
 
   return (
-    <span className={cn("rounded-full px-3.5 py-1.5 text-xs font-bold", tone)}>{label}</span>
+    <span className={cn("rounded-full px-3.5 py-1.5 text-xs font-bold", tone)}>
+      {label}
+    </span>
   );
 }
 
@@ -310,35 +417,47 @@ async function CheckoutNotice({
   hasAccess: boolean;
   isTrial: boolean;
 }) {
-  const [{ checkout }, { t }] = await Promise.all([searchParams, getTranslator()]);
+  const [{ checkout }, { t }] = await Promise.all([
+    searchParams,
+    getTranslator(),
+  ]);
   const justStarted = checkout === "success" && hasAccess;
 
   return (
     <>
-        {justStarted && (
-          <div className="flex max-w-2xl flex-col gap-4 rounded-3xl border border-matcha/40 bg-matcha-soft p-5 sm:flex-row sm:items-center">
-            <DonguriMascot className="profile-bob h-16 w-auto shrink-0 self-start sm:self-center" aria-hidden />
-            <div className="flex-1">
-              <p className="font-nunito text-lg font-extrabold text-sumi">
-                {isTrial
-                  ? t("billing.welcome_trial", "Your free trial has started 🎉")
-                  : t("billing.welcome_member", "Welcome to Donguri 🎉")}
-              </p>
-              <p className="text-sm text-sumi-soft">
-                {t("billing.welcome_body", "Everything is unlocked — let's get learning.")}
-              </p>
-            </div>
-            <Button variant="secondary" href="/dashboard">
-              {t("billing.start_learning", "Start learning")}
-            </Button>
+      {justStarted && (
+        <div className="flex max-w-2xl flex-col gap-4 rounded-3xl border border-matcha/40 bg-matcha-soft p-5 sm:flex-row sm:items-center">
+          <DonguriMascot
+            className="profile-bob h-16 w-auto shrink-0 self-start sm:self-center"
+            aria-hidden
+          />
+          <div className="flex-1">
+            <p className="font-nunito text-lg font-extrabold text-sumi">
+              {isTrial
+                ? t("billing.welcome_trial", "Your free trial has started 🎉")
+                : t("billing.welcome_member", "Welcome to Donguri 🎉")}
+            </p>
+            <p className="text-sm text-sumi-soft">
+              {t(
+                "billing.welcome_body",
+                "Everything is unlocked — let's get learning.",
+              )}
+            </p>
           </div>
-        )}
+          <Button variant="secondary" href="/dashboard">
+            {t("billing.start_learning", "Start learning")}
+          </Button>
+        </div>
+      )}
 
-        {checkout === "cancelled" && !hasAccess && (
-          <p className="max-w-2xl rounded-2xl bg-washi-soft px-5 py-3 text-sm text-sumi-soft">
-            {t("billing.checkout_cancelled", "Checkout was cancelled — nothing was charged.")}
-          </p>
-        )}
+      {checkout === "cancelled" && !hasAccess && (
+        <p className="max-w-2xl rounded-2xl bg-washi-soft px-5 py-3 text-sm text-sumi-soft">
+          {t(
+            "billing.checkout_cancelled",
+            "Checkout was cancelled — nothing was charged.",
+          )}
+        </p>
+      )}
     </>
   );
 }

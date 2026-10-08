@@ -35,7 +35,7 @@ const geistMono = localFont({
 const nunito = localFont({
   src: "./fonts/nunito-latin.woff2",
   variable: "--font-nunito",
-  weight: "400 800",
+  weight: "400 900",
   display: "swap",
 });
 
