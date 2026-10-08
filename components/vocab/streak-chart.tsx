@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { Flame } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { BookOpen, Clock, Flame, MessageCircle, Puzzle, type LucideIcon } from "lucide-react";
 import type { DailyActivityCount } from "@/lib/definitions";
 import { useTranslations } from "@/components/i18n/locale-provider";
+import { cn } from "@/lib/utils";
 
 function formatDayShort(dateStr: string): string {
   return new Intl.DateTimeFormat("en", { weekday: "short", timeZone: "UTC" }).format(
@@ -33,17 +35,13 @@ const SEGMENT_GAP = 2;
 const BAR_RADIUS = 4;
 const MAX_STREAK_DOTS = 14;
 
-// Vocab and grammar deliberately share the blue hue family (both are core
-// lesson content); reviews are red, matching the Review action card, and
-// the daily challenge gets its own green. Because
-// two series share a hue, identity leans on the legend + tooltip + sr-only
-// table rather than color-matching alone — see the CVD separation check run
-// against --chart-vocab/--chart-grammar/--chart-challenge before picking
-// these colors.
+// Vocab blue, grammar gold, reviews red, the daily challenge green (see
+// --chart-* in globals.css), shared by the bars, legend and hover card.
 // Tailwind's scanner needs each class spelled out as a literal somewhere in
 // source — `` `fill-${colorClass}` `` would never be generated — so every
 // variant a series needs (fill/bg/stroke) is listed here in full rather than
-// built from a shared color token at render time.
+// built from a shared color token at render time. `tile`/`label` colour each
+// series' box in the hover card to match.
 const SERIES = [
   {
     key: "review",
@@ -51,6 +49,9 @@ const SERIES = [
     fallback: "Review",
     bgClass: "bg-chart-review",
     strokeClass: "stroke-chart-review",
+    icon: Clock,
+    tile: "border-shu/20 bg-shu/10",
+    label: "text-shu-dark",
   },
   {
     key: "grammar",
@@ -58,6 +59,9 @@ const SERIES = [
     fallback: "Grammar",
     bgClass: "bg-chart-grammar",
     strokeClass: "stroke-chart-grammar",
+    icon: Puzzle,
+    tile: "border-kin/30 bg-kin/10",
+    label: "text-acorn",
   },
   {
     key: "vocab",
@@ -65,6 +69,9 @@ const SERIES = [
     fallback: "Vocabulary",
     bgClass: "bg-chart-vocab",
     strokeClass: "stroke-chart-vocab",
+    icon: BookOpen,
+    tile: "border-ai/20 bg-ai-soft/50",
+    label: "text-ai-dark",
   },
   {
     key: "challenge",
@@ -72,6 +79,9 @@ const SERIES = [
     fallback: "Daily challenge",
     bgClass: "bg-chart-challenge",
     strokeClass: "stroke-chart-challenge",
+    icon: MessageCircle,
+    tile: "border-matcha/20 bg-matcha-soft/50",
+    label: "text-matcha-dark",
   },
 ] as const satisfies readonly {
   key: keyof Pick<DailyActivityCount, "vocab" | "grammar" | "review" | "challenge">;
@@ -79,7 +89,16 @@ const SERIES = [
   fallback: string;
   bgClass: string;
   strokeClass: string;
+  icon: LucideIcon;
+  tile: string;
+  label: string;
 }[];
+
+// The key's pills and the hover card's boxes, in the routine's order
+// rather than the stack's.
+const TOOLTIP_ORDER = ["vocab", "grammar", "review", "challenge"].map(
+  (key) => SERIES.find((series) => series.key === key)!,
+);
 
 // Rounded top corners only — the baseline and the seams between stacked
 // segments stay square, so rounding never fights the 2px surface gap.
@@ -140,6 +159,9 @@ export function StreakChart({
 }) {
   const t = useTranslations();
   const [hovered, setHovered] = useState<number | null>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ left: number; top: number } | null>(null);
 
   const totals = data.map((day) => day.vocab + day.grammar + day.review + day.challenge);
   const max = Math.max(1, ...totals);
@@ -163,8 +185,43 @@ export function StreakChart({
   const lastIndex = n - 1;
   const streakDots = Math.min(currentStreak, MAX_STREAK_DOTS);
 
-  const tooltipWidth = 128;
-  const tooltipHeight = 20 + SERIES.length * 14 + 6;
+  // Places the hover card in the viewport: centred over the hovered bar,
+  // above it if there's room, otherwise below the chart, and always kept
+  // inside the window's edges.
+  useLayoutEffect(() => {
+    const chart = chartRef.current;
+    const tooltip = tooltipRef.current;
+    if (hovered === null || !chart || !tooltip) {
+      setTooltipPos(null);
+      return;
+    }
+    const { x, topY } = days[hovered];
+    const rect = chart.getBoundingClientRect();
+    const margin = 8;
+    const gap = 10;
+    const width = tooltip.offsetWidth;
+    const height = tooltip.offsetHeight;
+    const anchorX = rect.left + (x / WIDTH) * rect.width;
+    const barTop = rect.top + (topY / HEIGHT) * rect.height;
+    const left = Math.min(Math.max(anchorX - width / 2, margin), window.innerWidth - width - margin);
+    const above = barTop - gap - height;
+    const top = above >= margin ? above : rect.bottom + gap;
+    setTooltipPos({ left, top });
+    // `days` is rebuilt every render; the hovered day and data identify it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hovered, data]);
+
+  // Fixed positioning doesn't follow the page, so close the card on scroll.
+  useEffect(() => {
+    if (hovered === null) return;
+    const close = () => setHovered(null);
+    window.addEventListener("scroll", close, { passive: true, capture: true });
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, { capture: true });
+      window.removeEventListener("resize", close);
+    };
+  }, [hovered]);
 
   return (
     <div className="min-w-0 p-6">
@@ -211,18 +268,8 @@ export function StreakChart({
         </p>
       )}
 
-      {/* Legend — the dependable identity channel for 4 series; never rely
-          on color-matching the bars alone. */}
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">
-        {SERIES.map((series) => (
-          <div key={series.key} className="flex items-center gap-1.5 text-xs text-sumi-soft">
-            <span className={`h-2 w-2 rounded-sm ${series.bgClass}`} />
-            {t(series.labelKey, series.fallback)}
-          </div>
-        ))}
-      </div>
 
-      <div className="mt-4" style={{ aspectRatio: `${WIDTH} / ${HEIGHT}` }}>
+      <div ref={chartRef} className="relative mt-4" style={{ aspectRatio: `${WIDTH} / ${HEIGHT}` }}>
         <svg
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           preserveAspectRatio="none"
@@ -354,40 +401,75 @@ export function StreakChart({
             ) : null,
           )}
 
-          {hovered !== null &&
-            (() => {
-              const { day, x, topY } = days[hovered];
-              const boxX = Math.min(Math.max(x - tooltipWidth / 2, PAD_LEFT), WIDTH - PAD_RIGHT - tooltipWidth);
-              const boxY = Math.max(topY - tooltipHeight - 10, 2);
-              return (
-                <g pointerEvents="none">
-                  <rect x={boxX} y={boxY} width={tooltipWidth} height={tooltipHeight} rx={8} className="fill-sumi" />
-                  <text x={boxX + 10} y={boxY + 15} className="fill-washi text-[10px] font-medium">
-                    {formatDayFull(day.date)}
-                  </text>
-                  {SERIES.map((series, i) => (
-                    <g key={series.key}>
-                      <line
-                        x1={boxX + 10}
-                        x2={boxX + 18}
-                        y1={boxY + 28 + i * 14}
-                        y2={boxY + 28 + i * 14}
-                        className={series.strokeClass}
-                        strokeWidth={2}
-                      />
-                      <text x={boxX + 24} y={boxY + 31 + i * 14} className="fill-washi/80 text-[9px]">
-                        {t(series.labelKey, series.fallback)}
-                      </text>
-                      <text x={boxX + tooltipWidth - 10} y={boxY + 31 + i * 14} textAnchor="end" className="fill-washi text-[10px] font-medium">
-                        {day[series.key]}
-                      </text>
-                    </g>
-                  ))}
-                </g>
-              );
-            })()}
         </svg>
+
+        {/* The hovered day's breakdown, as a little card above its bar —
+            HTML rather than SVG so it matches the site's cards (and isn't
+            stretched by the chart's non-uniform scaling). Portalled to the
+            body and placed in viewport coordinates (see the layout effect
+            above), so the card's overflow-hidden never clips it. */}
+        {hovered !== null &&
+          (() => {
+            const { day } = days[hovered];
+            return createPortal(
+              <div
+                ref={tooltipRef}
+                aria-hidden
+                className={cn(
+                  "pointer-events-none fixed z-50 w-60 rounded-2xl border border-card-border bg-raised p-2.5 shadow-md",
+                  // Measured hidden first, then shown in place.
+                  !tooltipPos && "invisible",
+                )}
+                style={{ left: tooltipPos?.left ?? 0, top: tooltipPos?.top ?? 0 }}
+              >
+                <p className="px-0.5 font-nunito text-xs font-extrabold uppercase tracking-[0.16em] text-sumi-soft">
+                  {formatDayFull(day.date)}
+                </p>
+                <ul className="mt-2 grid grid-cols-2 gap-1.5">
+                  {TOOLTIP_ORDER.map((series) => (
+                    <li
+                      key={series.key}
+                      className={cn(
+                        "rounded-xl border px-2.5 py-2",
+                        series.tile,
+                        day[series.key] === 0 && "opacity-55",
+                      )}
+                    >
+                      <span className={cn("flex items-center gap-1 font-nunito text-[11px] leading-tight font-extrabold", series.label)}>
+                        <series.icon aria-hidden className="h-3 w-3 shrink-0" strokeWidth={2.5} />
+                        <span className="truncate">{t(series.labelKey, series.fallback)}</span>
+                      </span>
+                      <span className="mt-0.5 block font-nunito text-xl leading-none font-black tabular-nums text-sumi">
+                        {day[series.key]}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>,
+              document.body,
+            );
+          })()}
       </div>
+
+      {/* Legend — the dependable identity channel for 4 series; never rely
+          on color-matching the bars alone. */}
+      <ul className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
+        {TOOLTIP_ORDER.map((series) => (
+          <li
+            key={series.key}
+            className={cn(
+              "flex items-center gap-1.5 rounded-full border py-1 pr-2.5 pl-1 font-nunito text-xs font-extrabold",
+              series.tile,
+              series.label,
+            )}
+          >
+            <span className={cn("flex h-4.5 w-4.5 items-center justify-center rounded-full text-washi", series.bgClass)}>
+              <series.icon aria-hidden className="h-2.5 w-2.5" strokeWidth={3} />
+            </span>
+            {t(series.labelKey, series.fallback)}
+          </li>
+        ))}
+      </ul>
 
       <table className="sr-only">
         <caption>{t("streak_chart.aria_label", "Vocabulary, grammar, reviews and daily challenges completed per day")}</caption>

@@ -66,21 +66,15 @@
   --chart-line: #1a54c4;
   --chart-area: #c9ceba;
 
-  /* Activity chart series — deliberately distinct from --ai/--matcha/--shu
-     (see the light-theme category checks in the dataviz skill): the action
-     colors above sit too close in lightness/contrast to double as stacked
-     bar fills, so these are tuned separately for that job while staying on
-     the same hues.
-     Vocab and grammar intentionally share the blue hue family (both are
-     "core learning" content) with only lightness/chroma separating them —
-     validated at ΔE 16.0 normal-vision, below the categorical 8-color
-     adjacency floor but readable because the legend, tooltip and sr-only
-     table all carry identity as a secondary channel. Challenge gets its
-     own green so the one non-lesson activity stays visually distinct. */
-  --chart-vocab: #3d84e0;
-  --chart-grammar: #2354a0;
-  --chart-challenge: #178a3d;
-  --chart-review: #d4402f; /* red, matching the Review action card */
+  /* Activity chart series: vocab blue, grammar gold, reviews red (the
+     brand red), the daily challenge green — the same solid colours as the
+     dashboard's buttons. Gold alone is deepened a touch with acorn, as on
+     its own it all but vanishes on the cream card. Dark mode softens them
+     all a little toward the card instead, see .dark. */
+  --chart-vocab: var(--ai);
+  --chart-grammar: color-mix(in oklab, var(--kin) 85%, var(--acorn));
+  --chart-challenge: var(--matcha);
+  --chart-review: var(--shu);
 
   /* Cantonese tones 1-6, colouring Jyutping syllables (see
      components/vocab/jyutping.tsx). Six clearly separate hues, darkened in
@@ -181,6 +175,10 @@
   --shu: #ff6e52;
   --shu-dark: #ff9075;
   --kin: #ffcb4d;
+  --chart-vocab: color-mix(in oklab, var(--ai) 72%, var(--washi-soft));
+  --chart-grammar: color-mix(in oklab, var(--kin) 72%, var(--washi-soft));
+  --chart-challenge: color-mix(in oklab, var(--matcha) 72%, var(--washi-soft));
+  --chart-review: color-mix(in oklab, var(--shu) 72%, var(--washi-soft));
 
   /* The XP pill is a fixed high-contrast dark badge by design (see the
      light values in :root) — it reads fine on either page background, so
@@ -192,10 +190,6 @@
   --tag-foreground: #7cb8ff;
   --chart-line: #4e9cff;
   --chart-area: #4a4030;
-  --chart-vocab: #4f8fe0;
-  --chart-grammar: #3a6099;
-  --chart-challenge: #2fae54;
-  --chart-review: #e5604f;
   --tone-1: #f06595;
   --tone-2: #ff922b;
   --tone-3: #4dabf7;

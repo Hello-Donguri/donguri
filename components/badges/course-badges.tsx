@@ -6,20 +6,25 @@ import { BadgeTile } from "@/components/badges/badge-tile";
 import { BadgeTooltip } from "@/components/badges/badge-tooltip";
 import { useLocale, useTranslations } from "@/components/i18n/locale-provider";
 import type { EarnedBadge, LockedBadge } from "@/lib/badges";
+import { cn } from "@/lib/utils";
 
-// How many earned badges fit in the greeting's row before "See all".
+// How many earned badges fit in the row before "See all", by default.
 const MAX_IN_ROW = 5;
 
-// The course page's badges, under "Welcome back": the learner's latest
+// The course page's badges, in the profile card beside the greeting: the learner's latest
 // badges for this course (and every-course ones) as a row of medals, with a
 // button that opens them all — earned, then still to earn with progress —
 // in a modal. Nothing at all until an admin has made a badge.
 export function CourseBadges({
   earned,
   locked,
+  maxInRow = MAX_IN_ROW,
+  className = "mt-3",
 }: {
   earned: EarnedBadge[];
   locked: LockedBadge[];
+  maxInRow?: number;
+  className?: string;
 }) {
   const t = useTranslations();
   const locale = useLocale();
@@ -27,17 +32,17 @@ export function CourseBadges({
 
   if (earned.length === 0 && locked.length === 0) return null;
 
-  const shown = earned.slice(0, MAX_IN_ROW);
+  const shown = earned.slice(0, maxInRow);
   const hidden = earned.length - shown.length;
   const open = () => dialogRef.current?.showModal();
 
   return (
     <>
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      <div className={cn("flex flex-wrap items-center gap-x-4 gap-y-2", className)}>
         {shown.length > 0 ? (
-          <ul className="flex items-center" aria-label={t("badges.your_badges", "Your badges")}>
-            {shown.map((badge, index) => (
-              <li key={badge.id} className={`relative hover:z-10 focus-within:z-10 ${index > 0 ? "-ml-2.5" : ""}`}>
+          <ul className="flex items-center gap-2" aria-label={t("badges.your_badges", "Your badges")}>
+            {shown.map((badge) => (
+              <li key={badge.id} className="relative hover:z-10 focus-within:z-10">
                 <BadgeTooltip name={badge.name}>
                   <span className="flex h-12 w-12 items-center justify-center rounded-full bg-raised shadow-sm ring-2 ring-washi transition group-hover/badge:-translate-y-1">
                     {/* eslint-disable-next-line @next/next/no-img-element -- an admin-uploaded bunny.net image. */}
@@ -57,14 +62,14 @@ export function CourseBadges({
         <button
           type="button"
           onClick={open}
-          className="inline-flex items-center gap-1 rounded-full border border-card-border bg-washi-soft px-3 py-1.5 text-sm font-semibold text-sumi transition hover:bg-raised"
+          className="group inline-flex items-center gap-0.5 text-sm font-semibold text-sumi-soft transition hover:text-sumi"
         >
           {hidden > 0
             ? t("badges.see_all_more", "+{{count}} · See all", { count: hidden })
             : shown.length > 0
               ? t("badges.see_all", "See all badges")
               : t("badges.see_what_to_earn", "See what you can earn")}
-          <ChevronRight aria-hidden className="h-4 w-4" />
+          <ChevronRight aria-hidden className="h-4 w-4 transition group-hover:translate-x-0.5" />
         </button>
       </div>
 

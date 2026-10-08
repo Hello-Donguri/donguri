@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { usePrefersReducedMotion } from "@/lib/use-prefers-reduced-motion";
+import { cn } from "@/lib/utils";
 
 // How far across its area a leaf may start, in percent of the width —
 // kept in from the right edge so the leaf and its swing stay in view.
@@ -95,15 +96,17 @@ function Leaf({ delayMs, fallSeconds, pauseMs, className, swing }: LeafProps) {
 // above the page (see Leaf). Fills its (positioned) parent — and reaches up
 // over the hero's top padding (pt-12 / sm:pt-14), so they come out from
 // right under the header — sits behind the content, and never takes clicks.
-// Nothing at all for visitors who've asked for reduced motion.
-export function FallingLeaf() {
+// `className` replaces that top offset for other places (e.g. "top-0" on
+// the auth pages, which have no padding to reach over). Nothing at all for
+// visitors who've asked for reduced motion.
+export function FallingLeaf({ className = "-top-12 sm:-top-14" }: { className?: string }) {
   const reduceMotion = usePrefersReducedMotion();
   if (reduceMotion) return null;
 
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute inset-x-0 -top-12 bottom-0 overflow-hidden sm:-top-14"
+      className={cn("pointer-events-none absolute inset-x-0 bottom-0 overflow-hidden", className)}
     >
       {LEAVES.map((leaf, index) => (
         <Leaf key={index} {...leaf} />

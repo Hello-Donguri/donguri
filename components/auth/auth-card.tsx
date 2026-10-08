@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { LanguageSelector } from "@/components/i18n/language-selector";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
+import { FallingLeaf } from "@/components/landing/falling-leaf";
 import PeeringDonguriAcorn from "@/components/auth/peering-donguri";
 
 type AuthCardProps = {
@@ -13,7 +14,12 @@ type AuthCardProps = {
 
 export function AuthCard({ title, subtitle, children, footer }: AuthCardProps) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-washi px-6 py-12">
+    <div className="relative isolate flex min-h-screen flex-col items-center justify-center overflow-hidden bg-washi px-6 py-12">
+      {/* Leaves drift down the whole page, behind everything (-z-10 inside
+          this isolated stack, so they stay above the page background). */}
+      <div aria-hidden className="absolute inset-0 -z-10">
+        <FallingLeaf className="top-0" />
+      </div>
       <div className="mb-8 flex items-center gap-3">
         <Logo />
         <LanguageSelector />

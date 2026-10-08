@@ -34,7 +34,7 @@ export function WordShortcuts({
     {
       href: `/dashboard/courses/${courseSlug}/learnt`,
       image: { src: "/images/books.webp", width: 375, height: 263 },
-      title: t("word_list.revisit_title", "Revisit learnt words"),
+      title: t("word_list.revisit_title", "Word garden"),
       count: learntCount,
       body: t(
         "word_list.revisit_card",

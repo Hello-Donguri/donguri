@@ -5,6 +5,9 @@ import { signInWithOAuth, type OAuthProvider } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
 import { useTranslations } from "@/components/i18n/locale-provider";
 
+// "Continue with LINE" is hidden for now — flip this to bring it back.
+const SHOW_LINE = false;
+
 // "Continue with Google / LINE", shown above the email form on the login
 // and signup pages — the same buttons do both, since the callback creates
 // the profile on first sign-in.
@@ -20,12 +23,14 @@ export function OAuthButtons({ error }: { error?: boolean }) {
         <GoogleIcon />
         {t("auth.continue_with_google", "Continue with Google")}
       </ProviderForm>
-      <ProviderForm
-        provider="line"
-        className="bg-[#06C755] text-white hover:bg-[#05b34c]"
-      >
-        {t("auth.continue_with_line", "Continue with LINE")}
-      </ProviderForm>
+      {SHOW_LINE && (
+        <ProviderForm
+          provider="line"
+          className="bg-[#06C755] text-white hover:bg-[#05b34c]"
+        >
+          {t("auth.continue_with_line", "Continue with LINE")}
+        </ProviderForm>
+      )}
       {error && (
         <p className="text-sm text-shu">
           {t("auth.oauth_error", "Couldn't sign you in. Please try again.")}

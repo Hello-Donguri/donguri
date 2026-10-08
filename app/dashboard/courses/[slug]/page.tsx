@@ -24,6 +24,9 @@ import { GuestLimitModal } from "@/components/access/guest-limit-modal";
 
 import { ActivityOverviewCard } from "@/components/vocab/activity-overview-card";
 import { Greeting } from "@/components/dashboard/greeting";
+import { ProfileSnapshot } from "@/components/dashboard/profile-snapshot";
+import { TodaySummary } from "@/components/dashboard/today-summary";
+import { levelForXp, parseDonguriConfig, formatXp, type AccessoryId } from "@/lib/levels";
 import { getCourseGreeting } from "@/lib/course-greetings";
 import { LeaderboardTabs } from "@/components/leaderboard/leaderboard-tabs";
 import { DeckCompleteCelebration } from "@/components/vocab/deck-complete-celebration";
@@ -174,6 +177,43 @@ export default async function CourseHomePage({ params }: PageProps) {
   const learnLocked =
     allowance.remaining.total === 0 ||
     (allowance.remaining.vocab === 0 && allowance.remaining.grammar === 0);
+
+  // Beside the greeting: the learner's Donguri and profile stats.
+  const equippedAccessory =
+    (parseDonguriConfig(profile.donguriConfig).equippedAccessory as AccessoryId | undefined) ?? null;
+  const level = levelForXp(profile.xp);
+  // The activity chart's last day is today; its pills only once there's
+  // something to show, so the card keeps no room for them otherwise.
+  const todayActivity = dailyActivity.at(-1);
+  const doneToday =
+    !!todayActivity &&
+    todayActivity.vocab + todayActivity.grammar + todayActivity.review + todayActivity.challenge > 0;
+
+  // Under the greeting: how far their streak has come, with the milestones
+  // (day one, a week, a month) called out — and, when today's lesson is
+  // still to do, a nudge to keep it going.
+  const streakMessage =
+    currentStreak === 0
+      ? t("course_home.streak_none", "Let's start a new streak today! 🌱")
+      : !activeToday
+        ? t("course_home.streak_keep", "{{count}}-day streak — learn today to keep it going!", {
+            count: currentStreak,
+          })
+        : currentStreak === 1
+          ? t("course_home.streak_day_one", "Day 1! Thanks for coming today! 🌱")
+          : currentStreak < 7
+            ? t("course_home.streak_days", "You've been learning for {{count}} days!", { count: currentStreak })
+            : currentStreak === 7
+              ? t("course_home.streak_week", "You made it to one week! Let's keep growing together!")
+              : currentStreak < 30
+                ? t("course_home.streak_weeks", "{{count}} days in a row — you're on a roll!", {
+                    count: currentStreak,
+                  })
+                : currentStreak === 30
+                  ? t("course_home.streak_month", "A whole month of learning! Your garden is thriving! 🌳")
+                  : t("course_home.streak_long", "{{count}} days in a row — truly unstoppable!", {
+                      count: currentStreak,
+                    });
 
   const learnCardClassName =
     "group cursor-pointer relative flex min-h-[220px] flex-col overflow-hidden rounded-2xl border border-card-border bg-cover bg-center p-5 sm:min-h-[240px] sm:p-6 shadow-sm transition duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.015] hover:brightness-105 hover:shadow-md";
@@ -331,7 +371,7 @@ export default async function CourseHomePage({ params }: PageProps) {
       {/* After badges in the DOM, so a level-up shows on top, first. */}
       <LevelUpCelebration />
 
-      <main className="flex min-w-0 flex-col gap-6 sm:gap-8">
+      <main className="flex min-w-0 flex-col gap-5 sm:gap-6">
         <div>
           {/* In more than one course: the way back to the dashboard's course
               cards — styled like the review page's back link. */}
@@ -352,9 +392,52 @@ export default async function CourseHomePage({ params }: PageProps) {
               firstName={profile.first_name ?? profile.email}
               greetings={courseGreeting.greetings}
               motivations={courseGreeting.motivations}
-            >
-              <CourseBadges earned={badges.earned} locked={badges.locked} />
-            </Greeting>
+              subtitle={streakMessage}
+              aside={
+                <ProfileSnapshot
+                  equippedAccessory={equippedAccessory}
+                  level={level}
+                  levelLabel={t("xp_counter.level", "Lv {{level}}", { level })}
+                  stats={[
+                    {
+                      key: "words",
+                      label: t("user_profile.words_learnt", "Words learnt"),
+                      value: String(wordCounts.learnt),
+                    },
+                    {
+                      key: "streak",
+                      label: t("user_profile.longest_streak", "Longest streak"),
+                      value: String(longestStreak),
+                    },
+                    {
+                      key: "xp",
+                      label: t("user_profile.total_xp", "Total XP"),
+                      value: formatXp(profile.xp),
+                    },
+                    {
+                      key: "weekly",
+                      label: t("user_profile.weekly_xp", "XP this week"),
+                      value: formatXp(weeklyStats.xpEarned),
+                    },
+                  ]}
+                  profileHref={profile.username ? `/user/${profile.username}` : "/dashboard/profile"}
+                  profileLabel={t("course_home.view_profile", "View profile")}
+                  badges={
+                    <CourseBadges
+                      earned={badges.earned}
+                      locked={badges.locked}
+                      maxInRow={4}
+                      className="h-full flex-col items-start justify-center"
+                    />
+                  }
+                  today={
+                    doneToday ? (
+                      <TodaySummary today={todayActivity} t={t} className="@xl/hero:flex-nowrap" />
+                    ) : undefined
+                  }
+                />
+              }
+            />
           )}
 
           {/* Dev mode's automatic reset — draws nothing. The manual reset is
