@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, useMotionValueEvent, useTransform, type MotionValue } from "framer-motion";
-import { Check, Clock, Trophy } from "lucide-react";
+import { Check, Clock, Crown } from "lucide-react";
 import { ScrollStory, useStep, type StoryCopy } from "@/components/landing/story/scroll-story";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +20,7 @@ const ROW_PITCH = 42;
 
 // Step 3: the review ladder — the word hops down the stages as you scroll,
 // each one ticking off and the wait growing (15 minutes, 4 hours, 1 day…),
-// until it lands on Mastered with a trophy. The stages and waits are the
+// until it lands on Master Oak with a crown. The stages and waits are the
 // real ones (STAGES in lib/srs.ts).
 export function ReviewStory({ copy, labels }: { copy: StoryCopy; labels: ReviewLabels }) {
   return (
@@ -49,7 +49,7 @@ function ReviewLadder({ progress, labels }: { progress: MotionValue<number>; lab
   const chipOpacity = useStep(progress, TRIP_START - 0.04, TRIP_START);
 
   const mastered = reached >= rows - 1;
-  const trophyScale = useTransform(progress, [TRIP_END, TRIP_END + 0.05, TRIP_END + 0.08], [0, 1.4, 1], { clamp: true });
+  const crownScale = useTransform(progress, [TRIP_END, TRIP_END + 0.05, TRIP_END + 0.08], [0, 1.4, 1], { clamp: true });
 
   return (
     <motion.div
@@ -107,17 +107,16 @@ function ReviewLadder({ progress, labels }: { progress: MotionValue<number>; lab
             )}
           >
             <motion.span
-              style={{ scale: mastered ? trophyScale : 1 }}
+              style={{ scale: mastered ? crownScale : 1 }}
               className={cn(
                 "relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors duration-300",
                 mastered ? "bg-kin text-ink-on-light shadow-md" : "border-2 border-sumi/10 bg-raised text-sumi-soft",
               )}
             >
-              <Trophy aria-hidden className="h-4 w-4" />
+              <Crown aria-hidden className="h-4 w-4" />
             </motion.span>
             <span className={cn("font-nunito text-base font-black", mastered ? "text-sumi" : "text-sumi-soft")}>
               {labels.mastered}
-              {mastered && " 🎉"}
             </span>
           </li>
         </ol>
