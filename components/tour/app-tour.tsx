@@ -402,7 +402,7 @@ export function AppTour({
               type="button"
               onClick={close}
               aria-label={t("tour.skip", "Skip tour")}
-              className="absolute top-3 left-3 flex h-8 w-8 items-center justify-center rounded-full text-sumi-soft transition hover:bg-sumi/5 hover:text-sumi"
+              className="cursor-pointer absolute top-3 left-3 flex h-8 w-8 items-center justify-center rounded-full text-sumi-soft transition hover:bg-sumi/5 hover:text-sumi"
             >
               <X aria-hidden className="h-4 w-4" />
             </button>
@@ -453,7 +453,7 @@ export function AppTour({
                     type="button"
                     onClick={() => setIndex(index - 1)}
                     aria-label={t("tour.back", "Back")}
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-card-border text-sumi-soft transition hover:text-sumi"
+                    className="cursor-pointer flex h-9 w-9 items-center justify-center rounded-full border border-card-border text-sumi-soft transition hover:text-sumi"
                   >
                     <ArrowLeft aria-hidden className="h-4 w-4" />
                   </button>
@@ -462,7 +462,7 @@ export function AppTour({
                   ref={nextRef}
                   type="button"
                   onClick={() => (isLast ? close() : setIndex(index + 1))}
-                  className="group inline-flex items-center gap-1.5 rounded-full bg-ai px-4 py-2 font-nunito text-sm font-extrabold text-washi shadow-sm transition hover:bg-ai-dark"
+                  className="cursor-pointer group inline-flex items-center gap-1.5 rounded-full bg-ai px-4 py-2 font-nunito text-sm font-extrabold text-washi shadow-sm transition hover:bg-ai-dark"
                 >
                   {isLast
                     ? t("tour.done", "Let's go!")

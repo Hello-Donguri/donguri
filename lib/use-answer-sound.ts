@@ -11,14 +11,17 @@ let sounds: { success: HTMLAudioElement; fail: HTMLAudioElement } | null = null;
 
 function loadSounds() {
   if (!sounds) {
-    const load = (src: string) => {
+    const load = (src: string, volume: number) => {
       const audio = new Audio(src);
       audio.preload = "auto";
-      audio.volume = 0.5;
+      audio.volume = volume;
       audio.load();
       return audio;
     };
-    sounds = { success: load("/audio/success.mp3"), fail: load("/audio/fail.mp3") };
+    // fail.mp3 is recorded far louder (about 11 dB at its peak, 15 dB on
+    // average), so it plays at around a quarter of success's volume to
+    // sound as loud.
+    sounds = { success: load("/audio/success.mp3", 0.5), fail: load("/audio/fail.mp3", 0.12) };
   }
   return sounds;
 }
