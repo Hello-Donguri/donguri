@@ -103,7 +103,7 @@ export function ProgressShowcase({ labels }: { labels: ProgressLabels }) {
     // reducedMotion="user": for anyone who's asked for less motion, cards
     // just fade in rather than flying.
     <MotionConfig reducedMotion="user">
-      <section id="progress" className="bg-washi px-6 py-20 sm:py-28">
+      <section id="progress" className="overflow-x-clip bg-washi px-6 py-20 sm:py-28">
         <div className="mx-auto max-w-6xl">
           <motion.div
             initial={from}
@@ -130,7 +130,7 @@ export function ProgressShowcase({ labels }: { labels: ProgressLabels }) {
               whileInView="shown"
               viewport={{ once: true, amount: 0.3 }}
               variants={pop(-1)}
-              className="relative"
+              className="relative min-w-0"
             >
               <div
                 aria-hidden
@@ -205,7 +205,7 @@ export function ProgressShowcase({ labels }: { labels: ProgressLabels }) {
               whileInView="shown"
               viewport={{ once: true, amount: 0.3 }}
               variants={pop(1.5)}
-              className="relative"
+              className="relative min-w-0"
             >
               <div
                 aria-hidden

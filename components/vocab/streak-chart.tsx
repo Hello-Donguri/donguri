@@ -232,7 +232,7 @@ export function StreakChart({
         </h2>
 
         {currentStreak > 0 && (
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
             <div className="flex items-center gap-1.5 text-sm font-semibold text-sumi">
               <Flame className="h-4 w-4 fill-kin text-kin drop-shadow-[0_0_6px_var(--kin)]" />
               {t("streak_chart.day_streak", "{{count}} day streak", { count: currentStreak })}
@@ -472,27 +472,32 @@ export function StreakChart({
         ))}
       </ul>
 
-      <table className="sr-only">
-        <caption>{t("streak_chart.aria_label", "Vocabulary, grammar, reviews and daily challenges completed per day")}</caption>
-        <thead>
-          <tr>
-            <th>{t("streak_chart.table_date", "Date")}</th>
-            {SERIES.map((series) => (
-              <th key={series.key}>{t(series.labelKey, series.fallback)}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((day) => (
-            <tr key={day.date}>
-              <td>{formatDayFull(day.date)}</td>
+      {/* sr-only on a wrapper, not the table: a table won't shrink below
+          its content's width, and absolutely positioned it escaped the
+          card's clipping and widened the whole page on phones. */}
+      <div className="sr-only">
+        <table>
+          <caption>{t("streak_chart.aria_label", "Vocabulary, grammar, reviews and daily challenges completed per day")}</caption>
+          <thead>
+            <tr>
+              <th>{t("streak_chart.table_date", "Date")}</th>
               {SERIES.map((series) => (
-                <td key={series.key}>{day[series.key]}</td>
+                <th key={series.key}>{t(series.labelKey, series.fallback)}</th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {data.map((day) => (
+              <tr key={day.date}>
+                <td>{formatDayFull(day.date)}</td>
+                {SERIES.map((series) => (
+                  <td key={series.key}>{day[series.key]}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
