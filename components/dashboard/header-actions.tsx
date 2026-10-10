@@ -66,7 +66,7 @@ function HeaderStats({
     const streakTitle = t("header_stats.streak_title", "{{count}} day streak", { count: currentStreak });
     return (
       <div className="flex shrink-0 items-center gap-1.5">
-        <span className="relative inline-flex h-9 w-9 items-center justify-center" title={streakTitle}>
+        <span data-tour="streak" className="relative inline-flex h-9 w-9 items-center justify-center" title={streakTitle}>
           <Flame
             className={cn("h-9 w-9", currentStreak > 0 ? "fill-kin text-kin" : "text-sumi-soft")}
             strokeWidth={1.5}
@@ -83,6 +83,7 @@ function HeaderStats({
           </span>
         </span>
         <span
+          data-tour="xp"
           className="rounded-full bg-sumi px-2 py-0.5 text-xs font-bold whitespace-nowrap text-washi"
           title={`${displayXp}${max !== null ? ` / ${max}` : ""} ${t("xp_counter.xp", "XP")}`}
         >
@@ -95,6 +96,7 @@ function HeaderStats({
   return (
     <div className="flex shrink-0 items-center gap-3">
       <span
+        data-tour="streak"
         className="inline-flex items-center gap-1.5 text-sm font-semibold text-sumi"
         title={t("header_stats.streak_title", "{{count}} day streak", { count: currentStreak })}
       >
@@ -108,7 +110,10 @@ function HeaderStats({
 
       <span className="hidden h-6 w-px bg-sumi/15 sm:block" aria-hidden="true" />
 
-      <div className="inline-flex items-center gap-2 rounded-full border border-card-border bg-washi-soft py-1 pl-1 pr-3">
+      <div
+        data-tour="xp"
+        className="inline-flex items-center gap-2 rounded-full border border-card-border bg-washi-soft py-1 pl-1 pr-3"
+      >
         <span className="rounded-full bg-sumi px-2 py-0.5 text-xs font-bold whitespace-nowrap text-washi">
           {t("xp_counter.level", "Lv {{level}}", { level })}
         </span>

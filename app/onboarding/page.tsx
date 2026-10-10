@@ -44,6 +44,7 @@ export default async function OnboardingPage() {
         lastName={profile?.last_name ?? meta.family_name ?? meta.last_name ?? ""}
         username={profile?.username ?? null}
         nativeLanguage={profile?.native_language ?? null}
+        learningReason={profile?.learning_reason ?? null}
       />
       <form action={logout} className="mt-4 text-center">
         <button type="submit" className="text-sm text-sumi-soft hover:text-sumi">
