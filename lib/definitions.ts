@@ -50,11 +50,30 @@ export type NativeLanguage = (typeof NATIVE_LANGUAGES)[number];
 
 const NativeLanguageSchema = z.enum(NATIVE_LANGUAGES, { error: "Choose your native language." });
 
+// Why a learner is learning, picked from a dropdown on sign-up/onboarding
+// and changeable on the profile page. Kept in step with
+// profiles_learning_reason_check (section 54 of supabase/schema.sql).
+export const LEARNING_REASONS = [
+  "friends",
+  "travel",
+  "work",
+  "study",
+  "living_abroad",
+  "culture",
+  "family",
+  "fun",
+  "other",
+] as const;
+export type LearningReason = (typeof LEARNING_REASONS)[number];
+
+const LearningReasonSchema = z.enum(LEARNING_REASONS, { error: "Choose your reason for learning." });
+
 export const SignupFormSchema = z.object({
   firstName: FirstNameSchema,
   lastName: LastNameSchema,
   username: UsernameSchema,
   nativeLanguage: NativeLanguageSchema,
+  learningReason: LearningReasonSchema,
   email: z.email({ error: "Please enter a valid email." }).trim(),
   password: z
     .string()
@@ -94,6 +113,7 @@ export type SignupFormState =
         lastName?: string[];
         username?: string[];
         nativeLanguage?: string[];
+        learningReason?: string[];
         email?: string[];
         password?: string[];
       };
@@ -108,6 +128,7 @@ export const OnboardingFormSchema = z.object({
   lastName: LastNameSchema,
   username: UsernameSchema,
   nativeLanguage: NativeLanguageSchema,
+  learningReason: LearningReasonSchema,
 });
 
 export type OnboardingFormState =
@@ -117,6 +138,7 @@ export type OnboardingFormState =
         lastName?: string[];
         username?: string[];
         nativeLanguage?: string[];
+        learningReason?: string[];
       };
       message?: string;
     }
@@ -192,6 +214,10 @@ export type Profile = {
   // app/user/[username]).
   profile_hidden: boolean;
   native_language: NativeLanguage | null;
+  learning_reason: LearningReason | null;
+  // Whether they've finished or dismissed the welcome tour (see
+  // components/tour/app-tour.tsx).
+  tour_seen: boolean;
   // Whether they get the "regain your crown" email (lib/weekly-crown.ts).
   email_overtaken: boolean;
   // Synced copy of their Stripe subscription (see lib/billing.ts), null if

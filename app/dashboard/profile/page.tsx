@@ -4,6 +4,7 @@ import { requireRegisteredProfile } from "@/lib/dal";
 import { ProfileForm } from "@/components/profile/profile-form";
 import { DonguriCharacterCard } from "@/components/donguri/donguri-character-card";
 import { XpCounter } from "@/components/xp/xp-counter";
+import { LearningReasonSetting } from "@/components/settings/learning-reason-field";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { PageTitle } from "@/components/ui/page-heading";
 import { levelForXp, parseDonguriConfig, type AccessoryId } from "@/lib/levels";
@@ -65,6 +66,18 @@ export default async function ProfilePage() {
           </p>
         </div>
         <XpCounter value={profile.xp} />
+      </div>
+
+      <div className="flex flex-col gap-4 rounded-2xl border border-card-border bg-washi-soft p-6 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-semibold text-sumi">{t("profile_page.reason_title", "Why you're learning")}</h2>
+          <p className="mt-1 text-sm text-sumi-soft">
+            {t("profile_page.reason_description", "Your main reason for learning. Change it whenever it changes.")}
+          </p>
+        </div>
+        <div className="sm:w-64 sm:shrink-0">
+          <LearningReasonSetting initial={profile.learning_reason} />
+        </div>
       </div>
 
       <div className="max-w-lg rounded-2xl border border-card-border bg-washi-soft p-8">

@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import {
+  LEARNING_REASONS,
+  type LearningReason,
   NATIVE_LANGUAGES,
   type NativeLanguage,
   UpdateNameFormSchema,
@@ -99,6 +101,32 @@ export async function setNativeLanguage(language: NativeLanguage): Promise<void>
     data: { nativeLanguage: language },
   });
   revalidatePath("/dashboard/settings");
+}
+
+// The profile page's "why are you learning?" picker — saved as soon as it
+// changes.
+export async function setLearningReason(reason: LearningReason): Promise<void> {
+  const user = await requireUser();
+  if (!(LEARNING_REASONS as readonly string[]).includes(reason)) {
+    throw new Error("Unknown reason.");
+  }
+
+  await prisma.profile.update({
+    where: { id: user.id },
+    data: { learningReason: reason },
+  });
+  revalidatePath("/dashboard/profile");
+}
+
+// The welcome tour (components/tour/app-tour.tsx), finished or dismissed —
+// so it doesn't start by itself again.
+export async function markTourSeen(): Promise<void> {
+  const user = await requireUser();
+  await prisma.profile.update({
+    where: { id: user.id },
+    data: { tourSeenAt: new Date() },
+  });
+  revalidatePath("/dashboard", "layout");
 }
 
 // Account settings' switch for the "regain your crown" email (see

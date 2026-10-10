@@ -6,6 +6,7 @@ import { TextField } from "@/components/ui/text-field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { UsernameField } from "@/components/auth/username-field";
 import { NativeLanguageField } from "@/components/settings/native-language-field";
+import { LearningReasonField } from "@/components/settings/learning-reason-field";
 import { useTranslations } from "@/components/i18n/locale-provider";
 
 export function SignupForm() {
@@ -34,6 +35,7 @@ export function SignupForm() {
       />
       <UsernameField errors={state?.errors?.username} />
       <NativeLanguageField errors={state?.errors?.nativeLanguage} />
+      <LearningReasonField errors={state?.errors?.learningReason} />
       <TextField
         label={t("auth.email_label", "Email")}
         name="email"

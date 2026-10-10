@@ -33,7 +33,7 @@ export async function ActivityOverviewCard({
   const { t } = await getTranslator();
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-card-border bg-washi-soft shadow-sm">
+    <div data-tour="activity" className="overflow-hidden rounded-2xl border border-card-border bg-washi-soft shadow-sm">
       <div className="grid min-w-0 grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div className="flex flex-col border-b border-card-border p-6 lg:border-b-0 lg:border-r">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-sumi-soft">
