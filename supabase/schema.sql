@@ -1982,3 +1982,32 @@ alter table public.user_word_progress add column if not exists flagged_at timest
 create index if not exists user_word_progress_flagged_idx
   on public.user_word_progress (user_id, flagged_at desc)
   where flagged_at is not null;
+
+-- 54. Learning reason -------------------------------------------------------------------
+-- `learning_reason`: why the learner is learning — making friends, travel,
+-- work and so on — asked on sign-up/onboarding and editable on the profile
+-- page. Null for accounts from before it was asked. Kept in step with
+-- LEARNING_REASONS in lib/definitions.ts.
+
+alter table public.profiles add column if not exists learning_reason text;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'profiles_learning_reason_check') then
+    alter table public.profiles
+      add constraint profiles_learning_reason_check check (
+        learning_reason in (
+          'friends', 'travel', 'work', 'study', 'living_abroad', 'culture', 'family', 'fun', 'other'
+        )
+      );
+  end if;
+end;
+$$;
+
+-- 55. Welcome tour ----------------------------------------------------------------------
+-- `tour_seen_at`: when the learner finished or dismissed the course page's
+-- welcome tour (components/tour/app-tour.tsx). Null until then, which is
+-- what starts it automatically; it can always be taken again from the
+-- course page.
+
+alter table public.profiles add column if not exists tour_seen_at timestamptz;

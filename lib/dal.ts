@@ -36,7 +36,14 @@ import type {
   WordCategoryOption,
   WordType,
 } from "@/lib/definitions";
-import { NATIVE_LANGUAGES, WORD_TYPES, parseCourseLevel, type NativeLanguage } from "@/lib/definitions";
+import {
+  LEARNING_REASONS,
+  NATIVE_LANGUAGES,
+  WORD_TYPES,
+  parseCourseLevel,
+  type LearningReason,
+  type NativeLanguage,
+} from "@/lib/definitions";
 import {
   addDays,
   applyDailyActivity,
@@ -134,6 +141,8 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
       username: true,
       profileHidden: true,
       nativeLanguage: true,
+      learningReason: true,
+      tourSeenAt: true,
       emailOvertaken: true,
       isGuest: true,
       subscription: {
@@ -166,6 +175,8 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
     username: profile.username,
     profile_hidden: profile.profileHidden,
     native_language: isNativeLanguage(profile.nativeLanguage) ? profile.nativeLanguage : null,
+    learning_reason: isLearningReason(profile.learningReason) ? profile.learningReason : null,
+    tour_seen: profile.tourSeenAt !== null,
     email_overtaken: profile.emailOvertaken,
     subscription: profile.subscription,
     is_guest: profile.isGuest,
@@ -198,6 +209,10 @@ export const requireProfile = cache(async (): Promise<Profile> => {
 
   return profile;
 });
+
+function isLearningReason(value: string | null): value is LearningReason {
+  return value !== null && (LEARNING_REASONS as readonly string[]).includes(value);
+}
 
 function isNativeLanguage(value: string | null): value is NativeLanguage {
   return (NATIVE_LANGUAGES as readonly (string | null)[]).includes(value);

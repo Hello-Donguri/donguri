@@ -29,6 +29,13 @@ model Profile {
   // 'en', 'ja' or 'other'; null for accounts from before it was asked.
   // See section 48 of supabase/schema.sql.
   nativeLanguage         String?                 @map("native_language")
+  // Why they're learning (see LEARNING_REASONS in lib/definitions.ts); null
+  // for accounts from before it was asked. See section 54 of
+  // supabase/schema.sql.
+  learningReason         String?                 @map("learning_reason")
+  // When they finished or dismissed the course page's welcome tour; null
+  // until then. See section 55 of supabase/schema.sql.
+  tourSeenAt             DateTime?               @map("tour_seen_at") @db.Timestamptz(6)
   // The "regain your crown" email (lib/weekly-crown.ts) — on unless turned
   // off in account settings; at most one a day.
   emailOvertaken         Boolean                 @default(true) @map("email_overtaken")

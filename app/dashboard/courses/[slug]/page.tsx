@@ -26,6 +26,8 @@ import { ActivityOverviewCard } from "@/components/vocab/activity-overview-card"
 import { Greeting } from "@/components/dashboard/greeting";
 import { ProfileSnapshot } from "@/components/dashboard/profile-snapshot";
 import { TodaySummary } from "@/components/dashboard/today-summary";
+import { AppTour } from "@/components/tour/app-tour";
+import { TourButton } from "@/components/tour/tour-button";
 import { levelForXp, parseDonguriConfig, formatXp, type AccessoryId } from "@/lib/levels";
 import { getCourseGreeting } from "@/lib/course-greetings";
 import { LeaderboardTabs } from "@/components/leaderboard/leaderboard-tabs";
@@ -371,77 +373,92 @@ export default async function CourseHomePage({ params }: PageProps) {
       <BadgeCelebration />
       {/* After badges in the DOM, so a level-up shows on top, first. */}
       <LevelUpCelebration />
+      {/* The welcome tour: by itself until it's been seen once, then from
+          the "Take the tour" link under the greeting. */}
+      <AppTour
+        autoStart={!profile.tour_seen}
+        name={profile.first_name ?? ""}
+        equippedAccessory={equippedAccessory}
+        stats={[
+          { key: "words", label: t("user_profile.words_learnt", "Words learnt"), value: wordCounts.learnt },
+          { key: "xp", label: t("user_profile.total_xp", "Total XP"), value: profile.xp },
+          { key: "level", label: t("tour.stat_level", "Level"), value: level },
+          { key: "streak", label: t("tour.stat_streak", "Day streak"), value: currentStreak },
+        ]}
+      />
 
-      {/* The greeting and profile card, across the whole width, so the
-          two columns below start level: today's learning beside the decks
-          it comes from. */}
-      <div>
-        {/* In more than one course: the way back to the dashboard's course
-            cards — styled like the review page's back link. */}
-        {enrolledCourseCount > 1 && (
-          <Link
-            href="/dashboard"
-            prefetch
-            className="group inline-flex items-center gap-1.5 text-sm font-medium text-sumi-soft transition hover:text-sumi"
-          >
-            <ArrowLeft aria-hidden className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
-            {t("course_home.back_to_my_courses", "Back to my courses")}
-          </Link>
-        )}
-        {/* Guests (see lib/access.ts) get straight to the cards — no
-            greeting by name, and no badges to collect yet. */}
-        {!profile.is_guest && (
-          <Greeting
-            firstName={profile.first_name ?? profile.email}
-            greetings={courseGreeting.greetings}
-            motivations={courseGreeting.motivations}
-            subtitle={streakMessage}
-            aside={
-              <ProfileSnapshot
-                equippedAccessory={equippedAccessory}
-                level={level}
-                levelLabel={t("xp_counter.level", "Lv {{level}}", { level })}
-                stats={[
-                  {
-                    key: "words",
-                    label: t("user_profile.words_learnt", "Words learnt"),
-                    value: String(wordCounts.learnt),
-                  },
-                  {
-                    key: "streak",
-                    label: t("user_profile.longest_streak", "Longest streak"),
-                    value: String(longestStreak),
-                  },
-                  {
-                    key: "xp",
-                    label: t("user_profile.total_xp", "Total XP"),
-                    value: formatXp(profile.xp),
-                  },
-                  {
-                    key: "weekly",
-                    label: t("user_profile.weekly_xp", "XP this week"),
-                    value: formatXp(weeklyStats.xpEarned),
-                  },
-                ]}
-                profileHref={profile.username ? `/user/${profile.username}` : "/dashboard/profile"}
-                profileLabel={t("course_home.view_profile", "View profile")}
-                badges={
-                  <CourseBadges
-                    earned={badges.earned}
-                    locked={badges.locked}
-                    maxInRow={4}
-                    className="h-full flex-col items-start justify-center"
-                  />
-                }
-                today={
-                  doneToday ? (
-                    <TodaySummary today={todayActivity} t={t} className="@xl/hero:flex-nowrap" />
-                  ) : undefined
-                }
-              />
-            }
-          />
-        )}
+      <main className="flex min-w-0 flex-col gap-5 sm:gap-6">
+        <div>
+          {/* In more than one course: the way back to the dashboard's course
+              cards — styled like the review page's back link. */}
+          {enrolledCourseCount > 1 && (
+            <Link
+              href="/dashboard"
+              prefetch
+              className="group inline-flex items-center gap-1.5 text-sm font-medium text-sumi-soft transition hover:text-sumi"
+            >
+              <ArrowLeft aria-hidden className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+              {t("course_home.back_to_my_courses", "Back to my courses")}
+            </Link>
+          )}
+          {/* Guests (see lib/access.ts) get straight to the cards — no
+              greeting by name, and no badges to collect yet. */}
+          {!profile.is_guest && (
+            <Greeting
+              firstName={profile.first_name ?? profile.email}
+              greetings={courseGreeting.greetings}
+              motivations={courseGreeting.motivations}
+              subtitle={streakMessage}
+              aside={
+                <ProfileSnapshot
+                  equippedAccessory={equippedAccessory}
+                  level={level}
+                  levelLabel={t("xp_counter.level", "Lv {{level}}", { level })}
+                  stats={[
+                    {
+                      key: "words",
+                      label: t("user_profile.words_learnt", "Words learnt"),
+                      value: String(wordCounts.learnt),
+                    },
+                    {
+                      key: "streak",
+                      label: t("user_profile.longest_streak", "Longest streak"),
+                      value: String(longestStreak),
+                    },
+                    {
+                      key: "xp",
+                      label: t("user_profile.total_xp", "Total XP"),
+                      value: formatXp(profile.xp),
+                    },
+                    {
+                      key: "weekly",
+                      label: t("user_profile.weekly_xp", "XP this week"),
+                      value: formatXp(weeklyStats.xpEarned),
+                    },
+                  ]}
+                  profileHref={profile.username ? `/user/${profile.username}` : "/dashboard/profile"}
+                  profileLabel={t("course_home.view_profile", "View profile")}
+                  badges={
+                    <CourseBadges
+                      earned={badges.earned}
+                      locked={badges.locked}
+                      maxInRow={4}
+                      className="h-full flex-col items-start justify-center"
+                    />
+                  }
+                  today={
+                    doneToday ? (
+                      <TodaySummary today={todayActivity} t={t} className="@xl/hero:flex-nowrap" />
+                    ) : undefined
+                  }
+                />
+              }
+            >
+              <TourButton label={t("tour.take_tour", "Take the tour")} />
+            </Greeting>
+          )}
+        </div>
+      </main>
 
         {/* Dev mode's automatic reset — draws nothing. The manual reset is
             in the header's Admin menu. */}
@@ -468,6 +485,9 @@ export default async function CourseHomePage({ params }: PageProps) {
               {/* LEARN — turns into a browse-decks prompt once the active
                   decks have nothing new left (or none are active), and is
                   locked once the free words are used up. */}
+              {/* Each card in a plain grid wrapper the welcome tour can
+                  spotlight (see AppTour), whichever version is showing. */}
+              <div data-tour="learn" className="grid">
               {learnLocked && profile.tier !== "guest" ? (
                 // A free account that's used its allowance: the card keeps its
                 // colour, with a Donguri Pro pitch over it.
@@ -539,10 +559,12 @@ export default async function CourseHomePage({ params }: PageProps) {
                   {learnCardContent}
                 </BrowseDecksTrigger>
               )}
+            </div>
 
-              {/* REVIEW */}
-              {/* Live: the count goes up the moment each word comes due
-                  (see ReviewCard). Re-keyed so a fresh server count resets it. */}
+            {/* REVIEW */}
+            {/* Live: the count goes up the moment each word comes due
+                (see ReviewCard). Re-keyed so a fresh server count resets it. */}
+            <div data-tour="review" className="grid">
               <ReviewCard
                 key={`${reviewQueue.dueCount}:${reviewQueue.upcomingDue[0]?.getTime() ?? 0}`}
                 courseSlug={slug}
@@ -551,8 +573,10 @@ export default async function CourseHomePage({ params }: PageProps) {
                 nextDueAt={reviewQueue.nextDueAt}
                 locked={profile.is_guest}
               />
+            </div>
 
-              {/* DAILY CHALLENGE */}
+            {/* DAILY CHALLENGE */}
+            <div data-tour="challenge" className="grid lg:col-span-2">
               {challengesDone ? (
                 <div
                   aria-disabled="true"
@@ -575,30 +599,8 @@ export default async function CourseHomePage({ params }: PageProps) {
                 </Link>
               )}
             </div>
-          </section>
-
-          {/* Back into what's been learnt: flagged lessons and every learnt
-              word, always shown, each opening its full list. */}
-          <section className="rounded-3xl border border-card-border bg-washi-soft p-4 sm:p-5">
-            <SectionHeading className="mb-4">{t("course_home.section_words", "Your words")}</SectionHeading>
-            <WordShortcuts
-              courseSlug={slug}
-              flaggedCount={wordCounts.flagged}
-              learntCount={wordCounts.learnt}
-              t={t}
-            />
-          </section>
-
-          <ActivityOverviewCard
-            dailyActivity={dailyActivity}
-            currentStreak={currentStreak}
-            longestStreak={longestStreak}
-            activeToday={activeToday}
-            weeklyStats={weeklyStats}
-            weeklyBadges={weeklyBadges}
-            hasBadges={badges.earned.length + badges.locked.length > 0}
-          />
-        </main>
+          </div>
+        </section>
 
         <aside className="flex min-w-0 flex-col gap-6">
           <FindDeckModal
@@ -615,8 +617,17 @@ export default async function CourseHomePage({ params }: PageProps) {
 
       </div>
 
+      <aside className="flex min-w-0 flex-col gap-6">
+        <div data-tour="leaderboard">
+          <LeaderboardTabs
+            topEntries={leaderboards.top}
+            initialFriends={leaderboards.friends}
+          />
+        </div>
+      </aside>
+
       {/* Out of the way at the very bottom, and quiet: it wipes progress. */}
-      <div className="flex flex-col gap-4 rounded-3xl border border-dashed border-card-border p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+      <div className="flex flex-col gap-4 rounded-2xl border border-card-border bg-washi-soft p-5 sm:p-6 lg:col-start-1 lg:row-start-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-semibold text-sumi">
             {t("course_home.start_over", "Start over")}

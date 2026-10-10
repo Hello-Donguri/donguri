@@ -94,6 +94,7 @@ export async function signup(
     lastName: formData.get("lastName"),
     username: formData.get("username"),
     nativeLanguage: formData.get("nativeLanguage"),
+    learningReason: formData.get("learningReason"),
     email: formData.get("email"),
     password: formData.get("password"),
   });
@@ -104,7 +105,8 @@ export async function signup(
     };
   }
 
-  const { firstName, lastName, username, nativeLanguage, email, password } = validatedFields.data;
+  const { firstName, lastName, username, nativeLanguage, learningReason, email, password } =
+    validatedFields.data;
 
   // Checked before creating the auth user, so a taken handle doesn't leave
   // behind an account the user then has to finish on /onboarding.
@@ -163,6 +165,7 @@ export async function signup(
         lastName,
         username,
         nativeLanguage,
+        learningReason,
       },
       create: {
         id: data.user.id,
@@ -172,6 +175,7 @@ export async function signup(
         lastName,
         username,
         nativeLanguage,
+        learningReason,
         role: "user",
       },
     });
@@ -282,13 +286,14 @@ export async function completeOnboarding(
     // A username, once set, is fixed — whatever was submitted is ignored.
     username: existing?.username ?? formData.get("username"),
     nativeLanguage: formData.get("nativeLanguage"),
+    learningReason: formData.get("learningReason"),
   });
 
   if (!validatedFields.success) {
     return { errors: validatedFields.error.flatten().fieldErrors };
   }
 
-  const { firstName, lastName, username, nativeLanguage } = validatedFields.data;
+  const { firstName, lastName, username, nativeLanguage, learningReason } = validatedFields.data;
   const fullName = `${firstName} ${lastName}`;
 
   if (!existing?.username && (await isUsernameTaken(username, user.id))) {
@@ -298,7 +303,7 @@ export async function completeOnboarding(
   try {
     await prisma.profile.upsert({
       where: { id: user.id },
-      update: { firstName, lastName, fullName, username, nativeLanguage },
+      update: { firstName, lastName, fullName, username, nativeLanguage, learningReason },
       create: {
         id: user.id,
         email: user.email ?? "",
@@ -307,6 +312,7 @@ export async function completeOnboarding(
         fullName,
         username,
         nativeLanguage,
+        learningReason,
         role: "user",
       },
     });

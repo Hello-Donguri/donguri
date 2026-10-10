@@ -107,7 +107,10 @@ export function FindDeckModal({
 
   return (
     <>
-      <section className="flex flex-col gap-4 rounded-3xl border border-card-border bg-washi-soft p-4 sm:p-5">
+      <section
+        data-tour="decks"
+        className="flex flex-col gap-4 rounded-3xl border border-card-border bg-washi-soft p-4 sm:p-5"
+      >
         <div className="flex w-full items-center justify-between gap-3">
           <h2 className={sectionHeadingClass}>
             {t("find_deck.your_active_decks", "Your active decks")}
