@@ -74,7 +74,7 @@ export function LeaderboardTabs({
   }
 
   return (
-    <section className="flex flex-col rounded-2xl border border-card-border bg-washi-soft p-6">
+    <section className="flex flex-col rounded-3xl border border-card-border bg-washi-soft p-4 sm:p-5">
       <div className="relative flex rounded-full bg-neutral-soft p-1">
         {tabs.map((tab) => (
           <button

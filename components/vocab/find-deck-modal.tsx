@@ -8,6 +8,7 @@ import { useTranslations } from "@/components/i18n/locale-provider";
 import type { LanguageDeckSummary } from "@/lib/definitions";
 import { getContrastTextClass } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
+import { sectionHeadingClass } from "@/components/ui/page-heading";
 
 // Lets other parts of the page (e.g. the Learn card once the active decks
 // run dry) open the Find a deck dialog without lifting its state up.
@@ -108,7 +109,7 @@ export function FindDeckModal({
     <>
       <section className="flex flex-col gap-4 rounded-3xl border border-card-border bg-washi-soft p-4 sm:p-5">
         <div className="flex w-full items-center justify-between gap-3">
-          <h2 className="text-lg font-bold text-sumi">
+          <h2 className={sectionHeadingClass}>
             {t("find_deck.your_active_decks", "Your active decks")}
           </h2>
           <button

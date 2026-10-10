@@ -4,6 +4,7 @@ import { getTranslator } from "@/lib/i18n/server";
 import { StreakChart } from "@/components/vocab/streak-chart";
 import type { BadgeView } from "@/lib/badges";
 import { BadgeTooltip } from "@/components/badges/badge-tooltip";
+import { sectionHeadingClass } from "@/components/ui/page-heading";
 
 // The course home page's activity card: "Your progress this week" (words
 // learnt, accuracy, XP earned, streak — a 2x2 grid — then the badges earned
@@ -33,10 +34,10 @@ export async function ActivityOverviewCard({
   const { t } = await getTranslator();
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-card-border bg-washi-soft shadow-sm">
+    <div className="overflow-hidden rounded-3xl border border-card-border bg-washi-soft">
       <div className="grid min-w-0 grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <div className="flex flex-col border-b border-card-border p-6 lg:border-b-0 lg:border-r">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-sumi-soft">
+        <div className="flex flex-col border-b border-card-border p-4 sm:p-5 lg:border-b-0 lg:border-r">
+          <h2 className={sectionHeadingClass}>
             {t("weekly_stats.title", "Your progress this week")}
           </h2>
           <div className="@container mt-4 grid flex-1 auto-rows-fr grid-cols-2 gap-3">

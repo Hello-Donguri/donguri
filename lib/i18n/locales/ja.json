@@ -311,6 +311,8 @@
   "common.save": "",
   "common.saving": "",
   "course_home.back_to_my_courses": "コース一覧に戻る",
+  "course_home.section_today": "今日の学習",
+  "course_home.section_words": "あなたの単語",
   "course_home.today_challenge": "デイリーチャレンジ完了",
   "course_home.today_learnt": "今日{{count}}個覚えた",
   "course_home.today_reviewed": "今日{{count}}個復習した",

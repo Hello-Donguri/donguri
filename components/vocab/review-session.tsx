@@ -39,6 +39,7 @@ import { Jyutping, JyutpingInput } from "@/components/vocab/jyutping";
 import { InlineLesson, LessonButton, loadLesson } from "@/components/vocab/word-lesson";
 import { FlagButton } from "@/components/vocab/flag-button";
 import { parseDonguriConfig, formatXp, type AccessoryId } from "@/lib/levels";
+import { useAnswerSound } from "@/lib/use-answer-sound";
 
 type ReviewSessionProps = {
   quiz: QuizQuestion[];
@@ -161,7 +162,11 @@ const ReviewSessionQuestions = ({
     setXp(newXp);
   };
 
+  const playAnswerSound = useAnswerSound();
+
+  // Every answered question — not a near miss getting a second go.
   const recordResult = (correct: boolean) => {
+    playAnswerSound(correct);
     setScore((current) => ({
       correct: current.correct + (correct ? 1 : 0),
       incorrect: current.incorrect + (correct ? 0 : 1),

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { DonguriAvatar } from "@/components/icons/DonguriAvatar";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import type { LeaderboardEntry } from "@/lib/definitions";
+import { sectionHeadingClass } from "@/components/ui/page-heading";
 
 function Rank({ rank }: { rank: number }) {
   if (rank === 1) {
@@ -182,7 +183,7 @@ export function LeaderboardList({
     <section className="mt-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-sumi-soft">
+          <h2 className={sectionHeadingClass}>
             {t("leaderboard.heading", "Leaderboard")}
           </h2>
           <p className="mt-0.5 text-xs text-sumi-soft">

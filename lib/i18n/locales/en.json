@@ -340,6 +340,8 @@
   "contact.social": "Or follow us for news and updates",
   "contact.subtext": "Questions, feedback or a word you'd like us to add — send us a message and we'll get back to you.",
   "course_home.back_to_my_courses": "Back to my courses",
+  "course_home.section_today": "Today",
+  "course_home.section_words": "Your words",
   "course_home.today_challenge": "Daily challenge done",
   "course_home.today_learnt": "{{count}} learnt today",
   "course_home.today_reviewed": "{{count}} reviewed today",

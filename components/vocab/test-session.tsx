@@ -39,6 +39,7 @@ import { useTranslations } from "@/components/i18n/locale-provider";
 import { Jyutping, JyutpingInput } from "@/components/vocab/jyutping";
 import { LessonButton, lessonAccent } from "@/components/vocab/word-lesson";
 import { parseDonguriConfig, formatXp, type AccessoryId } from "@/lib/levels";
+import { useAnswerSound } from "@/lib/use-answer-sound";
 
 // The typed-answer form lives in the card, its Check button below it (like
 // the learn card's "Got it") — tied together by this id.
@@ -105,7 +106,11 @@ export const TestSession = ({
 
   const question = quiz[quizIndex];
 
+  const playAnswerSound = useAnswerSound();
+
+  // Every answered question — not a near miss getting a second go.
   const recordResult = (correct: boolean) => {
+    playAnswerSound(correct);
     setScore((current) => ({
       correct: current.correct + (correct ? 1 : 0),
       incorrect: current.incorrect + (correct ? 0 : 1),

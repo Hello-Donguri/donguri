@@ -40,3 +40,26 @@ export function PageSubtitle({
     </p>
   );
 }
+
+// A section's heading on a dashboard page — the small uppercase label that
+// opens each card on the course page (Today, Your words, Your active decks,
+// the leaderboard, the week's progress), so they all read as one set.
+// `action` sits at the other end of the row (e.g. "Browse decks").
+export const sectionHeadingClass = "text-sm font-semibold uppercase tracking-wide text-sumi-soft";
+
+export function SectionHeading({
+  children,
+  action,
+  className,
+}: {
+  children: ReactNode;
+  action?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex items-center justify-between gap-3", className)}>
+      <h2 className={sectionHeadingClass}>{children}</h2>
+      {action}
+    </div>
+  );
+}

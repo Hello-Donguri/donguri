@@ -44,7 +44,7 @@ export function WordShortcuts({
   ];
 
   return (
-    <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       {cards.map((card) => (
         <Link
           key={card.href}
@@ -76,6 +76,6 @@ export function WordShortcuts({
           />
         </Link>
       ))}
-    </section>
+    </div>
   );
 }

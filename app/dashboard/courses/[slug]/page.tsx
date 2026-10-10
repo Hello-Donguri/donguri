@@ -47,6 +47,7 @@ import { ReviewCard } from "@/components/vocab/review-card";
 import { CountBadge } from "@/components/ui/count-badge";
 import { SleepingDuck } from "@/components/icons/SleepingDuck";
 import { WordShortcuts } from "@/components/vocab/word-shortcuts";
+import { SectionHeading } from "@/components/ui/page-heading";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -360,7 +361,7 @@ export default async function CourseHomePage({ params }: PageProps) {
   );
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+    <div className="flex flex-col gap-6">
       <DeckCompleteCelebration slug={slug} decks={decks} />
       {/* A guest who's used their free words is asked — not sent — to sign
           up; the banner and locked cards still lead there once it's closed. */}
@@ -371,240 +372,251 @@ export default async function CourseHomePage({ params }: PageProps) {
       {/* After badges in the DOM, so a level-up shows on top, first. */}
       <LevelUpCelebration />
 
-      <main className="flex min-w-0 flex-col gap-5 sm:gap-6">
-        <div>
-          {/* In more than one course: the way back to the dashboard's course
-              cards — styled like the review page's back link. */}
-          {enrolledCourseCount > 1 && (
-            <Link
-              href="/dashboard"
-              prefetch
-              className="group inline-flex items-center gap-1.5 text-sm font-medium text-sumi-soft transition hover:text-sumi"
-            >
-              <ArrowLeft aria-hidden className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
-              {t("course_home.back_to_my_courses", "Back to my courses")}
-            </Link>
-          )}
-          {/* Guests (see lib/access.ts) get straight to the cards — no
-              greeting by name, and no badges to collect yet. */}
-          {!profile.is_guest && (
-            <Greeting
-              firstName={profile.first_name ?? profile.email}
-              greetings={courseGreeting.greetings}
-              motivations={courseGreeting.motivations}
-              subtitle={streakMessage}
-              aside={
-                <ProfileSnapshot
-                  equippedAccessory={equippedAccessory}
-                  level={level}
-                  levelLabel={t("xp_counter.level", "Lv {{level}}", { level })}
-                  stats={[
-                    {
-                      key: "words",
-                      label: t("user_profile.words_learnt", "Words learnt"),
-                      value: String(wordCounts.learnt),
-                    },
-                    {
-                      key: "streak",
-                      label: t("user_profile.longest_streak", "Longest streak"),
-                      value: String(longestStreak),
-                    },
-                    {
-                      key: "xp",
-                      label: t("user_profile.total_xp", "Total XP"),
-                      value: formatXp(profile.xp),
-                    },
-                    {
-                      key: "weekly",
-                      label: t("user_profile.weekly_xp", "XP this week"),
-                      value: formatXp(weeklyStats.xpEarned),
-                    },
-                  ]}
-                  profileHref={profile.username ? `/user/${profile.username}` : "/dashboard/profile"}
-                  profileLabel={t("course_home.view_profile", "View profile")}
-                  badges={
-                    <CourseBadges
-                      earned={badges.earned}
-                      locked={badges.locked}
-                      maxInRow={4}
-                      className="h-full flex-col items-start justify-center"
-                    />
-                  }
-                  today={
-                    doneToday ? (
-                      <TodaySummary today={todayActivity} t={t} className="@xl/hero:flex-nowrap" />
-                    ) : undefined
-                  }
-                />
-              }
-            />
-          )}
+      {/* The greeting and profile card, across the whole width, so the
+          two columns below start level: today's learning beside the decks
+          it comes from. */}
+      <div>
+        {/* In more than one course: the way back to the dashboard's course
+            cards — styled like the review page's back link. */}
+        {enrolledCourseCount > 1 && (
+          <Link
+            href="/dashboard"
+            prefetch
+            className="group inline-flex items-center gap-1.5 text-sm font-medium text-sumi-soft transition hover:text-sumi"
+          >
+            <ArrowLeft aria-hidden className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+            {t("course_home.back_to_my_courses", "Back to my courses")}
+          </Link>
+        )}
+        {/* Guests (see lib/access.ts) get straight to the cards — no
+            greeting by name, and no badges to collect yet. */}
+        {!profile.is_guest && (
+          <Greeting
+            firstName={profile.first_name ?? profile.email}
+            greetings={courseGreeting.greetings}
+            motivations={courseGreeting.motivations}
+            subtitle={streakMessage}
+            aside={
+              <ProfileSnapshot
+                equippedAccessory={equippedAccessory}
+                level={level}
+                levelLabel={t("xp_counter.level", "Lv {{level}}", { level })}
+                stats={[
+                  {
+                    key: "words",
+                    label: t("user_profile.words_learnt", "Words learnt"),
+                    value: String(wordCounts.learnt),
+                  },
+                  {
+                    key: "streak",
+                    label: t("user_profile.longest_streak", "Longest streak"),
+                    value: String(longestStreak),
+                  },
+                  {
+                    key: "xp",
+                    label: t("user_profile.total_xp", "Total XP"),
+                    value: formatXp(profile.xp),
+                  },
+                  {
+                    key: "weekly",
+                    label: t("user_profile.weekly_xp", "XP this week"),
+                    value: formatXp(weeklyStats.xpEarned),
+                  },
+                ]}
+                profileHref={profile.username ? `/user/${profile.username}` : "/dashboard/profile"}
+                profileLabel={t("course_home.view_profile", "View profile")}
+                badges={
+                  <CourseBadges
+                    earned={badges.earned}
+                    locked={badges.locked}
+                    maxInRow={4}
+                    className="h-full flex-col items-start justify-center"
+                  />
+                }
+                today={
+                  doneToday ? (
+                    <TodaySummary today={todayActivity} t={t} className="@xl/hero:flex-nowrap" />
+                  ) : undefined
+                }
+              />
+            }
+          />
+        )}
 
-          {/* Dev mode's automatic reset — draws nothing. The manual reset is
-              in the header's Admin menu. */}
-          {isAdmin && (
-            <DailyChallengeDevReset
-              courseSlug={slug}
-              attemptsToday={challengeStatus.attemptsToday}
-            />
-          )}
+        {/* Dev mode's automatic reset — draws nothing. The manual reset is
+            in the header's Admin menu. */}
+        {isAdmin && (
+          <DailyChallengeDevReset
+            courseSlug={slug}
+            attemptsToday={challengeStatus.attemptsToday}
+          />
+        )}
 
-          {isAdmin && reviewQueueDebug && (
-            <div className="mt-4">
-              <ReviewQueueDevPanel entries={reviewQueueDebug} />
-            </div>
-          )}
-        </div>
+        {isAdmin && reviewQueueDebug && (
+          <div className="mt-4">
+            <ReviewQueueDevPanel entries={reviewQueueDebug} />
+          </div>
+        )}
+      </div>
 
-        {/* Primary learning actions */}
-        <section className="rounded-3xl border border-card-border bg-washi-soft p-4 sm:p-5">
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {/* LEARN — turns into a browse-decks prompt once the active
-                decks have nothing new left (or none are active), and is
-                locked once the free words are used up. */}
-            {learnLocked && profile.tier !== "guest" ? (
-              // A free account that's used its allowance: the card keeps its
-              // colour, with a Donguri Pro pitch over it.
-              <Link
-                href="/dashboard/billing"
-                className={`${learnCardClassName} items-center justify-center`}
-                style={{ backgroundImage: "url(/images/blue-bg2.webp)" }}
-              >
-                <div aria-hidden className="pointer-events-none absolute inset-0 bg-sumi/20" />
-                <div className="relative z-10 mx-auto flex max-w-xs flex-col items-center rounded-2xl bg-raised px-6 py-5 text-center shadow-lg">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-kin/25 text-sumi">
-                    <Sparkles aria-hidden className="h-5 w-5" strokeWidth={2.25} />
-                  </span>
-                  <h2 className="mt-3 font-nunito text-xl font-extrabold leading-tight text-sumi">
-                    {t("course_home.pro_title", "Get Donguri Pro")}
-                  </h2>
-                  <p className="mt-1.5 text-sm leading-snug text-sumi-soft">
-                    {t("course_home.pro_body", "Unlock thousands of words and decks with a Donguri Pro membership.")}
-                  </p>
-                  <span className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-ai px-5 py-2 text-sm font-semibold text-washi transition group-hover:bg-ai-dark">
-                    {t("course_home.pro_cta", "See membership")}
-                    <ArrowRight aria-hidden className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                  </span>
-                </div>
-              </Link>
-            ) : learnLocked ? (
-              <Link
-                href="/signup"
-                className="relative flex min-h-[220px] flex-col overflow-hidden rounded-2xl border border-card-border bg-cover bg-center p-5 opacity-60 shadow-sm grayscale transition hover:opacity-75 sm:min-h-[240px] sm:p-6"
-                style={{ backgroundImage: "url(/images/blue-bg2.webp)" }}
-              >
-                <div className="relative z-10">
-                  <div className="flex items-center gap-3">
-                    <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-100/95 text-2xl font-bold leading-none text-blue-700 shadow-sm">
-                      学
-                      <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-sumi text-washi shadow-sm">
-                        <Lock aria-hidden className="h-3 w-3" strokeWidth={2.5} />
-                      </span>
-                    </div>
-                    <span className="text-sm font-bold uppercase tracking-[0.2em] text-ink-on-dark/90">
-                      {t("course_home.learn_label", "Learn")}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <main className="flex min-w-0 flex-col gap-6">
+          {/* Primary learning actions */}
+          <section className="rounded-3xl border border-card-border bg-washi-soft p-4 sm:p-5">
+            <SectionHeading className="mb-4">{t("course_home.section_today", "Today")}</SectionHeading>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {/* LEARN — turns into a browse-decks prompt once the active
+                  decks have nothing new left (or none are active), and is
+                  locked once the free words are used up. */}
+              {learnLocked && profile.tier !== "guest" ? (
+                // A free account that's used its allowance: the card keeps its
+                // colour, with a Donguri Pro pitch over it.
+                <Link
+                  href="/dashboard/billing"
+                  className={`${learnCardClassName} items-center justify-center`}
+                  style={{ backgroundImage: "url(/images/blue-bg2.webp)" }}
+                >
+                  <div aria-hidden className="pointer-events-none absolute inset-0 bg-sumi/20" />
+                  <div className="relative z-10 mx-auto flex max-w-xs flex-col items-center rounded-2xl bg-raised px-6 py-5 text-center shadow-lg">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-kin/25 text-sumi">
+                      <Sparkles aria-hidden className="h-5 w-5" strokeWidth={2.25} />
+                    </span>
+                    <h2 className="mt-3 font-nunito text-xl font-extrabold leading-tight text-sumi">
+                      {t("course_home.pro_title", "Get Donguri Pro")}
+                    </h2>
+                    <p className="mt-1.5 text-sm leading-snug text-sumi-soft">
+                      {t("course_home.pro_body", "Unlock thousands of words and decks with a Donguri Pro membership.")}
+                    </p>
+                    <span className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-ai px-5 py-2 text-sm font-semibold text-washi transition group-hover:bg-ai-dark">
+                      {t("course_home.pro_cta", "See membership")}
+                      <ArrowRight aria-hidden className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                     </span>
                   </div>
-                  <h2 className="mt-4 text-2xl font-extrabold leading-tight sm:text-3xl text-ink-on-dark">
-                    {t("course_home.learn_locked_guest_title", "Sign up to learn more")}
-                  </h2>
-                  <p className="mt-2 max-w-[65%] text-sm leading-relaxed sm:max-w-[60%] text-ink-on-dark/85">
-                    {t(
-                      "course_home.learn_locked_guest_subtitle",
-                      "You've used your free words. Create a free account to keep them and unlock 40 words and 20 grammar points.",
-                    )}
-                  </p>
+                </Link>
+              ) : learnLocked ? (
+                <Link
+                  href="/signup"
+                  className="relative flex min-h-[220px] flex-col overflow-hidden rounded-2xl border border-card-border bg-cover bg-center p-5 opacity-60 shadow-sm grayscale transition hover:opacity-75 sm:min-h-[240px] sm:p-6"
+                  style={{ backgroundImage: "url(/images/blue-bg2.webp)" }}
+                >
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-3">
+                      <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-100/95 text-2xl font-bold leading-none text-blue-700 shadow-sm">
+                        学
+                        <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-sumi text-washi shadow-sm">
+                          <Lock aria-hidden className="h-3 w-3" strokeWidth={2.5} />
+                        </span>
+                      </div>
+                      <span className="text-sm font-bold uppercase tracking-[0.2em] text-ink-on-dark/90">
+                        {t("course_home.learn_label", "Learn")}
+                      </span>
+                    </div>
+                    <h2 className="mt-4 text-2xl font-extrabold leading-tight sm:text-3xl text-ink-on-dark">
+                      {t("course_home.learn_locked_guest_title", "Sign up to learn more")}
+                    </h2>
+                    <p className="mt-2 max-w-[65%] text-sm leading-relaxed sm:max-w-[60%] text-ink-on-dark/85">
+                      {t(
+                        "course_home.learn_locked_guest_subtitle",
+                        "You've used your free words. Create a free account to keep them and unlock 40 words and 20 grammar points.",
+                      )}
+                    </p>
+                  </div>
+                  <ReadingRabbit className="pointer-events-none absolute bottom-3 -right-95 z-0 h-28 select-none object-contain" />
+                </Link>
+              ) : hasNewWords ? (
+                <Link
+                  href={`/dashboard/courses/${slug}/learn`}
+                  className={learnCardClassName}
+                  style={{ backgroundImage: "url(/images/blue-bg2.webp)" }}
+                >
+                  {learnCardContent}
+                </Link>
+              ) : (
+                <BrowseDecksTrigger
+                  className={`${learnCardClassName} text-left`}
+                  style={{ backgroundImage: "url(/images/blue-bg2.webp)" }}
+                >
+                  {learnCardContent}
+                </BrowseDecksTrigger>
+              )}
+
+              {/* REVIEW */}
+              {/* Live: the count goes up the moment each word comes due
+                  (see ReviewCard). Re-keyed so a fresh server count resets it. */}
+              <ReviewCard
+                key={`${reviewQueue.dueCount}:${reviewQueue.upcomingDue[0]?.getTime() ?? 0}`}
+                courseSlug={slug}
+                dueCount={reviewQueue.dueCount}
+                upcomingDue={reviewQueue.upcomingDue}
+                nextDueAt={reviewQueue.nextDueAt}
+                locked={profile.is_guest}
+              />
+
+              {/* DAILY CHALLENGE */}
+              {challengesDone ? (
+                <div
+                  aria-disabled="true"
+                  className="pointer-events-none relative flex min-h-[112px] select-none items-center overflow-hidden rounded-2xl border border-card-border bg-cover bg-center px-5 py-4 shadow-sm saturate-75 sm:px-6 lg:col-span-2"
+                  style={{ backgroundImage: "url(/images/green-bg.webp)" }}
+                >
+                  {challengeCardContent}
                 </div>
-                <ReadingRabbit className="pointer-events-none absolute bottom-3 -right-95 z-0 h-28 select-none object-contain" />
-              </Link>
-            ) : hasNewWords ? (
-              <Link
-                href={`/dashboard/courses/${slug}/learn`}
-                className={learnCardClassName}
-                style={{ backgroundImage: "url(/images/blue-bg2.webp)" }}
-              >
-                {learnCardContent}
-              </Link>
-            ) : (
-              <BrowseDecksTrigger
-                className={`${learnCardClassName} text-left`}
-                style={{ backgroundImage: "url(/images/blue-bg2.webp)" }}
-              >
-                {learnCardContent}
-              </BrowseDecksTrigger>
-            )}
+              ) : (
+                <Link
+                  href={challengeLocked ? challengeLockedHref : `/dashboard/courses/${slug}/daily-challenge`}
+                  className={cn(
+                    // Guests see it clearly greyed out, like the review card.
+                    profile.is_guest && "opacity-60 grayscale",
+                    "group relative flex min-h-[112px] items-center overflow-hidden rounded-2xl border border-card-border bg-cover bg-center px-5 py-4 shadow-sm transition sm:px-6 duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.015] hover:brightness-105 hover:shadow-md lg:col-span-2",
+                  )}
+                  style={{ backgroundImage: "url(/images/green-bg.webp)" }}
+                >
+                  {challengeCardContent}
+                </Link>
+              )}
+            </div>
+          </section>
 
-            {/* REVIEW */}
-            {/* Live: the count goes up the moment each word comes due
-                (see ReviewCard). Re-keyed so a fresh server count resets it. */}
-            <ReviewCard
-              key={`${reviewQueue.dueCount}:${reviewQueue.upcomingDue[0]?.getTime() ?? 0}`}
+          {/* Back into what's been learnt: flagged lessons and every learnt
+              word, always shown, each opening its full list. */}
+          <section className="rounded-3xl border border-card-border bg-washi-soft p-4 sm:p-5">
+            <SectionHeading className="mb-4">{t("course_home.section_words", "Your words")}</SectionHeading>
+            <WordShortcuts
               courseSlug={slug}
-              dueCount={reviewQueue.dueCount}
-              upcomingDue={reviewQueue.upcomingDue}
-              nextDueAt={reviewQueue.nextDueAt}
-              locked={profile.is_guest}
+              flaggedCount={wordCounts.flagged}
+              learntCount={wordCounts.learnt}
+              t={t}
             />
+          </section>
 
-            {/* DAILY CHALLENGE */}
-            {challengesDone ? (
-              <div
-                aria-disabled="true"
-                className="pointer-events-none relative flex min-h-[112px] select-none items-center overflow-hidden rounded-2xl border border-card-border bg-cover bg-center px-5 py-4 shadow-sm saturate-75 sm:px-6 lg:col-span-2"
-                style={{ backgroundImage: "url(/images/green-bg.webp)" }}
-              >
-                {challengeCardContent}
-              </div>
-            ) : (
-              <Link
-                href={challengeLocked ? challengeLockedHref : `/dashboard/courses/${slug}/daily-challenge`}
-                className={cn(
-                  // Guests see it clearly greyed out, like the review card.
-                  profile.is_guest && "opacity-60 grayscale",
-                  "group relative flex min-h-[112px] items-center overflow-hidden rounded-2xl border border-card-border bg-cover bg-center px-5 py-4 shadow-sm transition sm:px-6 duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.015] hover:brightness-105 hover:shadow-md lg:col-span-2",
-                )}
-                style={{ backgroundImage: "url(/images/green-bg.webp)" }}
-              >
-                {challengeCardContent}
-              </Link>
-            )}
-          </div>
-        </section>
+          <ActivityOverviewCard
+            dailyActivity={dailyActivity}
+            currentStreak={currentStreak}
+            longestStreak={longestStreak}
+            activeToday={activeToday}
+            weeklyStats={weeklyStats}
+            weeklyBadges={weeklyBadges}
+            hasBadges={badges.earned.length + badges.locked.length > 0}
+          />
+        </main>
 
-        {/* Back into what's been learnt: flagged lessons and every learnt
-            word, always shown, each opening its full list. */}
-        <WordShortcuts
-          courseSlug={slug}
-          flaggedCount={wordCounts.flagged}
-          learntCount={wordCounts.learnt}
-          t={t}
-        />
+        <aside className="flex min-w-0 flex-col gap-6">
+          <FindDeckModal
+            slug={slug}
+            decks={decks}
+            activeDeckIds={activeDeckIds}
+          />
 
-        <ActivityOverviewCard
-          dailyActivity={dailyActivity}
-          currentStreak={currentStreak}
-          longestStreak={longestStreak}
-          activeToday={activeToday}
-          weeklyStats={weeklyStats}
-          weeklyBadges={weeklyBadges}
-          hasBadges={badges.earned.length + badges.locked.length > 0}
-        />
-      </main>
+          <LeaderboardTabs
+            topEntries={leaderboards.top}
+            initialFriends={leaderboards.friends}
+          />
+        </aside>
 
-      <aside className="flex min-w-0 flex-col gap-6 lg:col-start-2 lg:row-start-1 lg:row-span-2">
-        <FindDeckModal
-          slug={slug}
-          decks={decks}
-          activeDeckIds={activeDeckIds}
-        />
+      </div>
 
-        <LeaderboardTabs
-          topEntries={leaderboards.top}
-          initialFriends={leaderboards.friends}
-        />
-      </aside>
-
-      <div className="flex flex-col gap-4 rounded-2xl border border-card-border bg-washi-soft p-5 sm:p-6 lg:col-start-1 lg:row-start-2 sm:flex-row sm:items-center sm:justify-between">
+      {/* Out of the way at the very bottom, and quiet: it wipes progress. */}
+      <div className="flex flex-col gap-4 rounded-3xl border border-dashed border-card-border p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div>
           <h2 className="font-semibold text-sumi">
             {t("course_home.start_over", "Start over")}

@@ -6,6 +6,7 @@ import { BookOpen, Clock, Flame, MessageCircle, Puzzle, type LucideIcon } from "
 import type { DailyActivityCount } from "@/lib/definitions";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { cn } from "@/lib/utils";
+import { sectionHeadingClass } from "@/components/ui/page-heading";
 
 function formatDayShort(dateStr: string): string {
   return new Intl.DateTimeFormat("en", { weekday: "short", timeZone: "UTC" }).format(
@@ -224,9 +225,9 @@ export function StreakChart({
   }, [hovered]);
 
   return (
-    <div className="min-w-0 p-6">
+    <div className="min-w-0 p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-sumi-soft">
+        <h2 className={sectionHeadingClass}>
           {t("streak_chart.title", "Learning activity")}
         </h2>
 
