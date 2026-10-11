@@ -9,6 +9,8 @@ export function hasActiveAccess(
   role: string,
   subscription: { status: string | null } | null,
 ): boolean {
-  if (role === "admin") return true;
+  // Admins, and testers (see UserRole in lib/definitions.ts), without
+  // needing a subscription.
+  if (role === "admin" || role === "tester") return true;
   return subscription?.status != null && ACCESS_STATUSES.has(subscription.status);
 }

@@ -8,7 +8,8 @@
 //             FREE_VOCAB_LIMIT words and FREE_GRAMMAR_LIMIT grammar points
 //             in total — a guest's items count towards these, since they
 //             carry over on sign-up (lib/guest-merge.ts).
-//   - member: an active (or past_due) Stripe subscription, or an admin.
+//   - member: an active (or past_due) Stripe subscription, an admin, or a
+//             tester.
 //             No limits, plus the daily challenge.
 // The limits are on *learning new items* only: reviews and quizzes of what
 // someone has already learnt stay open on every tier. Items skipped as

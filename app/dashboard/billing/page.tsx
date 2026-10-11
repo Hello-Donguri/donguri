@@ -240,10 +240,9 @@ export default async function BillingPage({ searchParams }: PageProps) {
           <span className="text-2xl" aria-hidden>
             🌰
           </span>
-          {t(
-            "billing.admin_access",
-            "You have full access as an admin — no membership needed.",
-          )}
+          {profile.role === "tester"
+            ? t("billing.tester_access", "You have full access as a tester — no membership needed.")
+            : t("billing.admin_access", "You have full access as an admin — no membership needed.")}
         </p>
       ) : (
         <section className="relative mx-auto w-full max-w-4xl">

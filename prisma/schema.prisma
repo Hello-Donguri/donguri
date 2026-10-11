@@ -203,6 +203,9 @@ model Word {
   explanationJa    String?               @map("explanation_ja")
   categoryId       String?               @map("category_id") @db.Uuid
   wordType         String?               @map("word_type")
+  // A second part of speech alongside `wordType` (e.g. an irregular verb
+  // that's also a phrase) — see section 56 of supabase/schema.sql.
+  secondaryWordType String?              @map("secondary_word_type")
   progress         UserWordProgress[]
   alternateAnswers WordAlternateAnswer[]
   examples         WordExample[]

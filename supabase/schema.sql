@@ -2011,3 +2011,37 @@ $$;
 -- course page.
 
 alter table public.profiles add column if not exists tour_seen_at timestamptz;
+
+-- 56. Irregular verbs and a secondary word type ------------------------------------------
+-- 'irregular_verb' joins the word types, and a word can have a second type
+-- alongside its first (e.g. irregular verb + phrase), set from the admin
+-- word form or the spreadsheet's "Secondary word type" column and shown on
+-- the lesson. Kept in step with WORD_TYPES in lib/definitions.ts.
+
+alter table public.words drop constraint if exists words_word_type_check;
+alter table public.words add constraint words_word_type_check
+  check (word_type is null or word_type in (
+        'noun', 'verb', 'irregular_verb', 'adjective', 'adverb', 'pronoun', 'preposition',
+        'conjunction', 'interjection', 'phrase', 'numeral', 'particle'
+      ));
+
+alter table public.words add column if not exists secondary_word_type text;
+
+alter table public.words drop constraint if exists words_secondary_word_type_check;
+alter table public.words add constraint words_secondary_word_type_check
+  check (secondary_word_type is null or secondary_word_type in (
+        'noun', 'verb', 'irregular_verb', 'adjective', 'adverb', 'pronoun', 'preposition',
+        'conjunction', 'interjection', 'phrase', 'numeral', 'particle'
+      ));
+
+-- 57. Testers -----------------------------------------------------------------------------
+-- A third role, 'tester': full learning access (like a member, with no
+-- subscription) but none of an admin's abilities — every admin check is
+-- `role = 'admin'`. Admins assign it from /dashboard/admin/users; the admin
+-- role itself is still only ever set here, in the SQL editor (see section 1).
+-- The original check was declared inline on the table, so Postgres named it
+-- profiles_role_check.
+
+alter table public.profiles drop constraint if exists profiles_role_check;
+alter table public.profiles add constraint profiles_role_check
+  check (role in ('user', 'tester', 'admin'));

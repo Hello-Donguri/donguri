@@ -28,6 +28,15 @@ export default async function AdminHubPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Link
+          href="/dashboard/admin/users"
+          className="rounded-2xl border border-card-border bg-washi-soft p-6 transition hover:border-ai/40"
+        >
+          <h2 className="font-semibold text-sumi">{t("admin_hub.users_title", "Users")}</h2>
+          <p className="mt-1 text-sm text-sumi-soft">
+            {t("admin_hub.users_subtitle", "See everyone with an account, and make someone a tester.")}
+          </p>
+        </Link>
+        <Link
           href="/dashboard/admin/reset-password"
           className="rounded-2xl border border-card-border bg-washi-soft p-6 transition hover:border-ai/40"
         >

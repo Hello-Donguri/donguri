@@ -47,6 +47,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         explanation: true,
         explanationJa: true,
         wordType: true,
+        secondaryWordType: true,
         category: { select: { name: true } },
         alternateAnswers: { orderBy: { position: "asc" }, select: { value: true } },
         forms: { orderBy: { position: "asc" }, select: { labelEn: true, labelJa: true, value: true } },
@@ -77,6 +78,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     explanationJa: word.explanationJa,
     categoryName: word.category?.name ?? null,
     wordType: word.wordType,
+    secondaryWordType: word.secondaryWordType,
     alternateSpellings: word.alternateAnswers.map((answer) => answer.value),
     forms: word.forms.map((form) => ({ labelEn: form.labelEn, labelJa: form.labelJa, value: form.value })),
     examples: word.examples.map((example) => ({

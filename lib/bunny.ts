@@ -18,6 +18,8 @@ function extensionForMime(mime: string): string {
       return "png";
     case "image/jpeg":
       return "jpg";
+    case "image/svg+xml":
+      return "svg";
     default:
       throw new Error(`Unsupported image type: ${mime}`);
   }

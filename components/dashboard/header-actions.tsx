@@ -236,7 +236,7 @@ function AdminMenu({ role, className }: { role: UserRole; className?: string }) 
               {t("dashboard_home.course_management", "Course management")}
             </Link>
             <Link
-              href="/dashboard/admin/reset-password"
+              href="/dashboard/admin/users"
               onClick={() => setOpen(false)}
               className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-sumi transition hover:bg-sumi/5"
             >

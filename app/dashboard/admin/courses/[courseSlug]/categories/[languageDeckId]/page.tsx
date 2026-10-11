@@ -179,7 +179,7 @@ export default async function AdminCategoryWordsPage({ params }: PageProps) {
                 </p>
               )}
 
-              {(word.category || word.wordType) && (
+              {(word.category || word.wordType || word.secondaryWordType) && (
                 <div className="flex flex-wrap items-center gap-1.5">
                   {word.category && (
                     <span
@@ -192,10 +192,16 @@ export default async function AdminCategoryWordsPage({ params }: PageProps) {
                       {word.category.name}
                     </span>
                   )}
-                  {word.wordType && (
-                    <span className="inline-flex items-center rounded-full border border-sumi/15 px-2.5 py-0.5 text-xs font-medium text-sumi-soft">
-                      {word.wordType}
-                    </span>
+                  {[word.wordType, word.secondaryWordType].map(
+                    (type) =>
+                      type && (
+                        <span
+                          key={type}
+                          className="inline-flex items-center rounded-full border border-sumi/15 px-2.5 py-0.5 text-xs font-medium text-sumi-soft"
+                        >
+                          {type.replace(/_/g, " ")}
+                        </span>
+                      ),
                   )}
                 </div>
               )}

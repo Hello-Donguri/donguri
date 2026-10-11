@@ -7,6 +7,7 @@ import { requireProfile } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { buildDeckCoverImageKey, buildWordImageKey, uploadImage } from "@/lib/bunny";
+import { isSafeSvg, UNSAFE_SVG_MESSAGE } from "@/lib/svg";
 import {
   parseExamplesColumns,
   parseFormsCell,
@@ -504,6 +505,7 @@ export async function createWord(
     explanationJa: formData.get("explanationJa") || undefined,
     categoryId: formData.get("categoryId") || undefined,
     wordType: formData.get("wordType") || undefined,
+    secondaryWordType: formData.get("secondaryWordType") || undefined,
     path: formData.get("path"),
     image,
   });
@@ -522,6 +524,7 @@ export async function createWord(
     explanationJa,
     categoryId,
     wordType,
+    secondaryWordType,
     path,
     image: validImage,
   } = validatedFields.data;
@@ -543,6 +546,9 @@ export async function createWord(
   let imageKey: string | null = null;
 
   if (validImage) {
+    if (validImage.type === "image/svg+xml" && !(await isSafeSvg(validImage))) {
+      return { errors: { image: [UNSAFE_SVG_MESSAGE] } };
+    }
     imageKey = buildWordImageKey(validImage.type);
 
     try {
@@ -564,6 +570,7 @@ export async function createWord(
       explanationJa: explanationJa || null,
       categoryId: categoryId || null,
       wordType: wordType || null,
+      secondaryWordType: secondaryWordType || null,
       path,
       position: (_max.position ?? 0) + 1,
       imageKey,
@@ -605,6 +612,7 @@ export async function updateWord(
     explanationJa: formData.get("explanationJa") || undefined,
     categoryId: formData.get("categoryId") || undefined,
     wordType: formData.get("wordType") || undefined,
+    secondaryWordType: formData.get("secondaryWordType") || undefined,
     path: formData.get("path"),
     image,
   });
@@ -623,6 +631,7 @@ export async function updateWord(
     explanationJa,
     categoryId,
     wordType,
+    secondaryWordType,
     path,
     image: validImage,
   } = validatedFields.data;
@@ -639,6 +648,9 @@ export async function updateWord(
   let imageKey = existing.imageKey;
 
   if (validImage) {
+    if (validImage.type === "image/svg+xml" && !(await isSafeSvg(validImage))) {
+      return { errors: { image: [UNSAFE_SVG_MESSAGE] } };
+    }
     imageKey = buildWordImageKey(validImage.type);
 
     try {
@@ -660,6 +672,7 @@ export async function updateWord(
       explanationJa: explanationJa || null,
       categoryId: categoryId || null,
       wordType: wordType || null,
+      secondaryWordType: secondaryWordType || null,
       path,
       imageKey,
     },
@@ -850,6 +863,7 @@ export async function importWords(
             imageKey: word.imageKey,
             categoryId: word.categoryId,
             wordType: word.wordType,
+            secondaryWordType: word.secondaryWordType,
             position: basePosition + 1 + wordIndex,
           },
         }),
@@ -904,6 +918,7 @@ type ImportedWordRow = {
   explanationJa: string | null;
   categoryId: string | null;
   wordType: string | null;
+  secondaryWordType: string | null;
 };
 type ImportedFormRow = { id: string; wordId: string; labelEn: string; labelJa: string; value: string };
 type ImportedExampleRow = {
@@ -1003,15 +1018,18 @@ function processWordSheet(
       }
     }
 
-    let wordType: string | null = null;
-    if (data.wordType) {
-      const normalized = data.wordType.toLowerCase();
-      if (wordTypes.includes(normalized)) {
-        wordType = normalized;
-      } else {
-        warnings.push(`${sheetLabel} row ${row.rowNumber}: word type "${data.wordType}" isn't recognized — imported without one.`);
-      }
-    }
+    // "Irregular verb", "irregular-verb" and "irregular_verb" all match
+    // the stored "irregular_verb"; an unrecognised one is a warning, not an
+    // error, and the word is imported without it.
+    const readWordType = (value: string | undefined, label: string): string | null => {
+      if (!value) return null;
+      const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+      if (wordTypes.includes(normalized)) return normalized;
+      warnings.push(`${sheetLabel} row ${row.rowNumber}: ${label} "${value}" isn't recognized — imported without one.`);
+      return null;
+    };
+    const wordType = readWordType(data.wordType, "word type");
+    const secondaryWordType = readWordType(data.secondaryWordType, "secondary word type");
 
     const providedWordId = data.wordId || null;
 
@@ -1061,6 +1079,7 @@ function processWordSheet(
       explanationJa: data.explanationJa || null,
       categoryId,
       wordType,
+      secondaryWordType,
     });
 
     if (data.alternateSpellings) {
@@ -1326,6 +1345,7 @@ export async function importWordsFromSpreadsheet(
           explanationJa: row.explanationJa,
           categoryId: row.categoryId,
           wordType: row.wordType,
+          secondaryWordType: row.secondaryWordType,
           position: basePosition + 1 + index,
         })),
       }),
@@ -1342,7 +1362,7 @@ export async function importWordsFromSpreadsheet(
   if (updatedRows.length > 0) {
     const updateValueRows = updatedRows.map(
       (row) =>
-        Prisma.sql`(${row.id}::uuid, ${row.term}::text, ${row.translation}::text, ${row.romanization}::text, ${row.exampleSentence}::text, ${row.explanation}::text, ${row.explanationJa}::text, ${row.categoryId}::uuid, ${row.wordType}::text)`,
+        Prisma.sql`(${row.id}::uuid, ${row.term}::text, ${row.translation}::text, ${row.romanization}::text, ${row.exampleSentence}::text, ${row.explanation}::text, ${row.explanationJa}::text, ${row.categoryId}::uuid, ${row.wordType}::text, ${row.secondaryWordType}::text)`,
     );
 
     ops.push(
@@ -1356,9 +1376,10 @@ export async function importWordsFromSpreadsheet(
           explanation = v.explanation,
           explanation_ja = v.explanation_ja,
           category_id = v.category_id,
-          word_type = v.word_type
+          word_type = v.word_type,
+          secondary_word_type = v.secondary_word_type
         FROM (VALUES ${Prisma.join(updateValueRows)})
-          AS v(id, term, translation, romanization, example_sentence, explanation, explanation_ja, category_id, word_type)
+          AS v(id, term, translation, romanization, example_sentence, explanation, explanation_ja, category_id, word_type, secondary_word_type)
         WHERE w.id = v.id
       `,
     );

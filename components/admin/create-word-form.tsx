@@ -19,7 +19,8 @@ type CreateWordFormProps = {
 
 const WORD_TYPE_OPTIONS = WORD_TYPES.map((type) => ({
   value: type,
-  label: type[0].toUpperCase() + type.slice(1),
+  // "irregular_verb" → "Irregular verb".
+  label: type[0].toUpperCase() + type.slice(1).replace(/_/g, " "),
 }));
 
 const PATH_OPTIONS = [
@@ -104,6 +105,14 @@ export function CreateWordForm({ languageDeckId, categories }: CreateWordFormPro
             options={WORD_TYPE_OPTIONS}
             errors={state?.errors?.wordType}
           />
+          <SelectField
+            label={t("admin_word_form.secondary_word_type", "Secondary word type")}
+            name="secondaryWordType"
+            required={false}
+            placeholder={t("admin_word_form.no_word_type", "No word type")}
+            options={WORD_TYPE_OPTIONS}
+            errors={state?.errors?.secondaryWordType}
+          />
         </div>
       </section>
 
@@ -149,7 +158,7 @@ export function CreateWordForm({ languageDeckId, categories }: CreateWordFormPro
             <FileField
               label={t("admin_word_form.picture", "Picture")}
               name="image"
-              accept="image/webp,image/png,image/jpeg"
+              accept="image/webp,image/png,image/jpeg,image/svg+xml"
               onChange={handleImageChange}
               errors={state?.errors?.image}
             />

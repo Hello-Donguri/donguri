@@ -21,7 +21,8 @@ type EditWordFormProps = {
 
 const WORD_TYPE_OPTIONS = WORD_TYPES.map((type) => ({
   value: type,
-  label: type[0].toUpperCase() + type.slice(1),
+  // "irregular_verb" → "Irregular verb".
+  label: type[0].toUpperCase() + type.slice(1).replace(/_/g, " "),
 }));
 
 const PATH_OPTIONS = [
@@ -87,6 +88,15 @@ export function EditWordForm({ word, currentImageSrc, categories }: EditWordForm
             options={WORD_TYPE_OPTIONS}
             errors={state?.errors?.wordType}
           />
+          <SelectField
+            label={t("admin_word_form.secondary_word_type", "Secondary word type")}
+            name="secondaryWordType"
+            required={false}
+            placeholder={t("admin_word_form.no_word_type", "No word type")}
+            defaultValue={word.secondaryWordType ?? ""}
+            options={WORD_TYPE_OPTIONS}
+            errors={state?.errors?.secondaryWordType}
+          />
         </div>
       </section>
 
@@ -145,7 +155,7 @@ export function EditWordForm({ word, currentImageSrc, categories }: EditWordForm
             <FileField
               label={t("admin_word_form.replace_image", "Replace image")}
               name="image"
-              accept="image/webp,image/png,image/jpeg"
+              accept="image/webp,image/png,image/jpeg,image/svg+xml"
               errors={state?.errors?.image}
             />
           </div>

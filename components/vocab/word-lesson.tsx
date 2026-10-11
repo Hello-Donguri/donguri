@@ -53,6 +53,10 @@ export function lessonAccent(path: RevealWord["path"]) {
 export const WordLesson = ({ word, header }: { word: RevealWord; header?: ReactNode }) => {
   const t = useTranslations();
   const isGrammar = word.path === "grammar";
+  // Its word type, then the secondary one — once each, if both are the same.
+  const wordTypes = [...new Set([word.wordType, word.secondaryWordType])].filter(
+    (type): type is WordType => type !== null,
+  );
   const [mainExample, ...moreExamples] = word.examples;
   const accent = lessonAccent(word.path);
 
@@ -187,15 +191,24 @@ export const WordLesson = ({ word, header }: { word: RevealWord; header?: ReactN
       {/* The meaning, set apart from the word and its sound so it reads as the
           answer — the biggest thing on the card after the word itself. */}
       <div className="mt-7 flex w-full flex-col items-center border-t border-sumi/10 pt-6">
-        {word.wordType && (
-          <span className="rounded-full bg-sumi/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-sumi-soft">
-            {wordTypeLabel(word.wordType, t)}
-          </span>
+        {/* Its word type, and a second one beside it when it has one (e.g.
+            Irregular verb · Phrase). */}
+        {wordTypes.length > 0 && (
+          <div className="flex flex-wrap justify-center gap-1.5">
+            {wordTypes.map((type) => (
+              <span
+                key={type}
+                className="rounded-full bg-sumi/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-sumi-soft"
+              >
+                {wordTypeLabel(type, t)}
+              </span>
+            ))}
+          </div>
         )}
 
         <p
           lang={englishIsTarget ? otherLang : "en"}
-          className={`${word.wordType ? "mt-3" : ""} text-3xl font-bold leading-tight tracking-tight text-sumi sm:text-4xl`}
+          className={`${wordTypes.length > 0 ? "mt-3" : ""} text-3xl font-bold leading-tight tracking-tight text-sumi sm:text-4xl`}
         >
           {word.translation}
         </p>
@@ -390,6 +403,8 @@ function wordTypeLabel(type: WordType, t: ReturnType<typeof useTranslations>): s
       return t("word_type.noun", "Noun");
     case "verb":
       return t("word_type.verb", "Verb");
+    case "irregular_verb":
+      return t("word_type.irregular_verb", "Irregular verb");
     case "adjective":
       return t("word_type.adjective", "Adjective");
     case "adverb":

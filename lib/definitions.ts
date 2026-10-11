@@ -198,7 +198,15 @@ export type AdminResetPasswordFormState =
     }
   | undefined;
 
-export type UserRole = "admin" | "user";
+// `tester`: full learning access, like a member, without paying — and
+// without any of an admin's abilities (every admin check is
+// `role === "admin"`). Assigned by an admin from /dashboard/admin/users.
+export type UserRole = "admin" | "tester" | "user";
+
+// The roles an admin can give from the users page — never "admin", which
+// is only ever set in the SQL editor (see section 1 of supabase/schema.sql).
+export const ASSIGNABLE_ROLES = ["user", "tester"] as const;
+export type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
 
 export type Profile = {
   id: string;
@@ -286,6 +294,7 @@ export type QuizDirection = "term-to-translation" | "translation-to-term";
 export const WORD_TYPES = [
   "noun",
   "verb",
+  "irregular_verb",
   "adjective",
   "adverb",
   "pronoun",
@@ -342,6 +351,8 @@ export type RevealWord = {
   // Part of speech (noun, numeral…) — null for grammar points, or an
   // unrecognised value.
   wordType: WordType | null;
+  // A second part of speech, shown beside the first; null when there's none.
+  secondaryWordType: WordType | null;
   exampleSentence: string | null;
   explanation: string | null;
   explanationJa: string | null;
@@ -630,6 +641,18 @@ const IMAGE_FIELD_SCHEMA = z
   })
   .optional();
 
+// A word's picture can also be an SVG (illustrations often are). Only
+// words: they're always shown through a plain <img> (see WordImage), where
+// an SVG can't run anything — and lib/svg.ts turns away any SVG with
+// scripting in it anyway, in case its URL is opened directly.
+const WORD_IMAGE_FIELD_SCHEMA = z
+  .file({ error: "Choose an image." })
+  .max(MAX_IMAGE_BYTES, { error: "Image must be under 5MB." })
+  .mime(["image/webp", "image/png", "image/jpeg", "image/svg+xml"], {
+    error: "Use a WebP, PNG, JPEG or SVG image.",
+  })
+  .optional();
+
 const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
 
 const OPTIONAL_HEX_COLOR_SCHEMA = z
@@ -875,11 +898,12 @@ const WordFieldsSchema = {
     .optional(),
   categoryId: z.uuid({ error: "Invalid category." }).optional(),
   wordType: z.enum(WORD_TYPES, { error: "Invalid word type." }).optional(),
+  secondaryWordType: z.enum(WORD_TYPES, { error: "Invalid word type." }).optional(),
   // Whether this is a vocab word or a grammar point — a deck can hold both,
   // so unlike everything else here this isn't inherited from the deck (see
   // the note on `Word.path` in prisma/schema.prisma).
   path: z.enum(["vocab", "grammar"], { error: "Choose vocabulary or grammar." }),
-  image: IMAGE_FIELD_SCHEMA,
+  image: WORD_IMAGE_FIELD_SCHEMA,
 };
 
 type WordFieldErrors = {
@@ -891,6 +915,7 @@ type WordFieldErrors = {
   explanationJa?: string[];
   categoryId?: string[];
   wordType?: string[];
+  secondaryWordType?: string[];
   path?: string[];
   image?: string[];
 };
@@ -1111,6 +1136,7 @@ export const WordImportRowSchema = z.object({
   explanationJa: z.string().trim().max(500, { error: "Keep it under 500 characters." }).optional(),
   category: z.string().trim().max(200).optional(),
   wordType: z.string().trim().max(50).optional(),
+  secondaryWordType: z.string().trim().max(50).optional(),
   // Semicolon-separated — a single cell rather than its own sheet, since
   // unlike forms/examples/quiz questions an alternate answer has no
   // sub-fields of its own to justify a repeatable row.
@@ -1204,6 +1230,7 @@ export type AdminWordSummary = {
   active: boolean;
   category: WordCategoryOption | null;
   wordType: WordType | null;
+  secondaryWordType: WordType | null;
   path: "vocab" | "grammar";
   forms: WordFormSummary[];
   examples: WordExampleSummary[];

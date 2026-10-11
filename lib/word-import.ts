@@ -45,6 +45,7 @@ const WORD_COLUMNS = [
   { header: "Explanation (Japanese)", key: "explanationJa", width: 36 },
   { header: "Category", key: "category", width: 20 },
   { header: "Word type", key: "wordType", width: 16 },
+  { header: "Secondary word type", key: "secondaryWordType", width: 20 },
   { header: "Alternative spellings", key: "alternateSpellings", width: 28 },
   { header: "Forms", key: "forms", width: 40 },
   { header: "Examples (English)", key: "examplesEn", width: 40 },
@@ -147,18 +148,31 @@ function addQuizSheet(workbook: ExcelJS.Workbook, sheetName: string): ExcelJS.Wo
   return sheet;
 }
 
+// Word types as the spreadsheet shows them — "irregular verb", not the
+// stored "irregular_verb" (the import accepts either; see readWordType in
+// lib/actions/admin-content.ts).
+const SHEET_WORD_TYPES = WORD_TYPES.map((type) => type.replace(/_/g, " "));
+
+export function sheetWordType(type: string | null): string {
+  return type ? type.replace(/_/g, " ") : "";
+}
+
+// The same dropdown on both the "Word type" and "Secondary word type"
+// columns.
 function addWordTypeValidation(sheet: ExcelJS.Worksheet, rowCount: number): void {
-  const wordTypeColumn = sheet.getColumn("wordType").letter;
-  const wordTypeFormula = `"${WORD_TYPES.join(",")}"`;
-  for (let row = 2; row <= rowCount; row++) {
-    sheet.getCell(`${wordTypeColumn}${row}`).dataValidation = {
-      type: "list",
-      allowBlank: true,
-      formulae: [wordTypeFormula],
-      showErrorMessage: true,
-      errorTitle: "Invalid word type",
-      error: `Use one of: ${WORD_TYPES.join(", ")} — or leave blank.`,
-    };
+  const wordTypeFormula = `"${SHEET_WORD_TYPES.join(",")}"`;
+  for (const key of ["wordType", "secondaryWordType"]) {
+    const column = sheet.getColumn(key).letter;
+    for (let row = 2; row <= rowCount; row++) {
+      sheet.getCell(`${column}${row}`).dataValidation = {
+        type: "list",
+        allowBlank: true,
+        formulae: [wordTypeFormula],
+        showErrorMessage: true,
+        errorTitle: "Invalid word type",
+        error: `Use one of: ${SHEET_WORD_TYPES.join(", ")} — or leave blank.`,
+      };
+    }
   }
 }
 
@@ -217,7 +231,11 @@ function addInstructionsSheet(workbook: ExcelJS.Workbook, cleanCategoryNames: st
         ? `Optional. Existing categories: ${cleanCategoryNames.join(", ")}. Leave blank if unsure — an unrecognized name is skipped, not an error.`
         : "Optional. Leave blank if unsure — an unrecognized name is skipped, not an error.",
     ],
-    ["Word type", `Optional. One of: ${WORD_TYPES.join(", ")}.`],
+    ["Word type", `Optional. One of: ${SHEET_WORD_TYPES.join(", ")}.`],
+    [
+      "Secondary word type",
+      `Optional. A second word type shown beside the first on the lesson — e.g. "irregular verb" with "phrase". Same choices as Word type.`,
+    ],
     [
       "Alternative spellings",
       'Optional. Other answers that should also count as correct when a learner types this word — e.g. "3; three" for a word whose Term is "三". Separate multiple alternatives with a semicolon ( ; ) or a pipe ( | ). Checked regardless of which side (Term or Translation) the learner is typing.',
@@ -296,6 +314,7 @@ export async function buildWordImportTemplate(categoryNames: string[]): Promise<
     explanationJa: "",
     category: categoryNames[0] ?? "",
     wordType: "verb",
+    secondaryWordType: "",
     alternateSpellings: "eat",
     forms: "Past simple|過去形|ate",
     examplesEn: "Yesterday I ate an apple.",
@@ -316,6 +335,7 @@ export async function buildWordImportTemplate(categoryNames: string[]): Promise<
     explanationJa: "",
     category: "",
     wordType: "",
+    secondaryWordType: "",
     alternateSpellings: "",
     forms: "",
     examplesEn: "I ended up forgetting my homework.",
@@ -394,6 +414,7 @@ export type WordExportRow = {
   explanationJa: string | null;
   categoryName: string | null;
   wordType: string | null;
+  secondaryWordType: string | null;
   alternateSpellings: string[];
   forms: WordExportForm[];
   examples: WordExportExample[];
@@ -466,7 +487,8 @@ function writeWordsAndQuizSheets(
       explanation: word.explanation ?? "",
       explanationJa: word.explanationJa ?? "",
       category: word.categoryName ?? "",
-      wordType: word.wordType ?? "",
+      wordType: sheetWordType(word.wordType),
+      secondaryWordType: sheetWordType(word.secondaryWordType),
       alternateSpellings: word.alternateSpellings.join("; "),
       forms: serializeFormsCell(word.forms),
       examplesEn: serializeHighlightedExamplesColumn(

@@ -537,6 +537,7 @@ function toAdminWordSummary(word: {
   imageKey: string | null;
   active: boolean;
   wordType: string | null;
+  secondaryWordType: string | null;
   path: string;
   category: { id: string; name: string; color: string } | null;
   forms: { id: string; labelEn: string; labelJa: string; value: string }[];
@@ -563,6 +564,7 @@ function toAdminWordSummary(word: {
     imageKey: word.imageKey,
     active: word.active,
     wordType: word.wordType as WordType | null,
+    secondaryWordType: word.secondaryWordType as WordType | null,
     path: word.path as "vocab" | "grammar",
     category: word.category,
     forms: word.forms.map((form) => ({
@@ -1753,6 +1755,10 @@ const revealWordInclude = {
 
 // What the learn card shows for one word — shared by the learn queue and
 // the quiz's "See the lesson" modal (see getLessonWord).
+function asWordType(value: string | null): WordType | null {
+  return (WORD_TYPES as readonly string[]).includes(value ?? "") ? (value as WordType) : null;
+}
+
 function toRevealWord(
   word: Prisma.WordGetPayload<{ include: typeof revealWordInclude }>,
   course: { targetLanguage: string },
@@ -1762,9 +1768,8 @@ function toRevealWord(
     term: word.term,
     translation: word.translation,
     romanization: word.romanization,
-    wordType: (WORD_TYPES as readonly string[]).includes(word.wordType ?? "")
-      ? (word.wordType as WordType)
-      : null,
+    wordType: asWordType(word.wordType),
+    secondaryWordType: asWordType(word.secondaryWordType),
     exampleSentence: word.exampleSentence,
     explanation: word.explanation,
     explanationJa: word.explanationJa,
