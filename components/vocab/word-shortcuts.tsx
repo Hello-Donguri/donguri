@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import type { TFunction } from "@/lib/i18n/translate";
-
+//dd
 // The course page's two ways back into what's been learnt, always shown:
 // the lessons flagged during reviews, and every word learnt so far — each
 // a card with its count, opening the full list on its own page.
