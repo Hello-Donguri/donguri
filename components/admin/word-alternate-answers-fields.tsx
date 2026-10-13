@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { useTranslations } from "@/components/i18n/locale-provider";
 
 // Repeatable "alternate answers" section for the word create/edit forms —
-// extra accepted spellings (e.g. "3" or "三" alongside "Three") checked
-// alongside the word's own term/translation, regardless of which side the
-// learner is typing (see matchesTypedAnswer in lib/actions/vocab.ts).
+// close answers (e.g. "large" alongside "big") that aren't accepted: typing
+// one, on whichever side the learner is typing, tells them they're nearly
+// there and asks for another word (see synonymFor in lib/actions/vocab.ts).
 // Submitted as indexed FormData fields (`alternateAnswers.0.value`, ...)
 // parsed server-side by `replaceWordAlternateAnswers` in
 // lib/actions/admin-content.ts.
@@ -51,7 +51,7 @@ export function WordAlternateAnswersFields({
           <span className="opacity-70">
             {t(
               "admin_word_alternate_answers.hint",
-              "(other accepted typed answers, e.g. \"3\" for \"Three\" — optional)",
+              "(close answers that aren't accepted — the learner is told they're nearly there and asked for another word, e.g. \"large\" for \"big\" — optional)",
             )}
           </span>
         </span>

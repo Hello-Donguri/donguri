@@ -48,11 +48,11 @@ export function Story({ t }: { t: TFunction }) {
       <ReviewStory
         copy={{
           step: 3,
-          eyebrow: t("home.story.review_eyebrow", "Review"),
-          heading: t("home.story.review_heading", "Words come back just in time."),
+          eyebrow: t("home.story.review_eyebrow", "Spaced repetition"),
+          heading: t("home.story.review_heading", "Review at just the right moment."),
           body: t(
             "home.story.review_body",
-            "Right before you'd forget, and further apart each time, until they're yours for good.",
+            "Each word comes back right before you'd forget it, with a longer gap every time you get it right. It's the proven way to move words into long-term memory.",
           ),
         }}
         labels={{

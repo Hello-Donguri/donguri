@@ -12,8 +12,8 @@ export type ReviewLabels = {
 };
 
 // When the word card starts and finishes its trip down the stages.
-const TRIP_START = 0.14;
-const TRIP_END = 0.82;
+const TRIP_START = 0.12;
+const TRIP_END = 0.6;
 // One row's height plus the gap below it (h-9 + gap-1.5), in px — how far
 // the word moves per stage.
 const ROW_PITCH = 42;
@@ -24,7 +24,7 @@ const ROW_PITCH = 42;
 // real ones (STAGES in lib/srs.ts).
 export function ReviewStory({ copy, labels }: { copy: StoryCopy; labels: ReviewLabels }) {
   return (
-    <ScrollStory id="reviews" copy={copy} accent="kin" screens={3}>
+    <ScrollStory id="reviews" copy={copy} accent="kin" screens={2}>
       {(progress) => <ReviewLadder progress={progress} labels={labels} />}
     </ScrollStory>
   );

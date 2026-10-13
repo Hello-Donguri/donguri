@@ -251,8 +251,11 @@ function jyutpingSpellingMiss(typed: string, stored: string, leniency: AnswerLen
 // Cantonese answer with only its tones wrong; "spelling" is a small
 // spelling slip — in an English or French answer (see nearMissReading), or one letter
 // in one syllable of a Jyutping answer (see jyutpingSpellingMiss). Getting it on
-// that second go counts as correct, for half the usual XP.
-export type RetryReason = "tone" | "spelling";
+// that second go counts as correct, for half the usual XP. "synonym" is
+// one of the word's alternate answers (see synonymFor) — close, but not
+// the word we're after — so the learner is asked for another word, with
+// nothing recorded and no XP lost.
+export type RetryReason = "tone" | "spelling" | "synonym";
 const RETRY_XP = 0.5;
 
 // Whether a wrong typed answer gets a second go, and why. Latin-script
@@ -277,6 +280,23 @@ function retryFor(
     if (answer) return { reason: "spelling", answer };
   }
   return null;
+}
+
+// A wrong typed answer that's one of the word's alternate answers (see
+// WordAlternateAnswer) — it isn't accepted, but the learner is told
+// they're nearly there and asked for another word. Comes back as a
+// "synonym" retry with what they typed, so the note can show it; checked
+// every time, so typing it again just asks again.
+function synonymFor(
+  typed: string,
+  alternates: { value: string }[],
+  leniency: AnswerLeniency,
+): { reason: RetryReason; answer: string } | null {
+  if (alternates.length === 0) return null;
+  const stored = alternates.map((alt) => alt.value).join(",");
+  return matchTypedAnswer(typed, stored, leniency).correct
+    ? { reason: "synonym", answer: typed.trim() }
+    : null;
 }
 
 // The response for an answer being offered a retry — nothing is recorded
@@ -476,11 +496,10 @@ export async function submitAnswer(
 // case-insensitive, comma-list-tolerant comparison instead of an exact
 // option match (some translations carry more than one accepted reading,
 // e.g. "こんにちは, もしもし"). The word's own alternate answers (see
-// WordAlternateAnswer — extra accepted spellings like "3" or "三" for
-// "Three") are unioned into the same comma-list check, regardless of which
-// side (term or translation) is being typed. The correct-answer shown back
-// to the learner is just the first reading, not the full stored list or any
-// alternates. Shared by the quiz's typed half (`advancesStage: false`) and
+// WordAlternateAnswer) aren't accepted, on whichever side is being typed:
+// one of those comes back as a "synonym" retry (see synonymFor). The
+// correct-answer shown back to the learner is just the first reading, not
+// the full stored list. Shared by the quiz's typed half (`advancesStage: false`) and
 // the review queue's fallback typed question for words with no cloze
 // content (`advancesStage: true`).
 // A nearly-right answer (a tone slip in Jyutping, a spelling slip in
@@ -533,16 +552,14 @@ export async function submitTypedAnswer(
   // Where the Jyutping is asked for, the characters themselves count too —
   // a learner who can write 今日 shouldn't be marked wrong for not typing
   // gam1 jat6. (Characters can't be a near miss, so no retry for them.)
-  const acceptedAnswers = [
-    storedAnswer,
-    ...(useRomanizedAnswer ? [word.term] : []),
-    ...word.alternateAnswers.map((alt) => alt.value),
-  ].join(",");
+  const acceptedAnswers = [storedAnswer, ...(useRomanizedAnswer ? [word.term] : [])].join(",");
   const leniency = { vocab: word.path === "vocab" };
   // Jyutping may come in with no spaces between syllables — the tone
   // numbers already mark where each one ends.
   const answer = useRomanizedAnswer ? spaceJyutpingSyllables(typedAnswer) : typedAnswer;
   const { correct, fullAnswer } = matchTypedAnswer(answer, acceptedAnswers, leniency);
+  const synonym = correct ? null : synonymFor(answer, word.alternateAnswers, leniency);
+  if (synonym) return retryResponse(user.id, synonym);
   // A comma list shows just its first reading; slash alternatives
   // ("they / them") are shown whole, since they're one answer.
   const correctAnswer = storedAnswer.split(",")[0].trim();
@@ -574,7 +591,8 @@ export async function submitTypedAnswer(
 // Checks a typed answer against a word form's value — trimmed and
 // case-insensitive, so "Went"/"went "/"WENT" all count. A null `formId`
 // means the blank was the word's own term (see findTermClozeMatches in
-// lib/cloze.ts), checked against the term plus its alternate answers. Shared by the
+// lib/cloze.ts), checked against the term — one of its alternate answers
+// is a "synonym" retry (see synonymFor). Shared by the
 // quiz's cloze-preferred typed half (`advancesStage: false`) and the review
 // queue's cloze question (`advancesStage: true`) — see `submitTypedAnswer`,
 // including its spelling retry (`retry` / `isRetry`).
@@ -611,13 +629,14 @@ export async function submitFormAnswer(
         ...courseSelect,
       },
     });
-    const acceptedAnswers = [word.term, ...word.alternateAnswers.map((alt) => alt.value)].join(",");
     const leniency = { vocab: word.path === "vocab" };
-    const { correct, fullAnswer } = matchTypedAnswer(typedAnswer, acceptedAnswers, leniency);
+    const { correct, fullAnswer } = matchTypedAnswer(typedAnswer, word.term, leniency);
+    const synonym = correct ? null : synonymFor(typedAnswer, word.alternateAnswers, leniency);
+    if (synonym) return retryResponse(user.id, synonym);
     const retry =
       correct || isRetry
         ? null
-        : retryFor(typedAnswer, acceptedAnswers, leniency, word.languageDeck.course.targetLanguage, false);
+        : retryFor(typedAnswer, word.term, leniency, word.languageDeck.course.targetLanguage, false);
     if (retry) return retryResponse(user.id, retry);
 
     const { xp } = await recordAnswer(user.id, wordId, correct, advancesStage, isRetry ? RETRY_XP : 1);

@@ -144,6 +144,12 @@ export type ChoiceFeedback = {
 // `typed` is what the learner put, shown beside the answer to compare.
 export type PendingRetry = { answer: string; reason: RetryReason; typed: string };
 
+// Whether the next answer is a second go after a near miss, recorded for
+// half XP. A "synonym" retry isn't: the learner just tries another word.
+export function isHalfXpRetry(retry: PendingRetry | null): retry is PendingRetry {
+  return retry !== null && retry.reason !== "synonym";
+}
+
 // What the learner typed, word by word (Jyutping syllable by syllable),
 // with each one that doesn't match the answer in the same place marked.
 function TypedComparison({ typed, answer }: { typed: string; answer: string }) {
@@ -173,7 +179,9 @@ function TypedComparison({ typed, answer }: { typed: string; answer: string }) {
 
 // Pops in when a typed answer was nearly right — a Jyutping answer with a
 // tone wrong, or an English answer with a small spelling slip: the correct
-// answer, and a prompt to type it in for half XP.
+// answer, and a prompt to type it in for half XP. For a synonym (one of
+// the word's alternate answers) the answer stays hidden — they're asked
+// for another word instead.
 export const RetryNote = ({ retry }: { retry: PendingRetry }) => {
   const t = useTranslations();
   const reduceMotion = useReducedMotion();
@@ -189,9 +197,16 @@ export const RetryNote = ({ retry }: { retry: PendingRetry }) => {
       className="mt-5 w-full rounded-2xl bg-kin/20 px-5 py-4 text-center text-sumi shadow-sm ring-2 ring-kin/40"
     >
       <p className="font-nunito text-xl font-extrabold">
-        {t("test_session.nearly", "Nearly!")}
+        {retry.reason === "synonym"
+          ? t("test_session.nearly_there", "You're nearly there!")
+          : t("test_session.nearly", "Nearly!")}
       </p>
-      {retry.reason === "tone" ? (
+      {retry.reason === "synonym" ? (
+        <p className="mt-1 font-semibold">
+          <strong className="text-lg">{retry.answer}</strong>{" "}
+          {t("test_session.synonym_miss", "is close, but we're looking for another word.")}
+        </p>
+      ) : retry.reason === "tone" ? (
         <p className="mt-1 font-semibold">
           {t("test_session.tone_miss", "So close — just the tones! It's")}{" "}
           <strong className="text-lg">
@@ -207,7 +222,7 @@ export const RetryNote = ({ retry }: { retry: PendingRetry }) => {
           </strong>
         </p>
       )}
-      {retry.typed.trim() && (
+      {retry.reason !== "synonym" && retry.typed.trim() && (
         <p className="mt-1 text-sm text-sumi-soft">
           {t("test_session.you_typed", "You typed")}{" "}
           <span className="font-semibold">
@@ -216,9 +231,11 @@ export const RetryNote = ({ retry }: { retry: PendingRetry }) => {
         </p>
       )}
       <p className="mt-2 text-sm text-sumi-soft">
-        {retry.reason === "tone"
-          ? t("test_session.tone_retry", "Type it again with the right tones for half XP.")
-          : t("test_session.spelling_retry", "Type it in correctly for half XP.")}
+        {retry.reason === "synonym"
+          ? t("test_session.synonym_retry", "Have another go — no XP lost.")
+          : retry.reason === "tone"
+            ? t("test_session.tone_retry", "Type it again with the right tones for half XP.")
+            : t("test_session.spelling_retry", "Type it in correctly for half XP.")}
       </p>
     </motion.div>
   );

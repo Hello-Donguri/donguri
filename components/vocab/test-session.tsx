@@ -25,6 +25,7 @@ import {
   useEnterToContinue,
   MultipleChoiceOptions,
   RetryNote,
+  isHalfXpRetry,
   retriedMessage,
   type PendingRetry,
   type ChoiceFeedback,
@@ -169,7 +170,7 @@ export const TestSession = ({
       correctAnswer: result.correctAnswer,
       alternatives: result.alternatives,
       fullAnswer: result.fullAnswer,
-      retried: retry && result.correct ? retry.reason : undefined,
+      retried: isHalfXpRetry(retry) && result.correct ? retry.reason : undefined,
     });
     setRetry(null);
     recordResult(result.correct);
@@ -183,7 +184,13 @@ export const TestSession = ({
 
     try {
       applyTypedResult(
-        await submitFormAnswer(question.wordId, question.formId, typedAnswer, false, retry !== null),
+        await submitFormAnswer(
+          question.wordId,
+          question.formId,
+          typedAnswer,
+          false,
+          isHalfXpRetry(retry),
+        ),
       );
     } finally {
       setPending(false);
@@ -259,7 +266,7 @@ export const TestSession = ({
           question.direction,
           typedAnswer,
           false,
-          retry !== null,
+          isHalfXpRetry(retry),
         ),
       );
     } finally {
