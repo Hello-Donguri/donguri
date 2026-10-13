@@ -41,6 +41,11 @@ export function buildBadgeImageKey(mime: string): string {
   return buildImageKey("badges", mime);
 }
 
+// Country slides, items and the room background (see lib/world.ts).
+export function buildWorldImageKey(mime: string): string {
+  return buildImageKey("world", mime);
+}
+
 export async function uploadImage(file: File, key: string): Promise<void> {
   const endpoint =
     process.env.BUNNY_STORAGE_ENDPOINT || "https://storage.bunnycdn.com";

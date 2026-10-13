@@ -87,6 +87,18 @@ export default async function AdminHubPage() {
             )}
           </p>
         </Link>
+        <Link
+          href="/dashboard/admin/world"
+          className="rounded-2xl border border-card-border bg-washi-soft p-6 transition hover:border-ai/40"
+        >
+          <h2 className="font-semibold text-sumi">{t("admin_hub.world_title", "Manage the world map")}</h2>
+          <p className="mt-1 text-sm text-sumi-soft">
+            {t(
+              "admin_hub.world_subtitle",
+              "Set up countries, their slides and the items learners pick for their room.",
+            )}
+          </p>
+        </Link>
       </div>
     </div>
   );

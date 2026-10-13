@@ -63,6 +63,7 @@ model Profile {
   subscription           Subscription?
   badges                 UserBadge[]
   weeklyLeader           WeeklyLeader[]
+  worldItems             UserWorldItem[]
 
   @@map("profiles")
 }
@@ -497,4 +498,81 @@ model WeeklyLeader {
   profile   Profile? @relation(fields: [userId], references: [id], onUpdate: NoAction)
 
   @@map("weekly_leader")
+}
+
+// A country on the learner's world map, set up by an admin — see section
+// 58 of supabase/schema.sql. `mapKey` is its key in lib/world-map.json.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model WorldCountry {
+  id        String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  mapKey    String              @unique @map("map_key")
+  name      String
+  active    Boolean             @default(true)
+  createdAt DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  slides    WorldCountrySlide[]
+  items     WorldItem[]
+
+  @@map("world_countries")
+}
+
+// One slide of a country's tour: some text and, optionally, an image.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model WorldCountrySlide {
+  id        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  countryId String       @map("country_id") @db.Uuid
+  position  Int          @default(0)
+  title     String?
+  body      String       @default("")
+  imageKey  String?      @map("image_key")
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  country   WorldCountry @relation(fields: [countryId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([countryId, position], map: "world_country_slides_country_idx")
+  @@map("world_country_slides")
+}
+
+// An item a learner can pick at the end of a country's tour — a PNG.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model WorldItem {
+  id        String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  countryId String          @map("country_id") @db.Uuid
+  name      String
+  imageKey  String          @map("image_key")
+  active    Boolean         @default(true)
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  country   WorldCountry    @relation(fields: [countryId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  owners    UserWorldItem[]
+
+  @@index([countryId], map: "world_items_country_idx")
+  @@map("world_items")
+}
+
+// An item a learner owns, and where it sits in their room: x and y are
+// fractions (0–1) of the room at its centre, z its layer (higher in
+// front) — a real coordinate in case rooms go 3D.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model UserWorldItem {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  itemId    String    @map("item_id") @db.Uuid
+  x         Float     @default(0.5)
+  y         Float     @default(0.5)
+  z         Float     @default(0)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  item      WorldItem @relation(fields: [itemId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  profile   Profile   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([userId, itemId], map: "user_world_items_user_item_key")
+  @@map("user_world_items")
+}
+
+// The room's background image — one row, shared by every learner.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model WorldRoom {
+  id            Int      @id @default(1)
+  backgroundKey String?  @map("background_key")
+  updatedAt     DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("world_room")
 }

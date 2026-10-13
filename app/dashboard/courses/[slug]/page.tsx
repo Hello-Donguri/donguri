@@ -49,6 +49,9 @@ import { ReviewCard } from "@/components/vocab/review-card";
 import { CountBadge } from "@/components/ui/count-badge";
 import { SleepingDuck } from "@/components/icons/SleepingDuck";
 import { WordShortcuts } from "@/components/vocab/word-shortcuts";
+import { WorldShortcuts } from "@/components/world/world-shortcuts";
+import { DevModeOnly } from "@/components/dashboard/dev-mode-only";
+import { getRoomItemCount } from "@/lib/world";
 import { SectionHeading } from "@/components/ui/page-heading";
 
 type PageProps = {
@@ -102,10 +105,12 @@ async function loadCourseHome(slug: string) {
   ]);
 
   const isAdmin = profile.role === "admin";
-  const [reviewQueueDebug, badges] = await Promise.all([
+  const [reviewQueueDebug, badges, roomItemCount] = await Promise.all([
     isAdmin ? getReviewQueueDebug(slug) : null,
     // This course's badges plus the every-course ones.
     badgeShelf(profile.id, course.id),
+    // The world map is admin-only while it's being built (see lib/world.ts).
+    isAdmin ? getRoomItemCount() : 0,
   ]);
   const badgeWeekStart = startOfBadgeWeek();
 
@@ -125,6 +130,7 @@ async function loadCourseHome(slug: string) {
     enrolledCourseCount,
     allowance,
     wordCounts,
+    roomItemCount,
     isAdmin,
     reviewQueueDebug,
     badges,
@@ -153,6 +159,7 @@ export default async function CourseHomePage({ params }: PageProps) {
       enrolledCourseCount,
       allowance,
       wordCounts,
+      roomItemCount,
       isAdmin,
       reviewQueueDebug,
       badges,
@@ -613,6 +620,17 @@ export default async function CourseHomePage({ params }: PageProps) {
               t={t}
             />
           </section>
+
+          {/* The world map and the room its souvenirs go in — admins in
+              dev mode only while it's being built (see lib/world.ts). */}
+          {isAdmin && (
+            <DevModeOnly>
+              <section className="rounded-3xl border border-card-border bg-washi-soft p-4 sm:p-5">
+                <SectionHeading className="mb-4">{t("course_home.section_world", "Your world")}</SectionHeading>
+                <WorldShortcuts courseSlug={slug} itemCount={roomItemCount} t={t} />
+              </section>
+            </DevModeOnly>
+          )}
 
           <ActivityOverviewCard
             dailyActivity={dailyActivity}

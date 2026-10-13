@@ -826,6 +826,81 @@ export const UpdateBadgeFormSchema = z.object({
   image: IMAGE_FIELD_SCHEMA,
 });
 
+// The world map's admin forms (lib/actions/world.ts) — countries, their
+// slides and items, and the room background.
+const REQUIRED_IMAGE_SCHEMA = z
+  .file({ error: "Choose an image." })
+  .max(MAX_IMAGE_BYTES, { error: "Image must be under 5MB." })
+  .mime(["image/webp", "image/png", "image/jpeg"], {
+    error: "Use a WebP, PNG, or JPEG image.",
+  });
+
+// Items sit on the room's background, so they need a transparent PNG (or
+// WebP).
+const ITEM_IMAGE_SCHEMA = z
+  .file({ error: "Choose an image." })
+  .max(MAX_IMAGE_BYTES, { error: "Image must be under 5MB." })
+  .mime(["image/png", "image/webp"], { error: "Use a PNG (or WebP) with a transparent background." });
+
+export const CreateWorldCountryFormSchema = z.object({
+  mapKey: z.string().trim().min(1, { error: "Pick a country on the map." }),
+  name: z.string().trim().min(1, { error: "Give it a name." }).max(80, { error: "Keep it under 80 characters." }),
+});
+
+export const UpdateWorldCountryFormSchema = z.object({
+  countryId: z.uuid({ error: "Missing country." }),
+  name: CreateWorldCountryFormSchema.shape.name,
+});
+
+const WorldSlideFieldsSchema = {
+  title: z
+    .string()
+    .trim()
+    .max(120, { error: "Keep it under 120 characters." })
+    .transform((value) => value || null),
+  body: z.string().trim().max(2000, { error: "Keep it under 2,000 characters." }),
+  image: IMAGE_FIELD_SCHEMA,
+};
+
+export const CreateWorldSlideFormSchema = z.object({
+  countryId: z.uuid({ error: "Missing country." }),
+  ...WorldSlideFieldsSchema,
+});
+
+export const UpdateWorldSlideFormSchema = z.object({
+  slideId: z.uuid({ error: "Missing slide." }),
+  ...WorldSlideFieldsSchema,
+  removeImage: z.boolean(),
+});
+
+const WorldItemNameSchema = z
+  .string()
+  .trim()
+  .min(1, { error: "Give it a name." })
+  .max(80, { error: "Keep it under 80 characters." });
+
+export const CreateWorldItemFormSchema = z.object({
+  countryId: z.uuid({ error: "Missing country." }),
+  name: WorldItemNameSchema,
+  image: ITEM_IMAGE_SCHEMA,
+});
+
+export const UpdateWorldItemFormSchema = z.object({
+  itemId: z.uuid({ error: "Missing item." }),
+  name: WorldItemNameSchema,
+  image: ITEM_IMAGE_SCHEMA.optional(),
+});
+
+export const WorldRoomFormSchema = z.object({ image: REQUIRED_IMAGE_SCHEMA });
+
+export type WorldFormState =
+  | {
+      errors?: Partial<Record<"mapKey" | "name" | "title" | "body" | "image", string[]>>;
+      message?: string;
+      success?: boolean;
+    }
+  | undefined;
+
 export type BadgeFormState =
   | {
       errors?: {

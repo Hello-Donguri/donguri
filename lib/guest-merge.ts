@@ -47,10 +47,11 @@ export async function mergeGuestInto(guestId: string, userId: string): Promise<v
     });
     if (!guest?.isGuest) return;
 
-    const [ownWords, ownEnrollments, ownDecks] = await Promise.all([
+    const [ownWords, ownEnrollments, ownDecks, ownWorldItems] = await Promise.all([
       prisma.userWordProgress.findMany({ where: { userId }, select: { wordId: true } }),
       prisma.courseEnrollment.findMany({ where: { userId }, select: { courseId: true, unenrolledAt: true } }),
       prisma.userDeckActivation.findMany({ where: { userId }, select: { languageDeckId: true } }),
+      prisma.userWorldItem.findMany({ where: { userId }, select: { itemId: true } }),
     ]);
     const ownCourseIds = ownEnrollments.map((row) => row.courseId);
     const guestCourseIds = (
@@ -80,6 +81,11 @@ export async function mergeGuestInto(guestId: string, userId: string): Promise<v
       }),
       prisma.userDeckActivation.updateMany({
         where: { userId: guestId, languageDeckId: { notIn: ownDecks.map((row) => row.languageDeckId) } },
+        data: { userId },
+      }),
+      // Items picked on the world map, where they were left in the room.
+      prisma.userWorldItem.updateMany({
+        where: { userId: guestId, itemId: { notIn: ownWorldItems.map((row) => row.itemId) } },
         data: { userId },
       }),
       prisma.profile.update({ where: { id: userId }, data: { xp: { increment: guest.xp } } }),

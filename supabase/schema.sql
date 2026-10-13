@@ -2045,3 +2045,94 @@ alter table public.words add constraint words_secondary_word_type_check
 alter table public.profiles drop constraint if exists profiles_role_check;
 alter table public.profiles add constraint profiles_role_check
   check (role in ('user', 'tester', 'admin'));
+
+-- 58. World map and rooms ------------------------------------------------------------------
+-- A learner's world map (/dashboard/courses/<slug>/world): countries the
+-- admin has set up light up on it, and opening one plays a few slides
+-- (text and an image each). At the end they pick one of that country's
+-- items — PNG images — to keep, and can come back for another they don't
+-- own yet. Their items live in their room (/dashboard/courses/<slug>/room),
+-- shared across courses, where they drag each one into place.
+--
+-- `map_key` is the country's key in lib/world-map.json (its ISO 3166-1
+-- numeric code, or its name for the few without one). An item's x and y
+-- are fractions (0–1) of the room's width and height, at its centre; z is
+-- its layer (higher in front), kept as a real coordinate in case rooms
+-- go 3D. The room's background is one admin-uploaded image (world_room,
+-- a single row). Writes all go through the server (Prisma, which bypasses
+-- RLS).
+
+create table if not exists public.world_countries (
+  id uuid primary key default gen_random_uuid(),
+  map_key text not null unique,
+  name text not null,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.world_country_slides (
+  id uuid primary key default gen_random_uuid(),
+  country_id uuid not null references public.world_countries (id) on delete cascade,
+  position integer not null default 0,
+  title text,
+  body text not null default '',
+  image_key text,
+  created_at timestamptz not null default now()
+);
+create index if not exists world_country_slides_country_idx
+  on public.world_country_slides (country_id, position);
+
+create table if not exists public.world_items (
+  id uuid primary key default gen_random_uuid(),
+  country_id uuid not null references public.world_countries (id) on delete cascade,
+  name text not null,
+  image_key text not null,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+create index if not exists world_items_country_idx on public.world_items (country_id);
+
+create table if not exists public.user_world_items (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  item_id uuid not null references public.world_items (id) on delete cascade,
+  x double precision not null default 0.5,
+  y double precision not null default 0.5,
+  z double precision not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint user_world_items_user_item_key unique (user_id, item_id)
+);
+
+create table if not exists public.world_room (
+  id integer primary key default 1,
+  background_key text,
+  updated_at timestamptz not null default now(),
+  constraint world_room_single_row check (id = 1)
+);
+
+alter table public.world_countries enable row level security;
+alter table public.world_country_slides enable row level security;
+alter table public.world_items enable row level security;
+alter table public.user_world_items enable row level security;
+alter table public.world_room enable row level security;
+
+drop policy if exists "Signed-in users can view world countries" on public.world_countries;
+create policy "Signed-in users can view world countries"
+  on public.world_countries for select to authenticated using (true);
+
+drop policy if exists "Signed-in users can view world slides" on public.world_country_slides;
+create policy "Signed-in users can view world slides"
+  on public.world_country_slides for select to authenticated using (true);
+
+drop policy if exists "Signed-in users can view world items" on public.world_items;
+create policy "Signed-in users can view world items"
+  on public.world_items for select to authenticated using (true);
+
+drop policy if exists "Users can view own world items" on public.user_world_items;
+create policy "Users can view own world items"
+  on public.user_world_items for select using (auth.uid() = user_id);
+
+drop policy if exists "Signed-in users can view the world room" on public.world_room;
+create policy "Signed-in users can view the world room"
+  on public.world_room for select to authenticated using (true);
