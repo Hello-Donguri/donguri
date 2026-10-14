@@ -2,6 +2,7 @@ import "server-only";
 
 import ExcelJS from "exceljs";
 import { WORD_TYPES } from "@/lib/definitions";
+import { normaliseXlsx } from "@/lib/xlsx-normalise";
 
 // Single source of truth for the spreadsheet's shape — both the downloadable
 // template (`buildWordImportTemplate`) and the upload parser
@@ -721,17 +722,63 @@ function parseSheetRows(sheet: ExcelJS.Worksheet, columns: readonly { header: st
   return rows;
 }
 
+// The first bytes of an .xlsx (a zip) and of an old-style Office file —
+// which is either a pre-2007 .xls or an .xlsx that's been password-
+// protected or encrypted (sensitivity labels do this too).
+const ZIP_SIGNATURE = "504b";
+const OLE_SIGNATURE = "d0cf11e0";
+
+const SAVE_AS_TIP = "Open it in Excel and use File → Save As → Excel Workbook (.xlsx), then upload that copy.";
+
+async function loadXlsx(workbook: ExcelJS.Workbook, buffer: Buffer): Promise<void> {
+  // exceljs's own bundled type declares `load(buffer: Buffer)` against a
+  // stricter/older Buffer shape than this project's @types/node resolves
+  // to — a type-only mismatch (the value itself is a plain Buffer).
+  await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
+}
+
+// Loads the upload into `workbook`, or says why it can't be: a file that
+// isn't an .xlsx at all is named for what it looks like, and a valid one
+// ExcelJS can't read as written (see normaliseXlsx) is tidied and tried
+// again. Anything else gets the reader's own error, so it can be looked
+// into rather than guessed at.
+async function loadUpload(workbook: ExcelJS.Workbook, buffer: Buffer): Promise<string | null> {
+  if (buffer.length === 0) return "That file is empty.";
+
+  const signature = buffer.subarray(0, 4).toString("hex");
+  if (signature === OLE_SIGNATURE) {
+    return `That file is either an old .xls workbook or password-protected / encrypted. Remove any password or sensitivity label, then ${SAVE_AS_TIP.charAt(0).toLowerCase()}${SAVE_AS_TIP.slice(1)}`;
+  }
+  if (!signature.startsWith(ZIP_SIGNATURE)) {
+    const start = buffer.subarray(0, 200).toString("utf8").trimStart().toLowerCase();
+    const looksLike = start.startsWith("<") ? "a web page or XML file" : "a text or CSV file";
+    return `That doesn't look like an .xlsx spreadsheet — it looks like ${looksLike}. ${SAVE_AS_TIP}`;
+  }
+
+  try {
+    await loadXlsx(workbook, buffer);
+    return null;
+  } catch (firstError) {
+    try {
+      const normalised = await normaliseXlsx(buffer);
+      if (normalised.changed) {
+        await loadXlsx(workbook, normalised.buffer);
+        return null;
+      }
+    } catch (secondError) {
+      console.error("Spreadsheet import: couldn't read the file even after tidying it:", secondError);
+    }
+    console.error("Spreadsheet import: couldn't read the file:", firstError);
+    const reason = firstError instanceof Error ? firstError.message : String(firstError);
+    return `Couldn't read that spreadsheet (${reason}). ${SAVE_AS_TIP}`;
+  }
+}
+
 export async function parseWordImportWorkbook(buffer: Buffer): Promise<ParsedWorkbook> {
   const workbook = new ExcelJS.Workbook();
 
-  try {
-    // exceljs's own bundled type declares `load(buffer: Buffer)` against a
-    // stricter/older Buffer shape than this project's @types/node resolves
-    // to — a type-only mismatch (the value itself is a plain Buffer).
-    await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);
-  } catch {
-    return { ok: false, message: "Couldn't read that file — make sure it's a valid .xlsx spreadsheet." };
-  }
+  const loadError = await loadUpload(workbook, buffer);
+  if (loadError) return { ok: false, message: loadError };
 
   // The main sheet is matched by name (falling back to the first sheet, for
   // a file where it's been renamed) rather than always workbook.worksheets[0]
