@@ -177,9 +177,9 @@ function addWordTypeValidation(sheet: ExcelJS.Worksheet, rowCount: number): void
 }
 
 // A suggestion list, not an enforced constraint — the import action matches
-// by name case-insensitively and just warns (doesn't fail) on an
-// unrecognized one, since this snapshot goes stale the moment someone adds a
-// category after the sheet was downloaded. Returns the filtered names so the
+// by name case-insensitively and creates any category it doesn't recognise,
+// since this snapshot goes stale the moment someone adds a category after
+// the sheet was downloaded. Returns the filtered names so the
 // caller can reuse them in the Instructions sheet.
 function addCategoryValidation(sheet: ExcelJS.Worksheet, categoryNames: string[], rowCount: number): string[] {
   const cleanCategoryNames = categoryNames.filter((name) => !name.includes(","));
@@ -228,8 +228,8 @@ function addInstructionsSheet(workbook: ExcelJS.Workbook, cleanCategoryNames: st
     [
       "Category",
       cleanCategoryNames.length > 0
-        ? `Optional. Existing categories: ${cleanCategoryNames.join(", ")}. Leave blank if unsure — an unrecognized name is skipped, not an error.`
-        : "Optional. Leave blank if unsure — an unrecognized name is skipped, not an error.",
+        ? `Optional. Existing categories: ${cleanCategoryNames.join(", ")}. A name that doesn't exist yet is created as a new category when you import.`
+        : "Optional. A name that doesn't exist yet is created as a new category when you import.",
     ],
     ["Word type", `Optional. One of: ${SHEET_WORD_TYPES.join(", ")}.`],
     [

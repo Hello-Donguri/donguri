@@ -932,6 +932,15 @@ type ImportedExampleRow = {
 };
 type ImportedQuizRow = { wordId: string; prompt: string; promptJa: string | null; options: string[]; correctIndex: number };
 
+// A category named in the spreadsheet that doesn't exist yet — created in
+// the import's own transaction, so it only appears if the import goes
+// through. Keyed by lower-cased name, like categoryIdByName.
+type NewWordCategory = { id: string; name: string };
+
+// Colours handed to auto-created categories in turn — the same kind of
+// mid-tone the admin picks by hand; any can be changed afterwards.
+const NEW_CATEGORY_COLOURS = ["#0369a1", "#4d7c0f", "#7c3aed", "#c2410c", "#0891b2", "#e11d48", "#a16207", "#4f46e5"];
+
 type ProcessedWordSheet = {
   rowErrors: string[];
   warnings: string[];
@@ -958,6 +967,7 @@ function processWordSheet(
   quizSheetLabel: string,
   existingWordsForPath: { id: string; term: string }[],
   categoryIdByName: Map<string, string>,
+  newCategories: Map<string, NewWordCategory>,
   wordTypes: readonly string[],
 ): ProcessedWordSheet {
   const existingWordIds = new Set(existingWordsForPath.map((word) => word.id));
@@ -1008,13 +1018,17 @@ function processWordSheet(
       continue;
     }
 
+    // A name that doesn't match an existing category (ignoring case) makes
+    // a new one, shared by every later row that names it.
     let categoryId: string | null = null;
-    if (data.category) {
-      const match = categoryIdByName.get(data.category.toLowerCase());
-      if (match) {
-        categoryId = match;
-      } else {
-        warnings.push(`${sheetLabel} row ${row.rowNumber}: category "${data.category}" doesn't exist — imported without one.`);
+    const categoryName = data.category?.trim();
+    if (categoryName) {
+      const key = categoryName.toLowerCase();
+      categoryId = categoryIdByName.get(key) ?? null;
+      if (!categoryId) {
+        categoryId = randomUUID();
+        categoryIdByName.set(key, categoryId);
+        newCategories.set(key, { id: categoryId, name: categoryName });
       }
     }
 
@@ -1253,6 +1267,7 @@ export async function importWordsFromSpreadsheet(
 
   const categories = await prisma.wordCategory.findMany({ select: { id: true, name: true } });
   const categoryIdByName = new Map(categories.map((category) => [category.name.toLowerCase(), category.id]));
+  const newCategories = new Map<string, NewWordCategory>();
   const wordTypes: readonly string[] = WORD_TYPES;
 
   // Split by path so a Words-sheet row can never Word ID/Term-match a
@@ -1272,6 +1287,7 @@ export async function importWordsFromSpreadsheet(
     "Quiz questions",
     existingVocabWords,
     categoryIdByName,
+    newCategories,
     wordTypes,
   );
   const grammar = processWordSheet(
@@ -1282,6 +1298,7 @@ export async function importWordsFromSpreadsheet(
     "Grammar quiz questions",
     existingGrammarWords,
     categoryIdByName,
+    newCategories,
     wordTypes,
   );
 
@@ -1329,6 +1346,23 @@ export async function importWordsFromSpreadsheet(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous Prisma operations, batched together below
   const ops: any[] = [];
+
+  // New categories first, so the words below can point at them. Added
+  // after the existing ones in the admin's order.
+  if (newCategories.size > 0) {
+    const { _max: categoryMax } = await prisma.wordCategory.aggregate({ _max: { position: true } });
+    const firstPosition = (categoryMax.position ?? 0) + 1;
+    ops.push(
+      prisma.wordCategory.createMany({
+        data: [...newCategories.values()].map((category, index) => ({
+          id: category.id,
+          name: category.name,
+          color: NEW_CATEGORY_COLOURS[index % NEW_CATEGORY_COLOURS.length],
+          position: firstPosition + index,
+        })),
+      }),
+    );
+  }
 
   if (newRows.length > 0) {
     ops.push(
@@ -1458,10 +1492,20 @@ export async function importWordsFromSpreadsheet(
   revalidatePath(`/dashboard/admin/courses/${languageDeck.course.slug}/categories/${languageDeckId}`);
   revalidatePath(`/dashboard/courses/${languageDeck.course.slug}/decks/${languageDeckId}`);
 
+  // New categories are worth knowing about (they may want their colours
+  // changed, or be a typo), so they hold the page like a warning does.
+  if (newCategories.size > 0) {
+    revalidatePath("/dashboard/admin/word-categories");
+    const names = [...newCategories.values()].map((category) => `"${category.name}"`).join(", ");
+    warnings.push(
+      `Created ${newCategories.size} new categor${newCategories.size === 1 ? "y" : "ies"}: ${names}. Change their colours in Manage word categories.`,
+    );
+  }
+
   // A clean import (nothing for the admin to double-check) goes straight to
   // the deck's word list, so they land on what they just imported instead
   // of a message they then have to navigate away from. A row-level warning
-  // (unrecognized category/word type, a Word ID that fell back to a Term
+  // (an unrecognized word type, new categories, a Word ID that fell back to a Term
   // match, etc.) holds here instead — those are worth reading before moving
   // on, and this codebase has no cross-navigation flash-message mechanism
   // (see ShareProgressButton's note) to carry them across a redirect.
