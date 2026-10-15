@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { usePrefersReducedMotion } from "@/lib/use-prefers-reduced-motion";
+import { fallingImagesFor, type FallingImage } from "@/lib/seasonal-falling";
 import { cn } from "@/lib/utils";
 
 // How far across its area a leaf may start, in percent of the width —
@@ -13,13 +14,13 @@ const MAX_LEFT = 82;
 
 const randomLeft = () => MIN_LEFT + Math.random() * (MAX_LEFT - MIN_LEFT);
 
-// The leaf pictures, one picked at random for each fall.
-const LEAF_IMAGES = [
-  { src: "/images/leaf.webp", width: 335, height: 303 },
-  { src: "/images/leaf2.webp", width: 480, height: 544 },
-];
-
-const randomImage = () => Math.floor(Math.random() * LEAF_IMAGES.length);
+// One of today's pictures — leaves, or a season's (see
+// lib/seasonal-falling.ts) — picked at random for each fall. Only ever
+// called in the browser, so it's the visitor's own date.
+const randomImage = (): FallingImage => {
+  const images = fallingImagesFor();
+  return images[Math.floor(Math.random() * images.length)];
+};
 
 // Each leaf's own character, so they never fall in step: when it first
 // appears, how long a fall takes, the pause before its next one, its size,
@@ -39,7 +40,7 @@ type LeafProps = (typeof LEAVES)[number];
 function Leaf({ delayMs, fallSeconds, pauseMs, className, swing }: LeafProps) {
   // Each fall is its own run: a fresh key restarts the animation, at a new
   // random `left` and picture.
-  const [fall, setFall] = useState<{ id: number; left: number; image: number } | null>(null);
+  const [fall, setFall] = useState<{ id: number; left: number; image: FallingImage } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -82,10 +83,10 @@ function Leaf({ delayMs, fallSeconds, pauseMs, className, swing }: LeafProps) {
       onAnimationComplete={nextFall}
     >
       <Image
-        src={LEAF_IMAGES[fall.image].src}
+        src={fall.image.src}
         alt=""
-        width={LEAF_IMAGES[fall.image].width}
-        height={LEAF_IMAGES[fall.image].height}
+        width={fall.image.width}
+        height={fall.image.height}
         className="h-auto w-full"
       />
     </motion.div>

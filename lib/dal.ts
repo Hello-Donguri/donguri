@@ -95,7 +95,14 @@ export const getSession = cache(async () => {
   } = await supabase.auth.getSession();
 
   if (error) {
-    console.error("Failed to retrieve Supabase session:", error);
+    // Next.js prerendering a page in the background stops any fetch still
+    // running when it finishes — here, Supabase refreshing an expired
+    // token. Supabase hands that back as its own fetch error, keeping only
+    // the message, and the prerender's output is thrown away anyway, so
+    // it's nothing to log.
+    if (!error.message.startsWith("During prerendering")) {
+      console.error("Failed to retrieve Supabase session:", error);
+    }
     return null;
   }
 

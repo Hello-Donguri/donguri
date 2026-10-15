@@ -2,7 +2,7 @@
 // The original app homepage is preserved below, commented out, so it can be
 // restored by deleting the /* ... */ wrapper and the new code beneath it.
 
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { getProfile, getSession } from "@/lib/dal";
 import { SiteHeader } from "@/components/landing/site-header";
 import { SiteFooter } from "@/components/landing/site-footer";
@@ -28,9 +28,11 @@ export default async function Home() {
 
   const { t, locale } = await getTranslator();
   // Shown on the pricing card; left off rather than failing the page if
-  // Stripe can't be reached.
+  // Stripe can't be reached. Next.js's own interruptions (a background
+  // prerender ending mid-fetch) are handed back to it, not logged.
   const priceLabel = await getMembershipPriceLabel(locale, t("billing.per_month", "month")).catch(
     (error) => {
+      unstable_rethrow(error);
       console.error("Couldn't load the membership price:", error);
       return null;
     },
