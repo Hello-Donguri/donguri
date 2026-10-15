@@ -2136,3 +2136,15 @@ create policy "Users can view own world items"
 drop policy if exists "Signed-in users can view the world room" on public.world_room;
 create policy "Signed-in users can view the world room"
   on public.world_room for select to authenticated using (true);
+
+-- 59. Word pronunciation recordings ------------------------------------------------------
+-- Optional recordings of a word (or grammar pattern) being said, one in a
+-- female voice and one in a male voice, uploaded from the admin word form
+-- to bunny.net (see lib/bunny.ts). Wherever the word itself is spoken —
+-- the learn card, the learn-complete list, quiz and review questions — the
+-- learner gets a button per recording; with neither, the browser's
+-- read-through is used as before. Example sentences always use the
+-- read-through.
+
+alter table public.words add column if not exists audio_female_key text;
+alter table public.words add column if not exists audio_male_key text;

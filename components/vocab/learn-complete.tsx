@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, Check, Volume2 } from "lucide-react";
 import type { RevealWord } from "@/lib/definitions";
-import { useSpeech } from "@/lib/speech";
+import { useRecording, useSpeech } from "@/lib/speech";
 import { WordImage } from "@/components/ui/word-image";
 import { Button } from "@/components/ui/button";
 import { useTranslations } from "@/components/i18n/locale-provider";
@@ -233,7 +233,11 @@ function WordTile({
 }) {
   const t = useTranslations();
   const { speak, speaking } = useSpeech();
+  const { play, playing } = useRecording();
   const isGrammar = word.path === "grammar";
+  // The whole tile is the button, so it plays one recording — the female
+  // one when there are both — or the read-through when there are none.
+  const recording = word.audio?.female ?? word.audio?.male ?? null;
 
   const initialLetter = (
     <span className="flex h-full w-full items-center justify-center font-nunito text-4xl font-bold text-ai-dark">
@@ -244,8 +248,8 @@ function WordTile({
   return (
     <motion.button
       type="button"
-      onClick={() => speak(word.term, word.targetLanguage)}
-      disabled={speaking}
+      onClick={() => (recording ? play(recording) : speak(word.term, word.targetLanguage))}
+      disabled={speaking || (recording !== null && playing === recording)}
       aria-label={t("session_ui.listen_to", "Listen to {{text}}", { text: word.term })}
       initial={animate ? { opacity: 0, y: 16, scale: 0.94 } : false}
       animate={{ opacity: 1, y: 0, scale: 1 }}

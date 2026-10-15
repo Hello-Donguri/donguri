@@ -20,8 +20,24 @@ function extensionForMime(mime: string): string {
       return "jpg";
     case "image/svg+xml":
       return "svg";
+    // Pronunciation recordings (see buildWordAudioKey).
+    case "audio/mpeg":
+    case "audio/mp3":
+      return "mp3";
+    case "audio/mp4":
+    case "audio/x-m4a":
+    case "audio/aac":
+      return "m4a";
+    case "audio/wav":
+    case "audio/x-wav":
+    case "audio/wave":
+      return "wav";
+    case "audio/ogg":
+      return "ogg";
+    case "audio/webm":
+      return "webm";
     default:
-      throw new Error(`Unsupported image type: ${mime}`);
+      throw new Error(`Unsupported file type: ${mime}`);
   }
 }
 
@@ -35,6 +51,13 @@ export function buildWordImageKey(mime: string): string {
 
 export function buildDeckCoverImageKey(mime: string): string {
   return buildImageKey("decks", mime);
+}
+
+// A word's female or male pronunciation recording (see
+// Word.audioFemaleKey). Uploaded with uploadImage, which is a plain PUT
+// that works for any file.
+export function buildWordAudioKey(mime: string): string {
+  return buildImageKey("audio", mime);
 }
 
 export function buildBadgeImageKey(mime: string): string {

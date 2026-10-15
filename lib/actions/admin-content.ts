@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
-import { buildDeckCoverImageKey, buildWordImageKey, uploadImage } from "@/lib/bunny";
+import { buildDeckCoverImageKey, buildWordAudioKey, buildWordImageKey, uploadImage } from "@/lib/bunny";
 import { isSafeSvg, UNSAFE_SVG_MESSAGE } from "@/lib/svg";
 import {
   parseExamplesColumns,
@@ -559,9 +559,14 @@ export async function createWord(
     }
   }
 
+  const audio = await saveWordAudio(formData, { audioFemaleKey: null, audioMaleKey: null });
+  if (!audio.ok) return "errors" in audio ? { errors: audio.errors } : { message: audio.message };
+
   const word = await prisma.word.create({
     data: {
       languageDeckId,
+      audioFemaleKey: audio.audioFemaleKey,
+      audioMaleKey: audio.audioMaleKey,
       term,
       translation,
       romanization: romanization || null,
@@ -584,6 +589,74 @@ export async function createWord(
   revalidatePath(`/dashboard/courses/${languageDeck.course.slug}/decks/${languageDeckId}`);
 
   return { success: true, message: `"${term}" added.` };
+}
+
+// --- Pronunciation recordings ---------------------------------------------------
+
+const AUDIO_MAX_BYTES = 5 * 1024 * 1024;
+
+// The audio formats bunny.net keys are built for (see extensionForMime in
+// lib/bunny.ts), by file extension — some browsers send an .m4a with no
+// type at all.
+const AUDIO_MIME_BY_EXTENSION: Record<string, string> = {
+  mp3: "audio/mpeg",
+  m4a: "audio/mp4",
+  aac: "audio/aac",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  webm: "audio/webm",
+};
+const AUDIO_MIMES = new Set([
+  ...Object.values(AUDIO_MIME_BY_EXTENSION),
+  "audio/mp3",
+  "audio/x-m4a",
+  "audio/x-wav",
+  "audio/wave",
+]);
+
+function audioMime(file: File): string | null {
+  if (AUDIO_MIMES.has(file.type)) return file.type;
+  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+  return AUDIO_MIME_BY_EXTENSION[extension] ?? null;
+}
+
+type AudioVoice = "Female" | "Male";
+
+// A word's female and male recordings after this save: a newly picked file
+// is uploaded (replacing the old one, which is left on bunny.net as with
+// images), "Remove" clears it, and otherwise it's kept.
+async function saveWordAudio(
+  formData: FormData,
+  current: { audioFemaleKey: string | null; audioMaleKey: string | null },
+): Promise<
+  | { ok: true; audioFemaleKey: string | null; audioMaleKey: string | null }
+  | { ok: false; errors: { audioFemale?: string[]; audioMale?: string[] } }
+  | { ok: false; message: string }
+> {
+  const keys = { Female: current.audioFemaleKey, Male: current.audioMaleKey };
+
+  for (const voice of ["Female", "Male"] as AudioVoice[]) {
+    const raw = formData.get(`audio${voice}`);
+    const file = raw instanceof File && raw.size > 0 ? raw : undefined;
+    if (formData.get(`removeAudio${voice}`) === "on") keys[voice] = null;
+    if (!file) continue;
+
+    const field = voice === "Female" ? "audioFemale" : "audioMale";
+    const mime = audioMime(file);
+    if (!mime) return { ok: false, errors: { [field]: ["Use an MP3, M4A, WAV, OGG or WebM audio file."] } };
+    if (file.size > AUDIO_MAX_BYTES) return { ok: false, errors: { [field]: ["Recording must be under 5MB."] } };
+
+    const key = buildWordAudioKey(mime);
+    try {
+      await uploadImage(file.type ? file : new File([file], file.name, { type: mime }), key);
+    } catch (error) {
+      console.error("Bunny audio upload failed:", error);
+      return { ok: false, message: "Recording upload failed. Try again." };
+    }
+    keys[voice] = key;
+  }
+
+  return { ok: true, audioFemaleKey: keys.Female, audioMaleKey: keys.Male };
 }
 
 // A new image replaces the old one (fresh key, old bunny.net object left
@@ -638,7 +711,13 @@ export async function updateWord(
 
   const existing = await prisma.word.findUnique({
     where: { id: wordId },
-    select: { imageKey: true, languageDeckId: true, languageDeck: { select: { course: { select: { slug: true } } } } },
+    select: {
+      imageKey: true,
+      audioFemaleKey: true,
+      audioMaleKey: true,
+      languageDeckId: true,
+      languageDeck: { select: { course: { select: { slug: true } } } },
+    },
   });
 
   if (!existing) {
@@ -661,9 +740,14 @@ export async function updateWord(
     }
   }
 
+  const audio = await saveWordAudio(formData, existing);
+  if (!audio.ok) return "errors" in audio ? { errors: audio.errors } : { message: audio.message };
+
   await prisma.word.update({
     where: { id: wordId },
     data: {
+      audioFemaleKey: audio.audioFemaleKey,
+      audioMaleKey: audio.audioMaleKey,
       term,
       translation,
       romanization: romanization || null,

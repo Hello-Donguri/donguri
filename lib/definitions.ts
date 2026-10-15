@@ -343,6 +343,12 @@ export type WordAlternateAnswerSummary = {
   value: string;
 };
 
+// A word's pronunciation recordings (see Word.audioFemaleKey), as URLs —
+// at least one is set. Wherever the word itself is spoken, the learner
+// gets a button for each; a word with neither carries null instead, and
+// the browser's read-through is used.
+export type WordAudio = { female: string | null; male: string | null };
+
 export type RevealWord = {
   id: string;
   term: string;
@@ -365,6 +371,7 @@ export type RevealWord = {
   // carries its own kind rather than the whole session being one or the
   // other.
   path: "vocab" | "grammar";
+  audio: WordAudio | null;
 };
 
 // A multiple-choice option — text only, never a picture (see toOption in
@@ -372,6 +379,9 @@ export type RevealWord = {
 export type QuizOption = {
   text: string;
   romanization: string | null;
+  // The option word's recordings, when the options are terms (the
+  // language being learned) — null otherwise.
+  audio: WordAudio | null;
 };
 
 // What a multiple-choice option means — the other side of the word it came
@@ -406,6 +416,9 @@ export type MultipleChoiceQuestion = {
   // Same convention as RevealWord.image — one picture per word, independent
   // of quiz direction.
   image: string;
+  // The word's recordings, when the prompt is its term — null when the
+  // prompt is the translation, or there are none.
+  promptAudio: WordAudio | null;
 };
 
 // A cloze/fill-in-the-blank exercise built from one of the word's own
@@ -497,6 +510,8 @@ export type TypeAnswerQuestion = {
   answerRomanized: boolean;
   targetLanguage: string;
   image: string;
+  // As MultipleChoiceQuestion.promptAudio.
+  promptAudio: WordAudio | null;
 };
 
 export type QuizQuestion =
@@ -993,6 +1008,8 @@ type WordFieldErrors = {
   secondaryWordType?: string[];
   path?: string[];
   image?: string[];
+  audioFemale?: string[];
+  audioMale?: string[];
 };
 
 // One row of a word's inflected forms, submitted from a repeatable admin-form
@@ -1302,6 +1319,8 @@ export type AdminWordSummary = {
   explanationJa: string | null;
   position: number;
   imageKey: string | null;
+  // The pronunciation recordings' URLs (see wordAudio in lib/images.ts).
+  audio: WordAudio | null;
   active: boolean;
   category: WordCategoryOption | null;
   wordType: WordType | null;

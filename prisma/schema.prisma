@@ -203,6 +203,10 @@ model Word {
   explanation      String?
   explanationJa    String?               @map("explanation_ja")
   categoryId       String?               @map("category_id") @db.Uuid
+  // Pronunciation recordings on bunny.net, either or both — see section 59
+  // of supabase/schema.sql. Null: the browser's read-through is used.
+  audioFemaleKey   String?               @map("audio_female_key")
+  audioMaleKey     String?               @map("audio_male_key")
   wordType         String?               @map("word_type")
   // A second part of speech alongside `wordType` (e.g. an irregular verb
   // that's also a phrase) — see section 56 of supabase/schema.sql.

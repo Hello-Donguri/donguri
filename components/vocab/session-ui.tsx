@@ -3,19 +3,88 @@
 import { useCallback, useEffect, useEffectEvent, useRef } from "react";
 import { Check, Volume2, X } from "lucide-react";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
-import { useSpeech } from "@/lib/speech";
+import { useRecording, useSpeech } from "@/lib/speech";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { Jyutping, ToneHelp } from "@/components/vocab/jyutping";
-import type { MultipleChoiceQuestion, OptionMeaning, QuizOption } from "@/lib/definitions";
+import type { MultipleChoiceQuestion, OptionMeaning, QuizOption, WordAudio } from "@/lib/definitions";
 import type { RetryReason } from "@/lib/actions/vocab";
 
+// The word's uploaded recordings, one button each — female, then male —
+// in place of the read-through. "icon" is SpeakButton's round button with
+// a ♀/♂ tag; "labelled" is ListenButton's pill with the voice named.
+function RecordingButtons({
+  text,
+  audio,
+  variant,
+}: {
+  text: string;
+  audio: WordAudio;
+  variant: "icon" | "labelled";
+}) {
+  const t = useTranslations();
+  const { play, playing } = useRecording();
+  const voices = [
+    { url: audio.female, symbol: "♀", label: t("session_ui.female_voice", "Female") },
+    { url: audio.male, symbol: "♂", label: t("session_ui.male_voice", "Male") },
+  ].filter((voice): voice is { url: string; symbol: string; label: string } => voice.url !== null);
+
+  return (
+    <span className="inline-flex shrink-0 items-center gap-2">
+      {voices.map((voice) => {
+        const active = playing === voice.url;
+        const ariaLabel = t("session_ui.listen_to_voice", "Listen to {{text}} ({{voice}} voice)", {
+          text,
+          voice: voice.label.toLowerCase(),
+        });
+        return variant === "icon" ? (
+          <button
+            key={voice.url}
+            type="button"
+            onClick={() => play(voice.url)}
+            aria-label={ariaLabel}
+            className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ai-soft text-ai transition hover:scale-105 hover:bg-ai/15"
+          >
+            <Volume2 aria-hidden className={`h-5 w-5 ${active ? "animate-pulse" : ""}`} strokeWidth={2.5} />
+            <span
+              aria-hidden
+              className="absolute -right-1 -bottom-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-washi bg-ai text-[11px] font-bold leading-none text-washi"
+            >
+              {voice.symbol}
+            </span>
+          </button>
+        ) : (
+          <button
+            key={voice.url}
+            type="button"
+            onClick={() => play(voice.url)}
+            aria-label={ariaLabel}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-ai/25 bg-ai-soft/60 px-4 text-sm font-semibold text-ai transition hover:bg-ai/15"
+          >
+            <Volume2 aria-hidden className={`h-4 w-4 ${active ? "animate-pulse" : ""}`} strokeWidth={2.5} />
+            {voice.label}
+          </button>
+        );
+      })}
+    </span>
+  );
+}
+
+// Plays the word: its recordings when it has any (see RecordingButtons),
+// otherwise the browser's read-through.
 export const SpeakButton = ({
   text,
   language,
+  audio = null,
 }: {
   text: string;
   language: string;
+  audio?: WordAudio | null;
 }) => {
+  if (audio) return <RecordingButtons text={text} audio={audio} variant="icon" />;
+  return <ReadThroughSpeakButton text={text} language={language} />;
+};
+
+const ReadThroughSpeakButton = ({ text, language }: { text: string; language: string }) => {
   const t = useTranslations();
   const { speak, speaking } = useSpeech();
 
@@ -41,10 +110,17 @@ export const SpeakButton = ({
 export const ListenButton = ({
   text,
   language,
+  audio = null,
 }: {
   text: string;
   language: string;
+  audio?: WordAudio | null;
 }) => {
+  if (audio) return <RecordingButtons text={text} audio={audio} variant="labelled" />;
+  return <ReadThroughListenButton text={text} language={language} />;
+};
+
+const ReadThroughListenButton = ({ text, language }: { text: string; language: string }) => {
   const t = useTranslations();
   const { speak, speaking } = useSpeech();
 
@@ -491,7 +567,7 @@ export const MultipleChoiceOptions = ({
               </span>
             </button>
             {!promptIsTargetLanguage && (
-              <SpeakButton text={option.text} language={question.targetLanguage} />
+              <SpeakButton text={option.text} language={question.targetLanguage} audio={option.audio} />
             )}
           </div>
         );

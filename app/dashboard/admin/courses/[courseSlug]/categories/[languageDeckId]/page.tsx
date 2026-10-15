@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { Volume2 } from "lucide-react";
 import { requireAdminProfile, getAdminCategoryWords } from "@/lib/dal";
 import { setWordActive } from "@/lib/actions/admin-content";
 import { DeleteWordButton } from "@/components/admin/delete-word-button";
@@ -140,6 +141,21 @@ export default async function AdminCategoryWordsPage({ params }: PageProps) {
         </div>
       </div>
 
+      {words.length > 0 && (
+        <p className="flex items-center gap-1.5 text-sm text-sumi-soft">
+          <Volume2 aria-hidden className="h-4 w-4" />
+          {t(
+            "admin_category_words.audio_summary",
+            "Recordings: {{both}} with both voices · {{one}} with one · {{none}} with none",
+            {
+              both: words.filter((word) => word.audio?.female && word.audio?.male).length,
+              one: words.filter((word) => word.audio && !(word.audio.female && word.audio.male)).length,
+              none: words.filter((word) => !word.audio).length,
+            },
+          )}
+        </p>
+      )}
+
       {words.length === 0 ? (
         <p className="text-sumi-soft">
           {t("admin_category_words.no_words", "No words yet.")}
@@ -179,8 +195,24 @@ export default async function AdminCategoryWordsPage({ params }: PageProps) {
                 </p>
               )}
 
-              {(word.category || word.wordType || word.secondaryWordType) && (
-                <div className="flex flex-wrap items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
+                  {/* Which pronunciation recordings it has — none means
+                      learners hear the read-through. */}
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium",
+                      word.audio ? "bg-ai-soft text-ai-dark" : "border border-dashed border-sumi/20 text-sumi-soft",
+                    )}
+                  >
+                    <Volume2 aria-hidden className="h-3 w-3" />
+                    {word.audio?.female && word.audio?.male
+                      ? t("admin_category_words.audio_both", "♀ ♂ Both")
+                      : word.audio?.female
+                        ? t("admin_category_words.audio_female", "♀ Female")
+                        : word.audio?.male
+                          ? t("admin_category_words.audio_male", "♂ Male")
+                          : t("admin_category_words.audio_none", "No recordings")}
+                  </span>
                   {word.category && (
                     <span
                       className={cn(
@@ -204,7 +236,6 @@ export default async function AdminCategoryWordsPage({ params }: PageProps) {
                       ),
                   )}
                 </div>
-              )}
 
               <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
                 <Button

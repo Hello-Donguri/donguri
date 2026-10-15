@@ -10,6 +10,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { WordImage } from "@/components/ui/word-image";
 import { WordFormsFields } from "@/components/admin/word-forms-fields";
 import { WordAlternateAnswersFields } from "@/components/admin/word-alternate-answers-fields";
+import { WordAudioFields } from "@/components/admin/word-audio-fields";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { WORD_TYPES, type AdminWordSummary, type WordCategoryOption } from "@/lib/definitions";
 
@@ -137,6 +138,11 @@ export function EditWordForm({ word, currentImageSrc, categories }: EditWordForm
       <div className="border-t border-sumi/10 pt-6">
         <WordAlternateAnswersFields initialAlternateAnswers={word.alternateAnswers} />
       </div>
+
+      <section className="flex flex-col gap-4 border-t border-sumi/10 pt-6">
+        <h2 className={sectionHeadingClass}>{t("admin_word_form.section_audio", "Pronunciation")}</h2>
+        <WordAudioFields current={word.audio} errors={state?.errors} />
+      </section>
 
       <section className="flex flex-col gap-4 border-t border-sumi/10 pt-6">
         <h2 className={sectionHeadingClass}>{t("admin_word_form.section_image", "Image")}</h2>

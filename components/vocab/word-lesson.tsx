@@ -182,9 +182,11 @@ export const WordLesson = ({ word, header }: { word: RevealWord; header?: ReactN
       )}
 
       {/* Belongs to the pronunciation above, so it sits tight under it. */}
-      {listenText && (
+      {(listenText || word.audio) && (
         <div className="mt-3">
-          <ListenButton text={listenText} language={word.targetLanguage} />
+          {/* The recordings say the word itself, whatever listenText falls
+              back to for a grammar pattern. */}
+          <ListenButton text={listenText ?? word.term} language={word.targetLanguage} audio={word.audio} />
         </div>
       )}
 

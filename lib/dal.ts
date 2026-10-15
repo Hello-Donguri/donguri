@@ -55,7 +55,7 @@ import {
   startOfUTCDay,
   toUTCDateString,
 } from "@/lib/srs";
-import { deckCoverImagePath, wordImagePath } from "@/lib/images";
+import { deckCoverImagePath, wordAudio, wordImagePath } from "@/lib/images";
 import {
   findClozeMatchesByForm,
   findTermClozeMatches,
@@ -542,6 +542,8 @@ function toAdminWordSummary(word: {
   explanationJa: string | null;
   position: number;
   imageKey: string | null;
+  audioFemaleKey: string | null;
+  audioMaleKey: string | null;
   active: boolean;
   wordType: string | null;
   secondaryWordType: string | null;
@@ -569,6 +571,7 @@ function toAdminWordSummary(word: {
     explanationJa: word.explanationJa,
     position: word.position,
     imageKey: word.imageKey,
+    audio: wordAudio(word),
     active: word.active,
     wordType: word.wordType as WordType | null,
     secondaryWordType: word.secondaryWordType as WordType | null,
@@ -1798,6 +1801,7 @@ function toRevealWord(
     image: wordImagePath(word),
     targetLanguage: course.targetLanguage,
     path: word.path as "vocab" | "grammar",
+    audio: wordAudio(word),
   };
 }
 
@@ -1981,6 +1985,8 @@ export const getTestQueueForCourse = cache(
           romanization: true,
           languageDeckId: true,
           imageKey: true,
+          audioFemaleKey: true,
+          audioMaleKey: true,
         },
       });
       const distractorWords = distractorPool.map((word) => ({
@@ -2260,6 +2266,8 @@ type QuestionWord = {
   romanization: string | null;
   languageDeckId: string;
   imageKey?: string | null;
+  audioFemaleKey?: string | null;
+  audioMaleKey?: string | null;
   // The originating languageDeck's path, carried onto every question this word
   // produces (see the QuizQuestion variants in lib/definitions.ts) so Test
   // and Review — which now pool vocab and grammar together — can label
@@ -2301,8 +2309,8 @@ function buildMultipleChoiceQuestion(
   // matching it to an option's picture would give the answer away.
   const toOption = (candidate: QuestionWord): QuizOption =>
     showingTerm
-      ? { text: candidate.term, romanization: candidate.romanization }
-      : { text: candidate.translation, romanization: null };
+      ? { text: candidate.term, romanization: candidate.romanization, audio: wordAudio(candidate) }
+      : { text: candidate.translation, romanization: null, audio: null };
 
   const rest = pool.filter((candidate) => candidate.id !== word.id);
   const sameCategory = shuffle(
@@ -2342,6 +2350,7 @@ function buildMultipleChoiceQuestion(
     targetLanguage: course.targetLanguage,
     options: shuffle([toOption(word), ...distractors]),
     image: wordImagePath(word),
+    promptAudio: direction === "term-to-translation" ? wordAudio(word) : null,
   };
 }
 
@@ -2376,6 +2385,8 @@ async function loadGrammarPool(course: {
       romanization: true,
       languageDeckId: true,
       imageKey: true,
+      audioFemaleKey: true,
+      audioMaleKey: true,
       forms: { select: { value: true } },
       examples: { select: { en: true, ja: true, romanization: true } },
     },
@@ -2555,6 +2566,7 @@ function buildTypedQuestion(
     answerRomanized,
     targetLanguage: course.targetLanguage,
     image: wordImagePath(word),
+    promptAudio: direction === "term-to-translation" ? wordAudio(word) : null,
   };
 }
 

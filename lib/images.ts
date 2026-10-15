@@ -1,4 +1,5 @@
 import { imageUrl } from "@/lib/bunny";
+import type { WordAudio } from "@/lib/definitions";
 
 // Words uploaded through the admin panel have a real `imageKey` pointing at
 // a bunny.net object. Older words with no upload yet fall back to a naming
@@ -32,6 +33,20 @@ export function wordImagePath(word: {
 
   const label = isAsciiWord(word.term) ? word.term : word.translation;
   return `/vocab-images/${slugify(label)}.webp`;
+}
+
+// A word's pronunciation recordings, as URLs — null when it has neither,
+// so the caller falls back to the browser's read-through (see
+// RevealWord.audio).
+export function wordAudio(word: {
+  audioFemaleKey?: string | null;
+  audioMaleKey?: string | null;
+}): WordAudio | null {
+  if (!word.audioFemaleKey && !word.audioMaleKey) return null;
+  return {
+    female: word.audioFemaleKey ? imageUrl(word.audioFemaleKey) : null,
+    male: word.audioMaleKey ? imageUrl(word.audioMaleKey) : null,
+  };
 }
 
 // A deck's cover photo has no naming-convention fallback like words do

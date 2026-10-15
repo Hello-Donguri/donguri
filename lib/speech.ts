@@ -86,6 +86,7 @@ export function useSpeech() {
     }
 
     window.speechSynthesis.cancel();
+    stopRecording();
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = speechLang(languageCode);
@@ -101,4 +102,39 @@ export function useSpeech() {
   }, []);
 
   return { speak, speaking };
+}
+
+// The recording playing now, wherever it was started — so starting another
+// (or the read-through) stops it rather than talking over it.
+let currentRecording: HTMLAudioElement | null = null;
+
+function stopRecording() {
+  currentRecording?.pause();
+  currentRecording = null;
+}
+
+// Plays an uploaded pronunciation recording (see WordAudio), stopping any
+// other recording or read-through first. `playing` is the URL playing now.
+export function useRecording() {
+  const [playing, setPlaying] = useState<string | null>(null);
+
+  const play = useCallback((url: string) => {
+    if (typeof window === "undefined") return;
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    stopRecording();
+
+    const audio = new Audio(url);
+    currentRecording = audio;
+    const done = () => {
+      setPlaying((current) => (current === url ? null : current));
+      if (currentRecording === audio) currentRecording = null;
+    };
+    audio.onended = done;
+    audio.onerror = done;
+    audio.onpause = done;
+    setPlaying(url);
+    audio.play().catch(done);
+  }, []);
+
+  return { play, playing };
 }
