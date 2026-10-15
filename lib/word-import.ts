@@ -97,6 +97,15 @@ const BOLD_START = "\u0001";
 const BOLD_END = "\u0002";
 const BOLD_AWARE_KEYS = new Set(["examplesEn", "examplesJa"]);
 
+// "**know**" marks a highlight too, for files whose bold doesn't survive —
+// ones made by a script or another app, or text pasted in from elsewhere.
+// Kept within one sentence (never across a "|"); a lone "**" is left as is.
+const STAR_MARK = /\*\*([^*|]+?)\*\*/g;
+
+function markStarredText(text: string): string {
+  return text.replace(STAR_MARK, `${BOLD_START}$1${BOLD_END}`);
+}
+
 // How far down to extend the Word type / Category dropdown validation —
 // generous enough for a large deck without making the file huge.
 const VALIDATED_ROW_COUNT = 500;
@@ -247,7 +256,7 @@ function addInstructionsSheet(workbook: ExcelJS.Workbook, cleanCategoryNames: st
     ],
     [
       "Examples (English) / Examples (Japanese)",
-      'Optional. Example sentences using this word — one "|"-separated list per language, e.g. "Yesterday I ate an apple.| I eat every day." in the English column and "昨日私はりんごを食べた。| 私は毎日食べます。" in the Japanese column. The two lists must have the same number of entries (checked on upload) — the Nth entry in each is paired up as one example. To choose which part of a sentence is highlighted as this word (e.g. when the sentence uses "ate" but the word is "to eat"), make just that part bold — one bold part per sentence. Sentences with nothing bold are highlighted automatically, as before.',
+      'Optional. Example sentences using this word — one "|"-separated list per language, e.g. "Yesterday I ate an apple.| I eat every day." in the English column and "昨日私はりんごを食べた。| 私は毎日食べます。" in the Japanese column. The two lists must have the same number of entries (checked on upload) — the Nth entry in each is paired up as one example. To choose which part of a sentence is highlighted as this word (e.g. when the sentence uses "ate" but the word is "to eat"), make just that part bold, or wrap it in double asterisks (e.g. "Do you **know** where it is?") — one marked part per sentence. Sentences with nothing marked are highlighted automatically, as before.',
     ],
     [
       "Examples (Romanization)",
@@ -710,7 +719,7 @@ function parseSheetRows(sheet: ExcelJS.Worksheet, columns: readonly { header: st
     const values: Record<string, string> = {};
     for (const [key, colNumber] of columnIndexByKey) {
       const value = row.getCell(colNumber).value;
-      const raw = BOLD_AWARE_KEYS.has(key) ? cellTextWithBold(value) : cellText(value);
+      const raw = BOLD_AWARE_KEYS.has(key) ? markStarredText(cellTextWithBold(value)) : cellText(value);
       if (raw) values[key] = raw;
     }
 

@@ -67,7 +67,9 @@ export function LevelUpModal({
         initial={{ scale: 0.7, opacity: 0, y: 30 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 260, damping: 20 }}
-        className="relative w-full max-w-md overflow-hidden rounded-3xl bg-washi-soft p-8 text-center shadow-xl"
+        // Never taller than the screen: on a short one the look picker
+        // scrolls inside it, so Continue always stays in reach.
+        className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-washi-soft p-6 text-center shadow-xl sm:p-8"
       >
         {phase === "celebrate" && (
           <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center">
@@ -122,11 +124,13 @@ export function LevelUpModal({
               {t("level_up.pick_a_look", "Pick a look")}
             </h1>
 
-            <div className="mx-auto mt-4 flex w-40 justify-center">
-              <DonguriAvatar equippedAccessory={chosen} className="w-40" />
+            <div className="mx-auto mt-4 flex w-28 shrink-0 justify-center sm:w-40">
+              <DonguriAvatar equippedAccessory={chosen} className="w-28 sm:w-40" />
             </div>
 
-            <div className="mt-5">
+            {/* Padded (and pulled back out by the same) so the "new" tags
+                poking above each tile aren't clipped by the scroll edge. */}
+            <div className="-mx-2 mt-5 min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pt-2 pb-1">
               <AccessoryPicker
                 unlockedAccessories={unlockedAccessories}
                 equippedAccessory={equippedAccessory}
@@ -135,7 +139,7 @@ export function LevelUpModal({
               />
             </div>
 
-            <div className="mt-7 flex flex-col gap-3">
+            <div className="mt-6 flex shrink-0 flex-col gap-3">
               <ShareButton
                 title={t("level_up.share_title", "Donguri")}
                 text={t("level_up.share_text", "I just reached Level {{level}} in Donguri! 🌰", {
