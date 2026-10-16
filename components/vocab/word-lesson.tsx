@@ -13,6 +13,7 @@ import {
   highlightMarked,
   type HighlightSegment,
 } from "@/lib/highlight-term";
+import { withStarMark } from "@/lib/star-mark";
 import { WordImage } from "@/components/ui/word-image";
 import { useTranslations } from "@/components/i18n/locale-provider";
 
@@ -57,7 +58,14 @@ export const WordLesson = ({ word, header }: { word: RevealWord; header?: ReactN
   const wordTypes = [...new Set([word.wordType, word.secondaryWordType])].filter(
     (type): type is WordType => type !== null,
   );
-  const [mainExample, ...moreExamples] = word.examples;
+  // Sentences stored with "*word*"/"**word**" marks (before those were
+  // pulled out on save/import) show clean, with that part highlighted.
+  const examples = word.examples.map((example) => {
+    const en = withStarMark(example.en, example.enHighlight);
+    const ja = withStarMark(example.ja, example.jaHighlight);
+    return { ...example, en: en.text, ja: ja.text, enHighlight: en.highlight, jaHighlight: ja.highlight };
+  });
+  const [mainExample, ...moreExamples] = examples;
   const accent = lessonAccent(word.path);
 
   // What to pick out in the examples. A grammar "term" is a structure

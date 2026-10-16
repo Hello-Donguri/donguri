@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { buildDeckCoverImageKey, buildWordAudioKey, buildWordImageKey, uploadImage } from "@/lib/bunny";
 import { isSafeSvg, UNSAFE_SVG_MESSAGE } from "@/lib/svg";
+import { withStarMark } from "@/lib/star-mark";
 import {
   parseExamplesColumns,
   parseFormsCell,
@@ -111,17 +112,23 @@ async function replaceWordFormsAndExamples(wordId: string, formData: FormData): 
     };
   });
 
-  const examplesData = exampleRows.map((example, index) => ({
-    id: randomUUID(),
-    wordId,
-    formId: example.formClientId ? (formIdByClientId.get(example.formClientId) ?? null) : null,
-    en: example.en,
-    ja: example.ja,
-    romanization: example.romanization || null,
-    enHighlight: example.enHighlight || null,
-    jaHighlight: example.jaHighlight || null,
-    position: index + 1,
-  }));
+  const examplesData = exampleRows.map((example, index) => {
+    // "*word*"/"**word**" in a sentence marks its highlight; the highlight
+    // fields win when filled in
+    const en = withStarMark(example.en, example.enHighlight);
+    const ja = withStarMark(example.ja, example.jaHighlight);
+    return {
+      id: randomUUID(),
+      wordId,
+      formId: example.formClientId ? (formIdByClientId.get(example.formClientId) ?? null) : null,
+      en: en.text,
+      ja: ja.text,
+      romanization: example.romanization || null,
+      enHighlight: en.highlight || null,
+      jaHighlight: ja.highlight || null,
+      position: index + 1,
+    };
+  });
 
   await prisma.$transaction([
     prisma.wordExample.deleteMany({ where: { wordId } }),

@@ -97,13 +97,17 @@ const BOLD_START = "\u0001";
 const BOLD_END = "\u0002";
 const BOLD_AWARE_KEYS = new Set(["examplesEn", "examplesJa"]);
 
-// "**know**" marks a highlight too, for files whose bold doesn't survive —
-// ones made by a script or another app, or text pasted in from elsewhere.
-// Kept within one sentence (never across a "|"); a lone "**" is left as is.
-const STAR_MARK = /\*\*([^*|]+?)\*\*/g;
+// "**know**" (or "*know*") marks a highlight too, for files whose bold
+// doesn't survive — ones made by a script or another app, or text pasted in
+// from elsewhere. Kept within one sentence (never across a "|"); a lone "*"
+// or "**" is left as is.
+const STAR_MARK = /\*\*(?!\s)([^*|]+?)(?<!\s)\*\*|\*(?!\s)([^*|]+?)(?<!\s)\*/g;
 
 function markStarredText(text: string): string {
-  return text.replace(STAR_MARK, `${BOLD_START}$1${BOLD_END}`);
+  return text.replace(
+    STAR_MARK,
+    (_, double: string | undefined, single: string | undefined) => `${BOLD_START}${double ?? single}${BOLD_END}`,
+  );
 }
 
 // How far down to extend the Word type / Category dropdown validation —
