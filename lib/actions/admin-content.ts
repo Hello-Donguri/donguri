@@ -7,6 +7,7 @@ import { requireProfile } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { buildDeckCoverImageKey, buildWordAudioKey, buildWordImageKey, uploadImage } from "@/lib/bunny";
+import { AUDIO_MAX_BYTES, AUDIO_SIZE_ERROR, AUDIO_TYPE_ERROR, audioMime, typedAudio } from "@/lib/word-media";
 import { isSafeSvg, UNSAFE_SVG_MESSAGE } from "@/lib/svg";
 import { withStarMark } from "@/lib/star-mark";
 import {
@@ -600,33 +601,6 @@ export async function createWord(
 
 // --- Pronunciation recordings ---------------------------------------------------
 
-const AUDIO_MAX_BYTES = 5 * 1024 * 1024;
-
-// The audio formats bunny.net keys are built for (see extensionForMime in
-// lib/bunny.ts), by file extension — some browsers send an .m4a with no
-// type at all.
-const AUDIO_MIME_BY_EXTENSION: Record<string, string> = {
-  mp3: "audio/mpeg",
-  m4a: "audio/mp4",
-  aac: "audio/aac",
-  wav: "audio/wav",
-  ogg: "audio/ogg",
-  webm: "audio/webm",
-};
-const AUDIO_MIMES = new Set([
-  ...Object.values(AUDIO_MIME_BY_EXTENSION),
-  "audio/mp3",
-  "audio/x-m4a",
-  "audio/x-wav",
-  "audio/wave",
-]);
-
-function audioMime(file: File): string | null {
-  if (AUDIO_MIMES.has(file.type)) return file.type;
-  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-  return AUDIO_MIME_BY_EXTENSION[extension] ?? null;
-}
-
 type AudioVoice = "Female" | "Male";
 
 // A word's female and male recordings after this save: a newly picked file
@@ -650,12 +624,12 @@ async function saveWordAudio(
 
     const field = voice === "Female" ? "audioFemale" : "audioMale";
     const mime = audioMime(file);
-    if (!mime) return { ok: false, errors: { [field]: ["Use an MP3, M4A, WAV, OGG or WebM audio file."] } };
-    if (file.size > AUDIO_MAX_BYTES) return { ok: false, errors: { [field]: ["Recording must be under 5MB."] } };
+    if (!mime) return { ok: false, errors: { [field]: [AUDIO_TYPE_ERROR] } };
+    if (file.size > AUDIO_MAX_BYTES) return { ok: false, errors: { [field]: [AUDIO_SIZE_ERROR] } };
 
     const key = buildWordAudioKey(mime);
     try {
-      await uploadImage(file.type ? file : new File([file], file.name, { type: mime }), key);
+      await uploadImage(typedAudio(file, mime), key);
     } catch (error) {
       console.error("Bunny audio upload failed:", error);
       return { ok: false, message: "Recording upload failed. Try again." };
