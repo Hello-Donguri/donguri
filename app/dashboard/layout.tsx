@@ -4,6 +4,7 @@ import { Logo } from "@/components/logo";
 import { HeaderActions } from "@/components/dashboard/header-actions";
 import { DevModeProvider } from "@/components/dashboard/dev-mode-context";
 import { ReviewDueNotifier } from "@/components/vocab/review-due-notifier";
+import { Toaster } from "@/components/ui/toast";
 import { GuestBanner } from "@/components/access/guest-banner";
 import { getCourseStreaks, getLearningAllowance, getProfile, requireProfile } from "@/lib/dal";
 import { connection } from "next/server";
@@ -33,6 +34,7 @@ export default function DashboardLayout({
         </Suspense>
         <main className="mx-auto max-w-360 px-4 py-6 sm:px-6 sm:py-10">{children}</main>
         <ReviewDueNotifier />
+        <Toaster />
       </div>
     </DevModeProvider>
   );

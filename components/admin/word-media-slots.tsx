@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { ImageIcon, Pause, Play, Upload, X } from "lucide-react";
+import { ImageIcon, Loader2, Pause, Play, Upload, X } from "lucide-react";
 import { removeWordMedia, uploadWordMedia, type WordMediaKind } from "@/lib/actions/word-media";
 import { useTranslations } from "@/components/i18n/locale-provider";
+import { toast } from "@/components/ui/toast";
 import type { WordAudio } from "@/lib/definitions";
 import { cn } from "@/lib/utils";
 
@@ -86,6 +87,7 @@ function Slot({
     startTransition(async () => {
       const result = await uploadWordMedia(formData);
       if (result.error) onError(`${label}: ${result.error}`);
+      else toast(t("admin_word_media.upload_complete", "Upload complete"));
     });
   };
 
@@ -94,7 +96,10 @@ function Slot({
       return;
     }
     onError(null);
-    startTransition(() => removeWordMedia(wordId, kind));
+    startTransition(async () => {
+      await removeWordMedia(wordId, kind);
+      toast(t("admin_word_media.removed", "Removed"));
+    });
   };
 
   const togglePlay = () => {
@@ -116,7 +121,6 @@ function Slot({
       className={cn(
         "inline-flex h-7 items-center gap-0.5 rounded-full border px-1 text-xs font-semibold",
         url ? "border-ai/30 bg-ai-soft/50 text-ai-dark" : "border-dashed border-sumi/20 text-sumi-soft",
-        pending && "animate-pulse",
       )}
     >
       {kind === "image" ? (
@@ -177,7 +181,8 @@ function Slot({
         }
         className={cn(iconButton, "hover:bg-ai/15")}
       >
-        <Upload aria-hidden className="h-3 w-3" />
+        {/* Spins while the file uploads; the card refreshes with it after. */}
+        {pending ? <Loader2 aria-hidden className="h-3 w-3 animate-spin" /> : <Upload aria-hidden className="h-3 w-3" />}
       </button>
 
       {url && (
