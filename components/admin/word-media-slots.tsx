@@ -5,6 +5,7 @@ import { ImageIcon, Loader2, Pause, Play, Upload, X } from "lucide-react";
 import { removeWordMedia, uploadWordMedia, type WordMediaKind } from "@/lib/actions/word-media";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { toast } from "@/components/ui/toast";
+import { ImageLightbox } from "@/components/ui/image-lightbox";
 import type { WordAudio } from "@/lib/definitions";
 import { cn } from "@/lib/utils";
 
@@ -125,8 +126,10 @@ function Slot({
     >
       {kind === "image" ? (
         url ? (
-          // eslint-disable-next-line @next/next/no-img-element -- a bunny.net image.
-          <img src={url} alt="" className="h-5 w-5 rounded object-cover" />
+          <ImageLightbox src={url} alt={term} className="flex">
+            {/* eslint-disable-next-line @next/next/no-img-element -- a bunny.net image. */}
+            <img src={url} alt="" className="h-5 w-5 rounded object-cover" />
+          </ImageLightbox>
         ) : (
           <ImageIcon aria-hidden className="mx-0.5 h-3.5 w-3.5" />
         )

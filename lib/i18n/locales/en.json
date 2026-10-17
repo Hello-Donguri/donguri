@@ -839,6 +839,7 @@
   "home.story.review_eyebrow": "Spaced repetition",
   "home.story.review_heading": "Review at just the right moment.",
   "home.story.what_does_this_mean": "What does this mean?",
+  "image_lightbox.open": "View {{alt}} full size",
   "jyutping.hint": "Press space after each syllable to pick its tone, or type the number.",
   "jyutping.pick_tone": "Which tone is “{{syllable}}”?",
   "jyutping.tone_1": "High level",

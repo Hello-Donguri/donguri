@@ -5,6 +5,7 @@ import { requireAdminProfile, getAdminCategoryWords } from "@/lib/dal";
 import { setWordActive } from "@/lib/actions/admin-content";
 import { DeleteWordButton } from "@/components/admin/delete-word-button";
 import { WordMediaSlots } from "@/components/admin/word-media-slots";
+import { ImageLightbox } from "@/components/ui/image-lightbox";
 import { imageUrl } from "@/lib/bunny";
 import { WordImage } from "@/components/ui/word-image";
 import { VisibilityToggle } from "@/components/ui/visibility-toggle";
@@ -174,11 +175,23 @@ export default async function AdminCategoryWordsPage({ params }: PageProps) {
               className="flex flex-col gap-3 rounded-2xl border border-card-border bg-washi-soft p-4"
             >
               <div className="flex items-center gap-3">
-                <WordImage
-                  src={wordImagePath(word)}
-                  alt={word.term}
-                  className="h-12 w-12 shrink-0 rounded-lg object-cover"
-                />
+                {/* An uploaded picture opens full size; the naming-convention
+                    fallback may not exist, so it stays a plain thumbnail. */}
+                {word.imageKey ? (
+                  <ImageLightbox src={imageUrl(word.imageKey)} alt={word.term} className="shrink-0">
+                    <WordImage
+                      src={imageUrl(word.imageKey)}
+                      alt={word.term}
+                      className="h-12 w-12 rounded-lg object-cover"
+                    />
+                  </ImageLightbox>
+                ) : (
+                  <WordImage
+                    src={wordImagePath(word)}
+                    alt={word.term}
+                    className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                  />
+                )}
                 <div className="min-w-0">
                   <h2 className="truncate font-semibold text-sumi">
                     {word.term} — {word.translation}
