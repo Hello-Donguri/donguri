@@ -30,70 +30,70 @@ export function WordMediaSlots({
   audio: WordAudio | null;
 }) {
   const t = useTranslations();
+  // One message for the row, from whichever slot last failed.
+  const [error, setError] = useState<string | null>(null);
+  const slots = [
+    { kind: "image" as const, symbol: null, label: t("admin_word_media.image", "Image"), url: imageUrl },
+    { kind: "audioFemale" as const, symbol: "♀", label: t("admin_word_media.female", "♀ Female"), url: audio?.female ?? null },
+    { kind: "audioMale" as const, symbol: "♂", label: t("admin_word_media.male", "♂ Male"), url: audio?.male ?? null },
+  ];
+
   return (
-    <div className="grid grid-cols-3 gap-2">
-      <Slot
-        wordId={wordId}
-        kind="image"
-        label={t("admin_word_media.image", "Image")}
-        term={term}
-        url={imageUrl}
-      />
-      <Slot
-        wordId={wordId}
-        kind="audioFemale"
-        label={t("admin_word_media.female", "♀ Female")}
-        term={term}
-        url={audio?.female ?? null}
-      />
-      <Slot
-        wordId={wordId}
-        kind="audioMale"
-        label={t("admin_word_media.male", "♂ Male")}
-        term={term}
-        url={audio?.male ?? null}
-      />
+    <div className="flex flex-col gap-1">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {slots.map((slot) => (
+          <Slot key={slot.kind} wordId={wordId} term={term} onError={setError} {...slot} />
+        ))}
+      </div>
+      {error && <p className="text-xs text-shu">{error}</p>}
     </div>
   );
 }
 
+// One compact pill: what's there (a thumbnail, or a play button for a
+// recording), an upload button that sends the picked file straight away,
+// and × to clear it.
 function Slot({
   wordId,
   kind,
+  symbol,
   label,
   term,
   url,
+  onError,
 }: {
   wordId: string;
   kind: WordMediaKind;
+  symbol: string | null;
   label: string;
   term: string;
   url: string | null;
+  onError: (error: string | null) => void;
 }) {
   const t = useTranslations();
   const inputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [error, setError] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [pending, startTransition] = useTransition();
+  const name = label.toLowerCase();
 
   const upload = (file: File) => {
-    setError(null);
+    onError(null);
     const formData = new FormData();
     formData.set("wordId", wordId);
     formData.set("kind", kind);
     formData.set("file", file);
     startTransition(async () => {
       const result = await uploadWordMedia(formData);
-      if (result.error) setError(result.error);
+      if (result.error) onError(`${label}: ${result.error}`);
     });
   };
 
   const remove = () => {
-    if (!confirm(t("admin_word_media.confirm_remove", "Remove the {{label}} for \"{{term}}\"?", { label: label.toLowerCase(), term }))) {
+    if (!confirm(t("admin_word_media.confirm_remove", "Remove the {{label}} for \"{{term}}\"?", { label: name, term }))) {
       return;
     }
-    setError(null);
+    onError(null);
     startTransition(() => removeWordMedia(wordId, kind));
   };
 
@@ -108,44 +108,50 @@ function Slot({
     }
   };
 
+  const iconButton = "flex h-5 w-5 items-center justify-center rounded-full transition disabled:cursor-wait";
+
   return (
     <div
+      title={label}
       className={cn(
-        "relative flex min-w-0 flex-col items-center gap-1.5 rounded-xl border p-2 text-center",
-        url ? "border-ai/30 bg-ai-soft/40" : "border-dashed border-sumi/20 bg-washi",
-        pending && "opacity-60",
+        "inline-flex h-7 items-center gap-0.5 rounded-full border px-1 text-xs font-semibold",
+        url ? "border-ai/30 bg-ai-soft/50 text-ai-dark" : "border-dashed border-sumi/20 text-sumi-soft",
+        pending && "animate-pulse",
       )}
     >
-      <span className="text-[11px] font-semibold uppercase tracking-wide text-sumi-soft">{label}</span>
-
       {kind === "image" ? (
         url ? (
           // eslint-disable-next-line @next/next/no-img-element -- a bunny.net image.
-          <img src={url} alt="" className="h-10 w-10 rounded-md object-cover" />
+          <img src={url} alt="" className="h-5 w-5 rounded object-cover" />
         ) : (
-          <ImageIcon aria-hidden className="h-10 w-5 text-sumi-soft/50" />
+          <ImageIcon aria-hidden className="mx-0.5 h-3.5 w-3.5" />
         )
-      ) : url ? (
-        <>
-          <audio
-            ref={audioRef}
-            src={url}
-            preload="none"
-            onPlay={() => setPlaying(true)}
-            onPause={() => setPlaying(false)}
-            onEnded={() => setPlaying(false)}
-          />
-          <button
-            type="button"
-            onClick={togglePlay}
-            aria-label={t("admin_word_media.play", "Play the {{label}} recording", { label: label.toLowerCase() })}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-ai text-washi transition hover:bg-ai-dark"
-          >
-            {playing ? <Pause aria-hidden className="h-4 w-4" /> : <Play aria-hidden className="h-4 w-4" />}
-          </button>
-        </>
       ) : (
-        <span className="flex h-10 items-center text-xs text-sumi-soft">{t("admin_word_media.none", "None")}</span>
+        <>
+          <span aria-hidden className="px-0.5">
+            {symbol}
+          </span>
+          {url && (
+            <>
+              <audio
+                ref={audioRef}
+                src={url}
+                preload="none"
+                onPlay={() => setPlaying(true)}
+                onPause={() => setPlaying(false)}
+                onEnded={() => setPlaying(false)}
+              />
+              <button
+                type="button"
+                onClick={togglePlay}
+                aria-label={t("admin_word_media.play", "Play the {{label}} recording", { label: name })}
+                className={cn(iconButton, "bg-ai text-washi hover:bg-ai-dark")}
+              >
+                {playing ? <Pause aria-hidden className="h-2.5 w-2.5" /> : <Play aria-hidden className="h-2.5 w-2.5" />}
+              </button>
+            </>
+          )}
+        </>
       )}
 
       <input
@@ -164,28 +170,27 @@ function Slot({
         type="button"
         disabled={pending}
         onClick={() => inputRef.current?.click()}
-        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold text-ai-dark transition hover:bg-ai/10 disabled:cursor-wait"
+        aria-label={
+          url
+            ? t("admin_word_media.replace_label", "Replace the {{label}}", { label: name })
+            : t("admin_word_media.upload_label", "Upload the {{label}}", { label: name })
+        }
+        className={cn(iconButton, "hover:bg-ai/15")}
       >
         <Upload aria-hidden className="h-3 w-3" />
-        {pending
-          ? t("admin_word_media.uploading", "Uploading…")
-          : url
-            ? t("admin_word_media.replace", "Replace")
-            : t("admin_word_media.upload", "Upload")}
       </button>
 
-      {url && !pending && (
+      {url && (
         <button
           type="button"
+          disabled={pending}
           onClick={remove}
-          aria-label={t("admin_word_media.remove", "Remove the {{label}}", { label: label.toLowerCase() })}
-          className="absolute top-1 right-1 rounded-full p-0.5 text-sumi-soft transition hover:bg-shu/10 hover:text-shu"
+          aria-label={t("admin_word_media.remove", "Remove the {{label}}", { label: name })}
+          className={cn(iconButton, "hover:bg-shu/10 hover:text-shu")}
         >
           <X aria-hidden className="h-3 w-3" />
         </button>
       )}
-
-      {error && <p className="text-[11px] leading-tight text-shu">{error}</p>}
     </div>
   );
 }
