@@ -151,7 +151,7 @@ const STEPS: Step[] = [
     titleKey: "tour.leaderboard_title",
     title: "Leaderboards",
     bodyKey: "tour.leaderboard_body",
-    body: "See how you rank against other learners, and your friends, this week.",
+    body: "See how you rank against other learners, and the people you follow, this week.",
   },
   {
     id: "finish",

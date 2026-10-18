@@ -228,6 +228,8 @@ export type Profile = {
   tour_seen: boolean;
   // Whether they get the "regain your crown" email (lib/weekly-crown.ts).
   email_overtaken: boolean;
+  // Whether they get the "someone followed you" email (lib/emails/new-follower.ts).
+  email_followed: boolean;
   // Synced copy of their Stripe subscription (see lib/billing.ts), null if
   // they've never started Checkout.
   subscription: ProfileSubscription | null;
@@ -1401,7 +1403,42 @@ export type PublicProfile = {
   // Only ever true when `isSelf` — nobody else can load a hidden profile.
   hidden: boolean;
   isSelf: boolean;
+  followers: number;
+  following: number;
+  recentFollowers?: (AccessoryId | null)[];
+  recentFollowing?: (AccessoryId | null)[];
+  // The viewer follows them / they follow the viewer — for the Follow /
+  // Follow back / Following button.
+  viewerFollows: boolean;
+  followsViewer: boolean;
 };
+
+// Follows are one-way, Instagram-style: following someone needs no
+// acceptance (see the Friendship model — `userId` follows `friendId`).
+export type FollowCounts = {
+  followers: number;
+  following: number;
+  // The Donguris of the latest few on each side, for the counts' little
+  // avatar stacks — absent where only the numbers are needed.
+  recentFollowers?: (AccessoryId | null)[];
+  recentFollowing?: (AccessoryId | null)[];
+};
+
+// One person in a followers / following list.
+export type FollowUser = {
+  id: string;
+  // Their handle; null for the few who never picked one.
+  username: string | null;
+  equippedAccessory: AccessoryId | null;
+  level: number;
+  profileHref: string | null;
+  // Whether the viewer follows them — Following, or Follow / Follow back.
+  viewerFollows: boolean;
+  // Whether they follow the viewer — makes the button "Follow back".
+  followsViewer: boolean;
+};
+
+export type FollowLists = { followers: FollowUser[]; following: FollowUser[] };
 
 export type LeaderboardEntry = {
   id: string;

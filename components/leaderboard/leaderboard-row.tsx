@@ -1,6 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { Check, UserPlus } from "lucide-react";
+import { FollowBurst } from "@/components/social/follow-burst";
 import { DonguriAvatar } from "@/components/icons/DonguriAvatar";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import type { LeaderboardEntry } from "@/lib/definitions";
@@ -42,14 +45,52 @@ function Rank({ rank }: { rank: number }) {
   );
 }
 
+// The top 10's quick follow: a small round + for someone you don't follow
+// yet, which bursts (FollowBurst) and becomes a tick once you do.
+function MiniFollowButton({ name, followed, onFollow }: { name: string; followed: boolean; onFollow: () => void }) {
+  const t = useTranslations();
+  const [burst, setBurst] = useState<number | null>(null);
+
+  if (followed) {
+    return (
+      <span
+        title={t("follow.following", "Following")}
+        className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-matcha-dark/70"
+      >
+        <Check aria-hidden className="h-3.5 w-3.5" strokeWidth={2.5} />
+        <span className="sr-only">{t("follow.following", "Following")}</span>
+        <FollowBurst burst={burst} />
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        setBurst(Date.now());
+        onFollow();
+      }}
+      aria-label={t("leaderboard.follow_aria", "Follow {{name}}", { name })}
+      title={t("leaderboard.follow_aria", "Follow {{name}}", { name })}
+      className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sumi-soft/70 transition hover:bg-ai-soft hover:text-ai-dark active:scale-90"
+    >
+      <UserPlus aria-hidden className="h-3.5 w-3.5" strokeWidth={2} />
+    </button>
+  );
+}
+
 export function LeaderboardRow({
   rank,
   entry,
-  onRemove,
+  followed,
+  onFollow,
 }: {
   rank: number;
   entry: LeaderboardEntry;
-  onRemove?: () => void;
+  // The top 10's quick follow — whether you follow them, and how to.
+  followed?: boolean;
+  onFollow?: () => void;
 }) {
   const t = useTranslations();
 
@@ -102,18 +143,10 @@ export function LeaderboardRow({
         </p>
       </div>
 
-      {onRemove && !entry.isSelf && (
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label={t("leaderboard.remove_aria", "Remove {{name}}", {
-            name: entry.name,
-          })}
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-lg leading-none text-sumi-soft transition hover:bg-shu/10 hover:text-shu-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ai"
-        >
-          ×
-        </button>
+      {onFollow && !entry.isSelf && (
+        <MiniFollowButton name={entry.name} followed={Boolean(followed)} onFollow={onFollow} />
       )}
+
     </li>
   );
 }
@@ -170,12 +203,15 @@ export function LeaderboardList({
   entries,
   selfTotalXp,
   emptyMessage,
-  onRemove,
+  followingIds,
+  onFollow,
 }: {
   entries: LeaderboardEntry[];
   selfTotalXp: number | null;
   emptyMessage: string;
-  onRemove?: (id: string) => void;
+  // The quick follow buttons, for the top 10 (see MiniFollowButton).
+  followingIds?: Set<string>;
+  onFollow?: (id: string) => void;
 }) {
   const t = useTranslations();
 
@@ -212,7 +248,8 @@ export function LeaderboardList({
                 key={entry.id}
                 rank={index + 1}
                 entry={entry}
-                onRemove={onRemove ? () => onRemove(entry.id) : undefined}
+                followed={followingIds?.has(entry.id)}
+                onFollow={onFollow ? () => onFollow(entry.id) : undefined}
               />
             ))}
           </ol>

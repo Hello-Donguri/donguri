@@ -2148,3 +2148,10 @@ create policy "Signed-in users can view the world room"
 
 alter table public.words add column if not exists audio_female_key text;
 alter table public.words add column if not exists audio_male_key text;
+
+-- 60. New follower emails ------------------------------------------------------------------
+-- An email when someone follows you (see lib/emails/new-follower.ts and
+-- `follow` in lib/actions/friends.ts) — on unless turned off in account
+-- settings' email notifications, alongside the leaderboard crown email.
+
+alter table public.profiles add column if not exists email_followed boolean not null default true;

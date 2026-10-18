@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { Volume2 } from "lucide-react";
 import { requireAdminProfile, getAdminCategoryWords } from "@/lib/dal";
 import { setWordActive } from "@/lib/actions/admin-content";
 import { DeleteWordButton } from "@/components/admin/delete-word-button";
 import { WordMediaSlots } from "@/components/admin/word-media-slots";
+import { DeckMediaSummary } from "@/components/admin/deck-media-summary";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
 import { imageUrl } from "@/lib/bunny";
 import { WordImage } from "@/components/ui/word-image";
@@ -144,20 +144,7 @@ export default async function AdminCategoryWordsPage({ params }: PageProps) {
         </div>
       </div>
 
-      {words.length > 0 && (
-        <p className="flex items-center gap-1.5 text-sm text-sumi-soft">
-          <Volume2 aria-hidden className="h-4 w-4" />
-          {t(
-            "admin_category_words.audio_summary",
-            "Recordings: {{both}} with both voices · {{one}} with one · {{none}} with none",
-            {
-              both: words.filter((word) => word.audio?.female && word.audio?.male).length,
-              one: words.filter((word) => word.audio && !(word.audio.female && word.audio.male)).length,
-              none: words.filter((word) => !word.audio).length,
-            },
-          )}
-        </p>
-      )}
+      {words.length > 0 && <DeckMediaSummary words={words} t={t} />}
 
       {words.length === 0 ? (
         <p className="text-sumi-soft">

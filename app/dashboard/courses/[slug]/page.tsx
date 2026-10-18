@@ -25,6 +25,7 @@ import { GuestLimitModal } from "@/components/access/guest-limit-modal";
 import { ActivityOverviewCard } from "@/components/vocab/activity-overview-card";
 import { Greeting } from "@/components/dashboard/greeting";
 import { ProfileSnapshot } from "@/components/dashboard/profile-snapshot";
+import { FollowCounts } from "@/components/social/follow-counts";
 import { TodaySummary } from "@/components/dashboard/today-summary";
 import { AppTour } from "@/components/tour/app-tour";
 import { TourButton } from "@/components/tour/tour-button";
@@ -420,6 +421,7 @@ export default async function CourseHomePage({ params }: PageProps) {
             subtitle={streakMessage}
             aside={
               <ProfileSnapshot
+                follows={<FollowCounts initialCounts={leaderboards.followCounts} size="sm" />}
                 equippedAccessory={equippedAccessory}
                 level={level}
                 levelLabel={t("xp_counter.level", "Lv {{level}}", { level })}

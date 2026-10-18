@@ -27,6 +27,7 @@ export function ProfileSnapshot({
   profileHref,
   profileLabel,
   badges,
+  follows,
   today,
 }: {
   equippedAccessory: AccessoryId | null;
@@ -37,6 +38,8 @@ export function ProfileSnapshot({
   profileHref: string;
   profileLabel: string;
   badges?: React.ReactNode;
+  // Followers / following, under the stats (see FollowCounts).
+  follows?: React.ReactNode;
   // Today's activity pills — hung over the card's bottom-right border once
   // there's room, inside the card below that.
   today?: React.ReactNode;
@@ -77,17 +80,20 @@ export function ProfileSnapshot({
           </span>
         </Link>
 
-        <dl className="grid min-w-0 flex-1 grid-cols-2 gap-x-4 gap-y-2.5">
-          {stats.map((stat) => (
-            <div key={stat.key} className="flex min-w-0 flex-col-reverse">
-              <dt className="flex items-center gap-1 truncate text-[11px] font-semibold text-sumi-soft">
-                {STAT_ICONS[stat.key]}
-                {stat.label}
-              </dt>
-              <dd className="font-nunito text-xl leading-tight font-black tabular-nums text-sumi">{stat.value}</dd>
-            </div>
-          ))}
-        </dl>
+        <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+          <dl className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-2.5">
+            {stats.map((stat) => (
+              <div key={stat.key} className="flex min-w-0 flex-col-reverse">
+                <dt className="flex items-center gap-1 truncate text-[11px] font-semibold text-sumi-soft">
+                  {STAT_ICONS[stat.key]}
+                  {stat.label}
+                </dt>
+                <dd className="font-nunito text-xl leading-tight font-black tabular-nums text-sumi">{stat.value}</dd>
+              </div>
+            ))}
+          </dl>
+          {follows}
+        </div>
       </div>
 
       {badges && (

@@ -39,6 +39,9 @@ model Profile {
   // The "regain your crown" email (lib/weekly-crown.ts) — on unless turned
   // off in account settings; at most one a day.
   emailOvertaken         Boolean                 @default(true) @map("email_overtaken")
+  // The "someone followed you" email — on unless turned off in account
+  // settings. See section 60 of supabase/schema.sql.
+  emailFollowed          Boolean                 @default(true) @map("email_followed")
   overtakenEmailedAt     DateTime?               @map("overtaken_emailed_at") @db.Timestamptz(6)
   role                  String                  @default("user")
   createdAt              DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)

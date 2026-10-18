@@ -8,6 +8,9 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import type {
+  FollowCounts,
+  FollowLists,
+  FollowUser,
   AdminCategoryDetail,
   AdminCategorySummary,
   AdminCourseOption,
@@ -65,7 +68,7 @@ import {
   type ClozeMatch,
 } from "@/lib/cloze";
 import { isLatinTypeable } from "@/lib/language";
-import { parseDonguriConfig, type AccessoryId } from "@/lib/levels";
+import { levelForXp, parseDonguriConfig, type AccessoryId } from "@/lib/levels";
 import {
   pickChallengeTarget,
   type ChallengeTarget,
@@ -151,6 +154,7 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
       learningReason: true,
       tourSeenAt: true,
       emailOvertaken: true,
+      emailFollowed: true,
       isGuest: true,
       subscription: {
         select: {
@@ -185,6 +189,7 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
     learning_reason: isLearningReason(profile.learningReason) ? profile.learningReason : null,
     tour_seen: profile.tourSeenAt !== null,
     email_overtaken: profile.emailOvertaken,
+    email_followed: profile.emailFollowed,
     subscription: profile.subscription,
     is_guest: profile.isGuest,
     tier,
@@ -1511,6 +1516,129 @@ export async function getFriendsLeaderboard(
     .sort(byWeeklyXp);
 }
 
+// How many people follow `userId`, and how many they follow (see
+// FollowCounts — a Friendship row is `userId` following `friendId`).
+export async function getFollowCounts(userId: string): Promise<FollowCounts> {
+  const accessory = (config: Prisma.JsonValue) =>
+    (parseDonguriConfig(config).equippedAccessory as AccessoryId | undefined) ?? null;
+  const [followers, following, recentFollowers, recentFollowing] = await Promise.all([
+    prisma.friendship.count({ where: { friendId: userId } }),
+    prisma.friendship.count({ where: { userId } }),
+    prisma.friendship.findMany({
+      where: { friendId: userId },
+      orderBy: { createdAt: "desc" },
+      take: 3,
+      select: { user: { select: { donguriConfig: true } } },
+    }),
+    prisma.friendship.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      take: 3,
+      select: { friend: { select: { donguriConfig: true } } },
+    }),
+  ]);
+  return {
+    followers,
+    following,
+    recentFollowers: recentFollowers.map((row) => accessory(row.user.donguriConfig)),
+    recentFollowing: recentFollowing.map((row) => accessory(row.friend.donguriConfig)),
+  };
+}
+
+const FOLLOW_USER_SELECT = {
+  id: true,
+  username: true,
+  xp: true,
+  donguriConfig: true,
+  profileHidden: true,
+} as const;
+
+// The viewer's followers and the people they follow, newest first, each
+// marked with who follows whom so the list can offer Follow back. Names are
+// usernames only — never the real name or email the leaderboard falls
+// back to, since a follower may be a stranger.
+export async function getFollowLists(viewerId: string): Promise<FollowLists> {
+  const [followerRows, followingRows] = await Promise.all([
+    prisma.friendship.findMany({
+      where: { friendId: viewerId },
+      orderBy: { createdAt: "desc" },
+      select: { user: { select: FOLLOW_USER_SELECT } },
+    }),
+    prisma.friendship.findMany({
+      where: { userId: viewerId },
+      orderBy: { createdAt: "desc" },
+      select: { friend: { select: FOLLOW_USER_SELECT } },
+    }),
+  ]);
+
+  const followerIds = new Set(followerRows.map((row) => row.user.id));
+  const followingIds = new Set(followingRows.map((row) => row.friend.id));
+
+  const toFollowUser = (profile: Prisma.ProfileGetPayload<{ select: typeof FOLLOW_USER_SELECT }>): FollowUser => ({
+    id: profile.id,
+    username: profile.username,
+    equippedAccessory:
+      (parseDonguriConfig(profile.donguriConfig).equippedAccessory as AccessoryId | undefined) ?? null,
+    level: levelForXp(profile.xp),
+    profileHref: profileHref(profile, viewerId),
+    viewerFollows: followingIds.has(profile.id),
+    followsViewer: followerIds.has(profile.id),
+  });
+
+  return {
+    followers: followerRows.map((row) => toFollowUser(row.user)),
+    following: followingRows.map((row) => toFollowUser(row.friend)),
+  };
+}
+
+// People to follow, for the leaderboard's search: usernames containing the
+// query (those starting with it first, then by XP), or the one account
+// with that exact email address. Never the viewer, guests, or anyone who's
+// hidden their profile — hiding keeps you out of search too. Up to 8.
+export async function searchUsersToFollow(viewerId: string, query: string): Promise<FollowUser[]> {
+  const trimmed = query.trim().replace(/^@/, "");
+  const isEmail = trimmed.indexOf("@") > 0;
+  if (trimmed.length < (isEmail ? 3 : 2)) return [];
+
+  const matches = await prisma.profile.findMany({
+    where: {
+      id: { not: viewerId },
+      isGuest: false,
+      profileHidden: false,
+      username: { not: null },
+      ...(isEmail
+        ? { email: { equals: trimmed, mode: "insensitive" } }
+        : { username: { contains: trimmed.toLowerCase() } }),
+    },
+    orderBy: { xp: "desc" },
+    take: 20,
+    select: FOLLOW_USER_SELECT,
+  });
+
+  const lower = trimmed.toLowerCase();
+  const ranked = matches
+    .sort((a, b) => Number(b.username!.startsWith(lower)) - Number(a.username!.startsWith(lower)))
+    .slice(0, 8);
+  const ids = ranked.map((profile) => profile.id);
+  const [following, followers] = await Promise.all([
+    prisma.friendship.findMany({ where: { userId: viewerId, friendId: { in: ids } }, select: { friendId: true } }),
+    prisma.friendship.findMany({ where: { userId: { in: ids }, friendId: viewerId }, select: { userId: true } }),
+  ]);
+  const followingIds = new Set(following.map((row) => row.friendId));
+  const followerIds = new Set(followers.map((row) => row.userId));
+
+  return ranked.map((profile) => ({
+    id: profile.id,
+    username: profile.username,
+    equippedAccessory:
+      (parseDonguriConfig(profile.donguriConfig).equippedAccessory as AccessoryId | undefined) ?? null,
+    level: levelForXp(profile.xp),
+    profileHref: profileHref(profile, viewerId),
+    viewerFollows: followingIds.has(profile.id),
+    followsViewer: followerIds.has(profile.id),
+  }));
+}
+
 // Global top 10 by XP earned this week, plus the viewer's own friends
 // leaderboard (which always includes themselves) — XP is an app-wide stat,
 // not per-course, so this isn't scoped to whichever course displays it.
@@ -1520,12 +1648,14 @@ export const getLeaderboards = cache(
   async (): Promise<{
     top: LeaderboardEntry[];
     friends: LeaderboardEntry[];
+    followCounts: FollowCounts;
   }> => {
     const user = await requireUser();
 
-    const [weeklyXp, friends] = await Promise.all([
+    const [weeklyXp, friends, followCounts] = await Promise.all([
       getWeeklyXpByUser(),
       getFriendsLeaderboard(user.id),
+      getFollowCounts(user.id),
     ]);
 
     // Weekly totals are summed per user in the DB, but a user's rank can't
@@ -1560,6 +1690,7 @@ export const getLeaderboards = cache(
         .sort(byWeeklyXp)
         .slice(0, 10),
       friends,
+      followCounts,
     };
   },
 );
@@ -1587,7 +1718,7 @@ export const getPublicProfile = cache(
     const isSelf = profile.id === user.id;
     if (profile.profileHidden && !isSelf) return null;
 
-    const [weeklyXp, lastActiveAt, wordsLearnt, dailyActivity, streak] = await Promise.all([
+    const [weeklyXp, lastActiveAt, wordsLearnt, dailyActivity, streak, counts, viewerFollows, followsViewer] = await Promise.all([
       getWeeklyXpByUser([profile.id]),
       getLastActiveAt(profile.id),
       // Across every course; "I already know this" skips don't count, as
@@ -1597,6 +1728,13 @@ export const getPublicProfile = cache(
       }),
       getWeeklyActivity(profile.id),
       getBestStreak(profile.id),
+      getFollowCounts(profile.id),
+      isSelf
+        ? false
+        : prisma.friendship.count({ where: { userId: user.id, friendId: profile.id } }).then(Boolean),
+      isSelf
+        ? false
+        : prisma.friendship.count({ where: { userId: profile.id, friendId: user.id } }).then(Boolean),
     ]);
 
     return {
@@ -1615,6 +1753,9 @@ export const getPublicProfile = cache(
           | undefined) ?? null,
       hidden: profile.profileHidden,
       isSelf,
+      ...counts,
+      viewerFollows,
+      followsViewer,
     };
   },
 );

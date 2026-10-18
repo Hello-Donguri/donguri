@@ -129,6 +129,17 @@ export async function markTourSeen(): Promise<void> {
   revalidatePath("/dashboard", "layout");
 }
 
+// Account settings' switch for the "someone followed you" email (see
+// lib/follow-notifications.ts).
+export async function setFollowedEmails(enabled: boolean): Promise<void> {
+  const user = await requireUser();
+  await prisma.profile.update({
+    where: { id: user.id },
+    data: { emailFollowed: enabled },
+  });
+  revalidatePath("/dashboard/settings");
+}
+
 // Account settings' switch for the "regain your crown" email (see
 // lib/weekly-crown.ts).
 export async function setOvertakenEmails(enabled: boolean): Promise<void> {

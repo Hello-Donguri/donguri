@@ -6,7 +6,7 @@ import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
 import { Button } from "@/components/ui/button";
 import { NameForm } from "@/components/settings/name-form";
 import { VisibilityToggle } from "@/components/ui/visibility-toggle";
-import { setOvertakenEmails, setProfileVisible } from "@/lib/actions/profile";
+import { setFollowedEmails, setOvertakenEmails, setProfileVisible } from "@/lib/actions/profile";
 import { NativeLanguageSetting } from "@/components/settings/native-language-field";
 import { getTranslator } from "@/lib/i18n/server";
 
@@ -105,7 +105,8 @@ export default async function SettingsPage() {
         <NativeLanguageSetting initial={profile.native_language} />
       </div>
 
-      <div className="max-w-lg rounded-2xl border border-card-border bg-washi-soft p-6">
+      {/* The "Manage notifications" link in every email lands here. */}
+      <div id="notifications" className="max-w-lg scroll-mt-24 rounded-2xl border border-card-border bg-washi-soft p-6">
         <h2 className="font-semibold text-sumi">
           {t("settings_page.notifications_title", "Email notifications")}
         </h2>
@@ -125,6 +126,25 @@ export default async function SettingsPage() {
             active={profile.email_overtaken}
             toggleAction={setOvertakenEmails}
             label={t("settings_page.overtaken_label", "leaderboard crown emails")}
+            statusLabels={{
+              on: t("settings_page.on", "On"),
+              off: t("settings_page.off", "Off"),
+            }}
+          />
+        </div>
+        <div className="mt-4 flex items-start justify-between gap-4 border-t border-card-border pt-4">
+          <div>
+            <p className="text-sm font-medium text-sumi">
+              {t("settings_page.followed_title", "New followers")}
+            </p>
+            <p className="mt-0.5 text-sm text-sumi-soft">
+              {t("settings_page.followed_description", "Email me when someone starts following me.")}
+            </p>
+          </div>
+          <VisibilityToggle
+            active={profile.email_followed}
+            toggleAction={setFollowedEmails}
+            label={t("settings_page.followed_label", "new follower emails")}
             statusLabels={{
               on: t("settings_page.on", "On"),
               off: t("settings_page.off", "Off"),

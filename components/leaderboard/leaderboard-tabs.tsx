@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { addFriend, removeFriend } from "@/lib/actions/friends";
+import { follow, type FollowState } from "@/lib/actions/friends";
+import { UserSearch } from "@/components/social/user-search";
+import { toast } from "@/components/ui/toast";
+import { announceFollows, useFollowsChanged } from "@/components/social/follow-events";
 import { LeaderboardList } from "@/components/leaderboard/leaderboard-row";
-import { Button } from "@/components/ui/button";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import type { LeaderboardEntry } from "@/lib/definitions";
 
@@ -16,6 +18,9 @@ const slideVariants = {
   exit: (direction: number) => ({ x: direction > 0 ? -24 : 24, opacity: 0 }),
 };
 
+// The course page's leaderboards: this week's top 10, each with a quick
+// follow button, and the people you follow (Instagram-style — see
+// lib/actions/friends.ts).
 export function LeaderboardTabs({
   topEntries,
   initialFriends,
@@ -28,16 +33,14 @@ export function LeaderboardTabs({
   const [direction, setDirection] = useState(0);
 
   const [friends, setFriends] = useState(initialFriends);
-  const [friendQuery, setFriendQuery] = useState("");
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
 
   // The friends list always includes the viewer (see getFriendsLeaderboard).
   const selfTotalXp = friends.find((entry) => entry.isSelf)?.xp ?? null;
 
   const tabs: { key: TabKey; label: string }[] = [
     { key: "top", label: t("leaderboard.top_10", "Top 10") },
-    { key: "friends", label: t("leaderboard.friends", "Friends") },
+    { key: "friends", label: t("leaderboard.following", "Following") },
   ];
 
   function switchTo(tab: TabKey) {
@@ -46,35 +49,45 @@ export function LeaderboardTabs({
     setActiveTab(tab);
   }
 
-  async function handleAddFriend(event: React.FormEvent) {
-    event.preventDefault();
-    if (pending || friendQuery.trim() === "") return;
+  // Everyone you follow, so the top 10 shows a tick instead of a +. A
+  // quick follow adds them straight away and takes it back if it fails.
+  const [quickFollowed, setQuickFollowed] = useState<Set<string>>(() => new Set());
 
-    setPending(true);
-    setError(null);
+  // A follow or unfollow anywhere (a profile, the followers list, a quick
+  // follow here) brings the server's list, which replaces the quick ones.
+  useFollowsChanged(
+    useCallback((state: FollowState) => {
+      setFriends(state.friends);
+      setQuickFollowed(new Set());
+    }, []),
+  );
+  const followingIds = new Set([
+    ...friends.filter((entry) => !entry.isSelf).map((entry) => entry.id),
+    ...quickFollowed,
+  ]);
 
-    try {
-      const result = await addFriend(friendQuery);
-
-      if (result.error) {
-        setError(result.error);
-      } else if (result.friends) {
-        setFriends(result.friends);
-        setFriendQuery("");
-      }
-    } finally {
-      setPending(false);
+  async function handleQuickFollow(id: string) {
+    setQuickFollowed((current) => new Set(current).add(id));
+    const result = await follow(id);
+    if ("error" in result) {
+      setQuickFollowed((current) => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      });
+      toast({ title: result.error, tone: "error" });
+      return;
     }
-  }
-
-  async function handleRemove(friendId: string) {
-    setFriends((current) => current.filter((entry) => entry.id !== friendId));
-    const updated = await removeFriend(friendId);
-    setFriends(updated);
+    announceFollows(result);
   }
 
   return (
     <section className="flex flex-col rounded-3xl border border-card-border bg-washi-soft p-4 sm:p-5">
+      {/* Find people to follow — above both tabs, so it's always there. */}
+      <div className="mb-4">
+        <UserSearch />
+      </div>
+
       <div className="relative flex rounded-full bg-neutral-soft p-1">
         {tabs.map((tab) => (
           <button
@@ -111,6 +124,8 @@ export function LeaderboardTabs({
             >
               <LeaderboardList
                 entries={topEntries}
+                followingIds={followingIds}
+                onFollow={handleQuickFollow}
                 selfTotalXp={selfTotalXp}
                 emptyMessage={t("leaderboard.no_xp_yet", "No one has earned XP yet.")}
               />
@@ -125,26 +140,10 @@ export function LeaderboardTabs({
               exit="exit"
               transition={{ duration: 0.2, ease: "easeInOut" }}
             >
-              <form onSubmit={handleAddFriend} className="flex gap-2">
-                <input
-                  type="text"
-                  value={friendQuery}
-                  onChange={(event) => setFriendQuery(event.target.value)}
-                  placeholder={t("leaderboard.friend_placeholder", "Username or email")}
-                  className="h-10 min-w-0 flex-1 rounded-full border border-sumi/15 bg-washi px-4 text-sm text-sumi outline-none transition focus:border-ai/50"
-                />
-                <Button type="submit" disabled={pending} className="h-10 shrink-0 px-5 text-sm">
-                  {t("leaderboard.add", "Add")}
-                </Button>
-              </form>
-
-              {error && <p className="mt-2 text-sm text-shu">{error}</p>}
-
               <LeaderboardList
                 entries={friends}
                 selfTotalXp={selfTotalXp}
-                emptyMessage={t("leaderboard.no_friends_yet", "Add a friend by username or email to compare XP.")}
-                onRemove={handleRemove}
+                emptyMessage={t("leaderboard.no_following_yet", "Follow someone by username or email to compare XP.")}
               />
             </motion.div>
           )}

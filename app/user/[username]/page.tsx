@@ -11,6 +11,8 @@ import { DonguriAvatar } from "@/components/icons/DonguriAvatar";
 import { BadgeTile } from "@/components/badges/badge-tile";
 import { StreakChart } from "@/components/vocab/streak-chart";
 import { levelRingClass } from "@/components/donguri/level-ring";
+import { FollowButton } from "@/components/social/follow-button";
+import { FollowCountPills, FollowCounts } from "@/components/social/follow-counts";
 import { getTranslator } from "@/lib/i18n/server";
 import type { TFunction } from "@/lib/i18n/translate";
 import type { Locale } from "@/lib/i18n/config";
@@ -131,6 +133,44 @@ export default async function UserProfilePage({ params }: PageProps) {
               <span className="text-acorn">@</span>
               {profile.username}
             </h1>
+
+            {/* Followers and following — your own open the lists; on
+                someone else's, Follow / Follow back / Following. */}
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 sm:justify-start">
+              {profile.isSelf ? (
+                <FollowCounts
+                  initialCounts={{
+                    followers: profile.followers,
+                    following: profile.following,
+                    recentFollowers: profile.recentFollowers,
+                    recentFollowing: profile.recentFollowing,
+                  }}
+                />
+              ) : (
+                <>
+                  <FollowCountPills
+                    counts={{
+                      followers: profile.followers,
+                      following: profile.following,
+                      recentFollowers: profile.recentFollowers,
+                      recentFollowing: profile.recentFollowing,
+                    }}
+                  />
+                  <FollowButton
+                    userId={profile.id}
+                    username={profile.username}
+                    initialFollowing={profile.viewerFollows}
+                    followsYou={profile.followsViewer}
+                    size="md"
+                  />
+                  {profile.followsViewer && (
+                    <span className="rounded-full bg-washi/80 px-2.5 py-1 text-xs font-semibold text-sumi-soft ring-1 ring-card-border">
+                      {t("follow.follows_you", "Follows you")}
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
 
             <div className="flex flex-wrap justify-center gap-2 sm:justify-start">
               <span className="inline-flex items-center gap-2 rounded-full bg-washi/80 px-3 py-1.5 text-sm font-semibold text-sumi shadow-sm ring-1 ring-card-border">
