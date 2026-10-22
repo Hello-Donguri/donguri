@@ -1,11 +1,12 @@
-import { CheckCircle2, ImageIcon, Mic } from "lucide-react";
+import { CheckCircle2, FileCheck2, ImageIcon, Mic } from "lucide-react";
 import type { TFunction } from "@/lib/i18n/translate";
 import type { WordAudio } from "@/lib/definitions";
 import { cn } from "@/lib/utils";
 
 // The admin deck page's media round-up: how many of its words have an
-// uploaded picture, a female recording and a male recording, each with a
-// bar and what's still missing — and how many have all three.
+// uploaded picture (and how many of those are SVGs), a female recording
+// and a male recording, each with a bar and what's still missing — and how
+// many have all three.
 export function DeckMediaSummary({
   words,
   t,
@@ -15,6 +16,7 @@ export function DeckMediaSummary({
 }) {
   const total = words.length;
   const images = words.filter((word) => word.imageKey).length;
+  const svgs = words.filter((word) => word.imageKey?.toLowerCase().endsWith(".svg")).length;
   const female = words.filter((word) => word.audio?.female).length;
   const male = words.filter((word) => word.audio?.male).length;
   const complete = words.filter((word) => word.imageKey && word.audio?.female && word.audio?.male).length;
@@ -23,6 +25,7 @@ export function DeckMediaSummary({
     { key: "images", label: t("admin_deck_media.images", "Images"), Icon: ImageIcon, count: images, tone: "bg-ai", tile: "bg-ai-soft text-ai-dark" },
     { key: "female", label: t("admin_deck_media.female", "♀ Female voice"), Icon: Mic, count: female, tone: "bg-sakura", tile: "bg-sakura-soft text-sakura-dark" },
     { key: "male", label: t("admin_deck_media.male", "♂ Male voice"), Icon: Mic, count: male, tone: "bg-matcha", tile: "bg-matcha-soft text-matcha-dark" },
+    { key: "svg", label: t("admin_deck_media.svg", "SVG images"), Icon: FileCheck2, count: svgs, tone: "bg-kin", tile: "bg-kin/20 text-acorn" },
   ];
 
   return (
@@ -37,7 +40,7 @@ export function DeckMediaSummary({
         </p>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map(({ key, label, Icon, count, tone, tile }) => {
           const percent = total === 0 ? 0 : Math.round((count / total) * 100);
           const missing = total - count;
@@ -66,7 +69,9 @@ export function DeckMediaSummary({
                 <p className="mt-1 text-xs text-sumi-soft">
                   {missing === 0
                     ? t("admin_deck_media.all_done", "All done")
-                    : t("admin_deck_media.missing", "{{count}} missing · {{percent}}%", { count: missing, percent })}
+                    : key === "svg"
+                      ? t("admin_deck_media.not_svg", "{{count}} not SVG · {{percent}}%", { count: missing, percent })
+                      : t("admin_deck_media.missing", "{{count}} missing · {{percent}}%", { count: missing, percent })}
                 </p>
               </div>
             </div>

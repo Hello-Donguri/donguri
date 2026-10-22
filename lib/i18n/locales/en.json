@@ -88,6 +88,8 @@
   "admin_deck_media.images": "Images",
   "admin_deck_media.male": "♂ Male voice",
   "admin_deck_media.missing": "{{count}} missing · {{percent}}%",
+  "admin_deck_media.not_svg": "{{count}} not SVG · {{percent}}%",
+  "admin_deck_media.svg": "SVG images",
   "admin_deck_media.title": "Media",
   "admin_edit_category.current_cover_image": "Current cover photo",
   "admin_edit_category.replace_cover_image": "Replace cover photo",
