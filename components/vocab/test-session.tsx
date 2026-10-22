@@ -589,6 +589,10 @@ export const TestSession = ({
     );
   }
 
+  // A vocab word's picture, for the "Great job!" banner (grammar points
+  // and custom questions keep Donguri cheering).
+  const wordPicture = question.path === "vocab" && "image" in question ? question.image : null;
+
   const feedbackBanner = feedback && (
     <motion.div
       key={`${quizIndex}-feedback`}
@@ -656,9 +660,22 @@ export const TestSession = ({
         )}
       </div>
 
-      {/* Donguri cheering a right answer; the reading rabbit for one to
-          learn from. Decorative, so hidden from screen readers. */}
-      {feedback.correct ? (
+      {/* A right answer shows the word's own picture, as a reminder of what
+          it means (Donguri cheering when it's a grammar point, or has no
+          picture); the reading rabbit for one to learn from. Decorative,
+          so hidden from screen readers. */}
+      {feedback.correct && wordPicture ? (
+        <span className="-my-2 flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-raised shadow-sm ring-2 ring-matcha/30 sm:h-24 sm:w-24">
+          <WordImage
+            src={wordPicture}
+            alt=""
+            className="h-full w-full object-contain"
+            fallback={
+              <Image src="/images/mascot.png" alt="" aria-hidden="true" width={1224} height={1285} className="h-16 w-auto object-contain" />
+            }
+          />
+        </span>
+      ) : feedback.correct ? (
         <Image
           src="/images/mascot.png"
           alt=""

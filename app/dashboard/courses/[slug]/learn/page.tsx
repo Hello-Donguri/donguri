@@ -7,7 +7,6 @@ import { LimitReached } from "@/components/access/limit-reached";
 import { LearnSession } from "@/components/vocab/learn-session";
 import { FreshSession } from "@/components/vocab/fresh-session";
 import { EnterShortcut } from "@/components/vocab/enter-shortcut";
-import { Breadcrumbs, type BreadcrumbItem } from "@/components/ui/breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { getTranslator } from "@/lib/i18n/server";
 
@@ -28,18 +27,12 @@ export default async function LearnPage({ params }: PageProps) {
   await connection();
   const { slug } = await params;
 
-  const [{ course }, { words, limitReached }, { t, locale }] = await Promise.all([
+  // getCourseHome checks they're enrolled; nothing it returns is shown.
+  const [, { words, limitReached }, { t, locale }] = await Promise.all([
     getCourseHome(slug),
     getLearnQueueForCourse(slug),
     getTranslator(),
   ]);
-
-  const breadcrumbItems: BreadcrumbItem[] = [
-    { href: "/dashboard", label: t("breadcrumbs.dashboard", "Dashboard") },
-    { href: "/dashboard/courses", label: t("breadcrumbs.courses", "Courses") },
-    { href: `/dashboard/courses/${slug}`, label: course.title, prefetch: true },
-    { label: t("learn_page.breadcrumb_learn", "Learn") },
-  ];
 
   if (limitReached) {
     const [allowance, priceLabel] = await Promise.all([
@@ -49,7 +42,6 @@ export default async function LearnPage({ params }: PageProps) {
 
     return (
       <div className="flex flex-col gap-6">
-        <Breadcrumbs items={breadcrumbItems} />
         <LimitReached allowance={allowance} courseSlug={slug} priceLabel={priceLabel} t={t} />
       </div>
     );
@@ -58,7 +50,6 @@ export default async function LearnPage({ params }: PageProps) {
   if (words.length === 0) {
     return (
       <div className="flex flex-col gap-6">
-        <Breadcrumbs items={breadcrumbItems} />
 
         <div className="flex flex-col items-center gap-3 rounded-2xl border border-card-border bg-washi-soft px-6 py-24 text-center">
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-ai-soft text-xl font-semibold text-ai-dark">
@@ -91,7 +82,6 @@ export default async function LearnPage({ params }: PageProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      <Breadcrumbs items={breadcrumbItems} />
       <FreshSession>
         <LearnSession
           key={words.map((word) => word.id).join(",")}

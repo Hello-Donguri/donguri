@@ -130,9 +130,65 @@ export const LearnSession = ({ words, courseSlug }: LearnSessionProps) => {
         total: words.length,
       });
 
+  // Skip / Got it. On wider screens a vocab word has them under its main
+  // example (skip on the left, Got it on the right — see WordLesson's
+  // `actions`) and a grammar point has them under the card; on phones they
+  // float at the bottom of the screen instead, so the next word is always a
+  // tap away however far down the examples go.
+  const gotItLabel =
+    index + 1 < words.length
+      ? isGrammar
+        ? t("learn_session.got_it_next_point", "Got it — next point")
+        : t("learn_session.got_it_next_word", "Got it — next word")
+      : t("learn_session.got_it_done", "Got it — done for now");
+  const skipButton = (className: string) => (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() => handleSkip(word.id)}
+      className={`rounded-full text-sm text-sumi-soft transition hover:text-sumi disabled:opacity-60 ${className}`}
+    >
+      {t("learn_session.skip", "I already know this — skip it")}
+    </button>
+  );
+  const gotItButton = (className: string) => (
+    <Button
+      disabled={pending}
+      onClick={handleGotIt}
+      size="lg"
+      className={`text-lg shadow-sm hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 ${className}`}
+    >
+      {gotItLabel}
+      <ArrowRight aria-hidden className="h-5 w-5" />
+    </Button>
+  );
+  const footerActions = (
+    <div className="flex items-center justify-between gap-4">
+      {skipButton("px-1 py-2")}
+      {gotItButton("h-13 px-8")}
+    </div>
+  );
+  const stackedActions = (compact: boolean) => (
+    <div className={`flex w-full flex-col items-center ${compact ? "gap-1" : "gap-2"}`}>
+      {gotItButton(`w-full ${compact ? "h-12" : "h-14"}`)}
+      {skipButton(`px-4 ${compact ? "py-1" : "py-2"}`)}
+    </div>
+  );
+
+  const typePill = (
+    <span
+      className={`rounded-full px-3.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${
+        isGrammar ? "bg-matcha-soft text-matcha-dark" : "bg-ai-soft text-ai-dark"
+      }`}
+    >
+      {isGrammar ? t("course_home.grammar", "Grammar") : t("course_home.vocabulary", "Vocabulary")}
+    </span>
+  );
+
   return (
     <section
-      className={`mx-auto w-full overflow-x-clip ${isGrammar ? "max-w-2xl" : "max-w-5xl"}`}
+      // Room at the bottom on phones for the floating buttons.
+      className={`mx-auto w-full overflow-x-clip pb-32 md:pb-0 ${isGrammar ? "max-w-2xl" : ""}`}
     >
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
@@ -145,55 +201,44 @@ export const LearnSession = ({ words, courseSlug }: LearnSessionProps) => {
         >
           <WordLesson
             word={word}
+            actions={isGrammar ? undefined : footerActions}
             header={
-              <>
-                {/* Same pill as the quiz header (see TestSession), so a
-                    grammar point never passes for a vocab word. */}
-                <span
-                  className={`mb-3 rounded-full px-3.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${
-                    isGrammar ? "bg-matcha-soft text-matcha-dark" : "bg-ai-soft text-ai-dark"
-                  }`}
-                >
-                  {isGrammar
-                    ? t("course_home.grammar", "Grammar")
-                    : t("course_home.vocabulary", "Vocabulary")}
-                </span>
-                <p className="text-xs font-medium uppercase tracking-[0.18em] text-sumi-soft">
-                  {progressLabel}
-                </p>
-                <div className="mt-3">
-                  <ProgressSegments current={index + 1} total={words.length} />
+              isGrammar ? (
+                <>
+                  {/* Same pill as the quiz header (see TestSession), so a
+                      grammar point never passes for a vocab word. */}
+                  <span className="mb-3">{typePill}</span>
+                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-sumi-soft">
+                    {progressLabel}
+                  </p>
+                  <div className="mt-3">
+                    <ProgressSegments current={index + 1} total={words.length} />
+                  </div>
+                </>
+              ) : (
+                // A bar across the top of the card: what it is on the
+                // left, how far through on the right.
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  {typePill}
+                  <div className="flex items-center gap-3">
+                    <p className="text-xs font-medium uppercase tracking-[0.18em] text-sumi-soft">
+                      {progressLabel}
+                    </p>
+                    <div className="w-24 sm:w-32">
+                      <ProgressSegments current={index + 1} total={words.length} />
+                    </div>
+                  </div>
                 </div>
-              </>
+              )
             }
           />
         </motion.div>
       </AnimatePresence>
 
-      <div className="mx-auto mt-8 flex w-full max-w-md flex-col items-center gap-2">
-        <Button
-          disabled={pending}
-          onClick={handleGotIt}
-          size="lg"
-          fullWidth
-          className="h-14 text-lg shadow-sm hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0"
-        >
-          {index + 1 < words.length
-            ? isGrammar
-              ? t("learn_session.got_it_next_point", "Got it — next point")
-              : t("learn_session.got_it_next_word", "Got it — next word")
-            : t("learn_session.got_it_done", "Got it — done for now")}
-          <ArrowRight aria-hidden className="h-5 w-5" />
-        </Button>
+      {isGrammar && <div className="mx-auto mt-8 hidden w-full max-w-md md:block">{stackedActions(false)}</div>}
 
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => handleSkip(word.id)}
-          className="rounded-full px-4 py-2 text-sm text-sumi-soft transition hover:text-sumi disabled:opacity-60"
-        >
-          {t("learn_session.skip", "I already know this — skip it")}
-        </button>
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-card-border bg-washi px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgb(0_0_0/0.06)] md:hidden">
+        <div className="mx-auto max-w-md">{stackedActions(true)}</div>
       </div>
     </section>
   );

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useAnimate } from "framer-motion";
-import { BookOpen, MessageSquareQuote } from "lucide-react";
+import { BookOpen, ChevronDown, Lightbulb, MessageSquareQuote } from "lucide-react";
 import type { RevealWord, WordType } from "@/lib/definitions";
 import { ListenButton, SpeakButton } from "@/components/vocab/session-ui";
 import { Jyutping } from "@/components/vocab/jyutping";
@@ -50,8 +50,19 @@ export function lessonAccent(path: RevealWord["path"]) {
 // meaning, explanation, examples, forms — without the card around it or
 // the session's controls, so the learn session and the quiz's lesson
 // modal render the same thing. `header` sits above the term (the learn
-// session's progress).
-export const WordLesson = ({ word, header }: { word: RevealWord; header?: ReactNode }) => {
+// session's progress; for a vocab word, a bar across the top of the card).
+// `actions` (the learn session's skip / Got it) sit under a vocab word's
+// main example on wider screens — the session floats its own copy at the
+// bottom on phones.
+export const WordLesson = ({
+  word,
+  header,
+  actions,
+}: {
+  word: RevealWord;
+  header?: ReactNode;
+  actions?: ReactNode;
+}) => {
   const t = useTranslations();
   const isGrammar = word.path === "grammar";
   // Its word type, then the secondary one — once each, if both are the same.
@@ -165,6 +176,18 @@ export const WordLesson = ({ word, header }: { word: RevealWord; header?: ReactN
           : mainExample.ja
         : null;
 
+  const mainExampleCard = mainExample && (
+    <div className={`w-full rounded-2xl px-6 py-5 text-left ${accent.panel}`}>
+      <p
+        className={`mb-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium uppercase tracking-[0.14em] ${accent.label}`}
+      >
+        <MessageSquareQuote aria-hidden className="h-3.5 w-3.5" />
+        {t("learn_session.example", "Example")}
+      </p>
+      {renderExample(mainExample, true)}
+    </div>
+  );
+
   const wordPanel = (
     <div className="flex flex-col items-center text-center">
       {header}
@@ -175,7 +198,7 @@ export const WordLesson = ({ word, header }: { word: RevealWord; header?: ReactN
         </div>
       ) : (
         <p
-          className={`${header ? "mt-8" : "mt-2"} font-extrabold tracking-tight text-sumi ${
+          className={`${header ? "mt-8" : "mt-2"} font-nunito font-black tracking-tight text-sumi ${
             isGrammar ? "text-4xl sm:text-5xl" : "text-6xl sm:text-7xl"
           }`}
         >
@@ -218,7 +241,7 @@ export const WordLesson = ({ word, header }: { word: RevealWord; header?: ReactN
 
         <p
           lang={englishIsTarget ? otherLang : "en"}
-          className={`${wordTypes.length > 0 ? "mt-3" : ""} text-3xl font-bold leading-tight tracking-tight text-sumi sm:text-4xl`}
+          className={`${wordTypes.length > 0 ? "mt-3" : ""} font-nunito text-3xl font-black leading-tight tracking-tight text-sumi sm:text-4xl`}
         >
           {word.translation}
         </p>
@@ -231,84 +254,233 @@ export const WordLesson = ({ word, header }: { word: RevealWord; header?: ReactN
         )}
       </div>
 
-      {mainExample && (
-        <>
-          <div
-            className={`mt-7 w-full rounded-2xl px-6 py-5 text-left ${accent.panel}`}
-          >
-            <p
-              className={`mb-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium uppercase tracking-[0.14em] ${accent.label}`}
-            >
-              <MessageSquareQuote aria-hidden className="h-3.5 w-3.5" />
-              {t("learn_session.example", "Example")}
-            </p>
-            {renderExample(mainExample, true)}
-          </div>
-        </>
-      )}
+      {/* A grammar point keeps its main example here; a vocab word's goes
+          to the examples column (see below). */}
+      {isGrammar && mainExampleCard && <div className="mt-7 w-full">{mainExampleCard}</div>}
     </div>
   );
 
   const hasForms = !isGrammar && word.forms.length > 0;
   const hasMoreExamples = moreExamples.length > 0;
 
-  return (
-    <>
-      {isGrammar ? (
-        <div className="px-2 pt-4 sm:px-6">{wordPanel}</div>
-      ) : (
-        <div className="grid items-center gap-6 md:grid-cols-[1.15fr_1fr] md:gap-8">
-          <div className="flex aspect-[7/6] items-center justify-center overflow-hidden rounded-3xl bg-ai-soft/60">
-            <WordImage src={word.image} alt={word.term} className="h-full w-full object-cover" />
+  const formsBlock = hasForms && (
+    <div>
+      <h3 className="mb-3 font-nunito text-xl font-extrabold text-sumi">{t("learn_session.forms", "Forms")}</h3>
+      <dl
+        className={`grid grid-cols-1 gap-2 ${word.forms.length > 1 ? "sm:grid-cols-2" : ""} ${FORM_COLUMNS[Math.min(word.forms.length, 6)]}`}
+      >
+        {word.forms.map((form) => (
+          <div key={form.id} className="rounded-xl bg-washi-soft px-4 py-3">
+            <dt className="text-xs text-sumi-soft">
+              {form.labelEn}
+              <span className="opacity-70"> / {form.labelJa}</span>
+            </dt>
+            <dd className="mt-0.5 text-lg font-semibold text-sumi">{form.value}</dd>
           </div>
-          <div className="py-2 md:pr-2">{wordPanel}</div>
-        </div>
-      )}
+        ))}
+      </dl>
+    </div>
+  );
 
-      {(hasForms || hasMoreExamples) && (
-        <div
-          className={`mt-6 grid gap-6 border-t border-card-border pt-6 ${
-            hasForms && hasMoreExamples ? "md:grid-cols-[0.85fr_1.15fr]" : ""
-          }`}
-        >
-          {hasForms && (
-            <div>
-              <p className="mb-3 text-xs font-medium uppercase tracking-[0.14em] text-sumi-soft">
-                {t("learn_session.forms", "Forms")}
-              </p>
-              <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {word.forms.map((form) => (
-                  <div key={form.id} className="rounded-xl bg-washi-soft px-4 py-3">
-                    <dt className="text-xs text-sumi-soft">
-                      {form.labelEn}
-                      <span className="opacity-70"> / {form.labelJa}</span>
-                    </dt>
-                    <dd className="mt-0.5 text-lg font-semibold text-sumi">{form.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          )}
+  const moreExamplesBlock = hasMoreExamples && (
+    <div>
+      <p className="mb-3 text-xs font-medium uppercase tracking-[0.14em] text-sumi-soft">
+        {t("learn_session.more_examples", "More examples")}
+      </p>
+      <ul className="flex flex-col divide-y divide-card-border/70">
+        {moreExamples.map((example) => (
+          <li key={example.id} className="py-3 first:pt-0 last:pb-0">
+            {renderExample(example)}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 
-          {hasMoreExamples && (
-            <div>
-              <p className="mb-3 text-xs font-medium uppercase tracking-[0.14em] text-sumi-soft">
-                {t("learn_session.more_examples", "More examples")}
-              </p>
-              <ul className="flex flex-col divide-y divide-card-border/70">
-                {moreExamples.map((example) => (
-                  <li key={example.id} className="py-3 first:pt-0 last:pb-0">
-                    {renderExample(example)}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
-    </>
+  // A grammar point has no picture: one column, everything below it.
+  if (isGrammar) {
+    return (
+      <>
+        <div className="px-2 pt-4 sm:px-6">{wordPanel}</div>
+        {hasMoreExamples && <div className="mt-6 border-t border-card-border pt-6">{moreExamplesBlock}</div>}
+      </>
+    );
+  }
+
+  // A vocab word: the header bar across the top; the picture (whole, never
+  // cropped) beside the word — term, romanization, type and Listen, then the
+  // meaning, its explanation and the main example; "More examples" below
+  // as a grid of cards, the first two shown; and the session's actions as
+  // a footer. Phones stack it all.
+  return (
+    <VocabLesson
+      word={word}
+      header={header}
+      actions={actions}
+      wordTypes={wordTypes.map((type) => wordTypeLabel(type, t))}
+      translationLang={englishIsTarget ? otherLang : "en"}
+      mainExampleCard={mainExampleCard}
+      formsBlock={formsBlock}
+      moreExamples={moreExamples.map((example) => ({ id: example.id, node: renderExample(example) }))}
+    />
   );
 };
+
+// The explanation's first sentence reads as the definition; anything after
+// it (usage notes — "For places, use 好多人 or 好旺.") goes in a tip.
+function splitExplanation(text: string): { lead: string; tip: string | null } {
+  // A full stop (or !) then a space and a new sentence — not a "？" inside
+  // a quoted phrase, or an abbreviation like "e.g." mid-sentence.
+  const match = text.match(/^([\s\S]+?[.!])\s+([A-Z\u3400-\u9fff][\s\S]*)$/);
+  return match ? { lead: match[1], tip: match[2] } : { lead: text, tip: null };
+}
+
+const MORE_EXAMPLES_SHOWN = 2;
+
+// The forms row splits the full width evenly between however many forms
+// there are (up to six a row), written out so Tailwind finds each class.
+const FORM_COLUMNS: Record<number, string> = {
+  0: "",
+  1: "md:grid-cols-1",
+  2: "md:grid-cols-2",
+  3: "md:grid-cols-3",
+  4: "md:grid-cols-4",
+  5: "md:grid-cols-5",
+  6: "md:grid-cols-6",
+};
+
+function VocabLesson({
+  word,
+  header,
+  actions,
+  wordTypes,
+  translationLang,
+  mainExampleCard,
+  formsBlock,
+  moreExamples,
+}: {
+  word: RevealWord;
+  header?: ReactNode;
+  actions?: ReactNode;
+  wordTypes: string[];
+  translationLang: string;
+  mainExampleCard: ReactNode;
+  formsBlock: ReactNode;
+  moreExamples: { id: string; node: ReactNode }[];
+}) {
+  const t = useTranslations();
+  const [showAll, setShowAll] = useState(false);
+  const explanation = word.explanation ? splitExplanation(word.explanation) : null;
+  const shown = showAll ? moreExamples : moreExamples.slice(0, MORE_EXAMPLES_SHOWN);
+
+  return (
+    <div className="flex flex-col gap-6">
+      {header}
+
+      <div className="grid gap-6 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] md:items-start md:gap-8">
+        <div className="overflow-hidden rounded-3xl bg-ai-soft/60">
+          <WordImage src={word.image} alt={word.term} className="block h-auto w-full" />
+        </div>
+
+        {/* The word, centred — and the column centred against the picture. */}
+        <div className="flex min-w-0 flex-col items-center gap-4 text-center md:self-center">
+          {/* Its type above; the word dead centre, with Listen hung beside
+              it (out of the flow, so it doesn't pull the word off centre —
+              below it on phones, where a long word leaves no room); the
+              romanization underneath. */}
+          <div className="flex flex-col items-center gap-3">
+            {wordTypes.length > 0 && (
+              <div className="flex flex-wrap justify-center gap-1.5">
+                {wordTypes.map((type) => (
+                  <span
+                    key={type}
+                    className="rounded-full bg-sumi/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-sumi-soft"
+                  >
+                    {type}
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="relative flex flex-col items-center gap-3 md:block">
+              <p className="font-nunito text-7xl leading-none font-black tracking-tight text-sumi sm:text-8xl">
+                {word.term}
+              </p>
+              <div className="whitespace-nowrap md:absolute md:top-1/2 md:left-full md:ml-5 md:-translate-y-1/2">
+                <ListenButton text={word.term} language={word.targetLanguage} audio={word.audio} />
+              </div>
+            </div>
+            {word.romanization && (
+              <p className="text-xl leading-none">
+                <Jyutping text={word.romanization} />
+              </p>
+            )}
+          </div>
+
+          {/* The meaning. */}
+          <div className="flex flex-col items-center gap-2">
+            <p
+              lang={translationLang}
+              className="font-nunito text-4xl leading-tight font-black tracking-tight text-sumi sm:text-5xl"
+            >
+              {word.translation}
+            </p>
+            {explanation && <p className="text-lg text-sumi-soft">{explanation.lead}</p>}
+            {word.explanationJa && <p className="text-sumi-soft">{word.explanationJa}</p>}
+            {explanation?.tip && (
+              <p className="mt-1 inline-flex items-start gap-2 rounded-xl bg-sumi/5 px-3.5 py-2.5 text-left text-sm text-sumi">
+                <Lightbulb aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-acorn" />
+                {explanation.tip}
+              </p>
+            )}
+          </div>
+
+          {/* Not wider than a comfortable line of reading, centred under the word. */}
+          {mainExampleCard && <div className="w-full max-w-xl">{mainExampleCard}</div>}
+
+          {/* The session's skip / Got it, right under the example so the
+              next word is in reach without scrolling (phones float them). */}
+          {actions && <div className="hidden w-full max-w-xl md:block">{actions}</div>}
+        </div>
+      </div>
+
+      {/* Its forms, full width under the picture and word. */}
+      {formsBlock && <div className="border-t border-card-border pt-5 text-left">{formsBlock}</div>}
+
+      {moreExamples.length > 0 && (
+        <section className="border-t border-card-border pt-5">
+          <h3 className="mb-3 font-nunito text-xl font-extrabold text-sumi">
+            {t("learn_session.more_examples_title", "More examples")}
+          </h3>
+          <ul className="grid gap-3 md:grid-cols-2">
+            {shown.map((example) => (
+              <li key={example.id} className="rounded-2xl border border-card-border bg-raised p-4">
+                {example.node}
+              </li>
+            ))}
+          </ul>
+          {moreExamples.length > MORE_EXAMPLES_SHOWN && (
+            <div className="mt-3 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShowAll((current) => !current)}
+                aria-expanded={showAll}
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold text-ai-dark transition hover:bg-ai-soft"
+              >
+                {showAll
+                  ? t("learn_session.show_fewer_examples", "Show fewer examples")
+                  : t("learn_session.show_more_examples", "Show {{count}} more examples", {
+                      count: moreExamples.length - MORE_EXAMPLES_SHOWN,
+                    })}
+                <ChevronDown aria-hidden className={`h-4 w-4 transition-transform ${showAll ? "rotate-180" : ""}`} />
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
+    </div>
+  );
+}
 
 // The words in a grammar pattern that stand for something the learner
 // fills in ("noun", "base verb", "X") rather than words they actually say.
@@ -588,7 +760,7 @@ export const LessonButton = ({
           event.preventDefault();
           close();
         }}
-        className={`m-auto max-h-[90vh] w-[calc(100%_-_2rem)] max-w-3xl overflow-y-auto rounded-4xl border bg-raised p-0 shadow-2xl backdrop:bg-sumi/40 backdrop:backdrop-blur-[2px] ${
+        className={`m-auto max-h-[90vh] w-[calc(100%_-_2rem)] max-w-6xl overflow-y-auto rounded-4xl border bg-raised p-0 shadow-2xl backdrop:bg-sumi/40 backdrop:backdrop-blur-[2px] ${
           lesson ? lessonAccent(lesson.path).card : "border-card-border"
         }`}
       >

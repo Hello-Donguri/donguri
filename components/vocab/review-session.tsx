@@ -556,6 +556,13 @@ const ReviewSessionQuestions = ({
                 feedback.correct ? "bg-matcha-soft text-matcha-dark" : "bg-shu/5 text-shu-dark"
               }`}
             >
+              {/* A right answer shows the word's own picture, as a reminder
+                  of what it means (not for grammar points). Decorative. */}
+              {feedback.correct && question.path === "vocab" && "image" in question && (
+                <span className="mx-auto mb-3 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl bg-raised shadow-sm ring-2 ring-matcha/30 empty:hidden sm:h-24 sm:w-24">
+                  <WordImage src={question.image} alt="" className="h-full w-full object-contain" />
+                </span>
+              )}
               <p className="font-semibold">
                 {feedback.correct
                   ? t("test_session.great_job", "Great job! You got it.")

@@ -2602,6 +2602,7 @@ function buildClozeQuestion(
       match.translationHighlight ?? findTranslationSpan(word.translation, match.translation),
     clozeRomanization: match.romanization,
     targetLanguage: course.targetLanguage,
+    image: wordImagePath(word),
   };
 
   if (!isLatinTypeable(answer)) {

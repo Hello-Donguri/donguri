@@ -450,6 +450,8 @@ type FormClozeQuestion = {
   clozeBlankWords: number;
   targetLanguage: string;
   path: "vocab" | "grammar";
+  // The word's picture — shown in the quiz's "Great job!" banner.
+  image: string;
 };
 
 // Free-text version: the learner types the missing form.
