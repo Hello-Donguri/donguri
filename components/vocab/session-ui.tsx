@@ -270,7 +270,8 @@ export const RetryNote = ({ retry }: { retry: PendingRetry }) => {
       initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.85, y: 8 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={reduceMotion ? { duration: 0.15 } : { type: "spring", stiffness: 420, damping: 18 }}
-      className="mt-5 w-full rounded-2xl bg-kin/20 px-5 py-4 text-center text-sumi shadow-sm ring-2 ring-kin/40"
+      // The site's usual card: soft paper and a hairline border.
+      className="mt-5 w-full rounded-3xl border border-card-border bg-washi-soft px-5 py-5 text-center text-sumi shadow-sm"
     >
       <p className="font-nunito text-xl font-extrabold">
         {retry.reason === "synonym"

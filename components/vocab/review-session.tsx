@@ -461,7 +461,7 @@ const ReviewSessionQuestions = ({
                       : t("test_session.type_the_word", "Type the word")}
               </p>
               <div className="mt-3 flex items-center justify-center gap-3">
-                <p className="text-3xl font-semibold text-sumi capitalize">{question.prompt}</p>
+                <p className="font-nunito text-3xl font-black text-sumi capitalize">{question.prompt}</p>
 
                 {question.direction === "term-to-translation" && (
                   <SpeakButton

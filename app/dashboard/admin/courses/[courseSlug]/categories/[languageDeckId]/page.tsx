@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { Check, ImageOff, X } from "lucide-react";
 import { requireAdminProfile, getAdminCategoryWords } from "@/lib/dal";
 import { setWordActive } from "@/lib/actions/admin-content";
 import { DeleteWordButton } from "@/components/admin/delete-word-button";
@@ -12,12 +14,18 @@ import { VisibilityToggle } from "@/components/ui/visibility-toggle";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
-import { wordImagePath } from "@/lib/images";
 import { getTranslator } from "@/lib/i18n/server";
 import { cn, getContrastTextClass } from "@/lib/utils";
 
+// Whether a word's uploaded picture is an SVG — flagged on its card.
+function isSvgImage(imageKey: string | null): boolean {
+  return Boolean(imageKey?.toLowerCase().endsWith(".svg"));
+}
+
 type PageProps = {
   params: Promise<{ courseSlug: string; languageDeckId: string }>;
+  // `?missing=image` shows only the words still without a picture.
+  searchParams: Promise<{ missing?: string }>;
 };
 
 export async function generateMetadata({
@@ -28,9 +36,10 @@ export async function generateMetadata({
   return { title: `${languageDeck.title} — Donguri` };
 }
 
-export default async function AdminCategoryWordsPage({ params }: PageProps) {
+export default async function AdminCategoryWordsPage({ params, searchParams }: PageProps) {
   await requireAdminProfile();
-  const { courseSlug, languageDeckId } = await params;
+  const [{ courseSlug, languageDeckId }, { missing }] = await Promise.all([params, searchParams]);
+  const onlyMissingImages = missing === "image";
   const { languageDeck, course, words } =
     await getAdminCategoryWords(languageDeckId);
   const { t } = await getTranslator();
@@ -38,6 +47,8 @@ export default async function AdminCategoryWordsPage({ params }: PageProps) {
   if (course.slug !== courseSlug) {
     redirect(`/dashboard/admin/courses/${courseSlug}`);
   }
+
+  const shownWords = onlyMissingImages ? words.filter((word) => !word.imageKey) : words;
 
   return (
     <div className="flex flex-col gap-6">
@@ -146,6 +157,47 @@ export default async function AdminCategoryWordsPage({ params }: PageProps) {
 
       {words.length > 0 && <DeckMediaSummary words={words} t={t} />}
 
+      {/* Narrow the list to the words still needing a picture, and back. */}
+      {words.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={
+              onlyMissingImages
+                ? `/dashboard/admin/courses/${courseSlug}/categories/${languageDeckId}`
+                : `/dashboard/admin/courses/${courseSlug}/categories/${languageDeckId}?missing=image`
+            }
+            aria-pressed={onlyMissingImages}
+            className={cn(
+              "inline-flex h-9 items-center gap-1.5 rounded-full border px-4 text-sm font-semibold transition",
+              onlyMissingImages
+                ? "border-shu bg-shu text-washi hover:bg-shu-dark"
+                : "border-shu/30 bg-shu/5 text-shu-dark hover:bg-shu/10",
+            )}
+          >
+            {onlyMissingImages ? <X aria-hidden className="h-4 w-4" /> : <ImageOff aria-hidden className="h-4 w-4" />}
+            {onlyMissingImages
+              ? t("admin_category_words.show_all", "Show all words")
+              : t("admin_category_words.filter_missing_image", "Missing image ({{count}})", {
+                  count: words.filter((word) => !word.imageKey).length,
+                })}
+          </Link>
+          {onlyMissingImages && (
+            <span className="text-sm text-sumi-soft">
+              {t("admin_category_words.showing_missing", "Showing {{count}} of {{total}} words — the ones without an image", {
+                count: shownWords.length,
+                total: words.length,
+              })}
+            </span>
+          )}
+        </div>
+      )}
+
+      {onlyMissingImages && shownWords.length === 0 && (
+        <p className="rounded-2xl border border-dashed border-card-border p-6 text-center text-sumi-soft">
+          {t("admin_category_words.all_have_images", "Every word in this deck has an image. 🎉")}
+        </p>
+      )}
+
       {words.length === 0 ? (
         <p className="text-sumi-soft">
           {t("admin_category_words.no_words", "No words yet.")}
@@ -156,7 +208,7 @@ export default async function AdminCategoryWordsPage({ params }: PageProps) {
         // hundreds), a single column meant scrolling through a very tall
         // page to find anything.
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {words.map((word) => (
+          {shownWords.map((word) => (
             <div
               key={word.id}
               className="flex flex-col gap-3 rounded-2xl border border-card-border bg-washi-soft p-4"
@@ -169,20 +221,41 @@ export default async function AdminCategoryWordsPage({ params }: PageProps) {
                     <WordImage
                       src={imageUrl(word.imageKey)}
                       alt={word.term}
-                      className="h-12 w-12 rounded-lg object-cover"
+                      className={cn(
+                        "h-12 w-12 rounded-lg object-cover",
+                        // An SVG upload (crisp at any size) gets a gold frame.
+                        isSvgImage(word.imageKey) && "border-2 border-kin",
+                      )}
                     />
                   </ImageLightbox>
                 ) : (
-                  <WordImage
-                    src={wordImagePath(word)}
-                    alt={word.term}
-                    className="h-12 w-12 shrink-0 rounded-lg object-cover"
-                  />
+                  // No uploaded picture: a dashed red placeholder, hard to miss
+                  // when scanning a deck for what still needs one.
+                  <span
+                    title={t("admin_category_words.no_image", "No image")}
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-shu/50 bg-shu/5 text-shu"
+                  >
+                    <ImageOff aria-hidden className="h-5 w-5" />
+                  </span>
                 )}
                 <div className="min-w-0">
-                  <h2 className="truncate font-semibold text-sumi">
-                    {word.term} — {word.translation}
-                  </h2>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <h2 className="truncate font-semibold text-sumi">
+                      {word.term} — {word.translation}
+                    </h2>
+                    {!word.imageKey && (
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-shu/10 px-2 py-0.5 text-[11px] font-bold text-shu-dark">
+                        <ImageOff aria-hidden className="h-3 w-3" />
+                        {t("admin_category_words.no_image", "No image")}
+                      </span>
+                    )}
+                    {isSvgImage(word.imageKey) && (
+                      <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-kin/20 px-2 py-0.5 text-[11px] font-bold text-acorn">
+                        <Check aria-hidden className="h-3 w-3" strokeWidth={3} />
+                        {t("admin_category_words.svg", "SVG")}
+                      </span>
+                    )}
+                  </div>
                   {word.romanization && (
                     <p className="truncate text-sm text-sumi-soft">
                       {word.romanization}

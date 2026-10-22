@@ -550,7 +550,7 @@ export const TestSession = ({
           </p>
           <div className="mt-3 flex items-center justify-center gap-3">
             <p
-              className={`font-extrabold tracking-tight text-sumi capitalize ${
+              className={`font-nunito font-black tracking-tight text-sumi capitalize ${
                 longPrompt ? "text-2xl sm:text-3xl" : "text-4xl sm:text-5xl"
               }`}
             >
