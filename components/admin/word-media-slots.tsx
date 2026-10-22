@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { ImageIcon, Loader2, Pause, Play, Upload, X } from "lucide-react";
 import { removeWordMedia, uploadWordMedia, type WordMediaKind } from "@/lib/actions/word-media";
 import { useTranslations } from "@/components/i18n/locale-provider";
@@ -23,9 +23,13 @@ export function WordMediaSlots({
   term,
   imageUrl,
   audio,
+  sharedImageWith = [],
 }: {
   wordId: string;
   term: string;
+  // Words in other decks using this same picture file — replacing it then
+  // asks whether to replace it there too (see SharedImageDialog).
+  sharedImageWith?: SharedImageUse[];
   // The uploaded picture, or null when there isn't one (the learner card
   // may still find one by naming convention — see wordImagePath).
   imageUrl: string | null;
@@ -44,7 +48,14 @@ export function WordMediaSlots({
     <div className="flex flex-col gap-1">
       <div className="flex flex-wrap items-center gap-1.5">
         {slots.map((slot) => (
-          <Slot key={slot.kind} wordId={wordId} term={term} onError={setError} {...slot} />
+          <Slot
+            key={slot.kind}
+            wordId={wordId}
+            term={term}
+            onError={setError}
+            sharedWith={slot.kind === "image" ? sharedImageWith : []}
+            {...slot}
+          />
         ))}
       </div>
       {error && <p className="text-xs text-shu">{error}</p>}
@@ -63,8 +74,10 @@ function Slot({
   term,
   url,
   onError,
+  sharedWith,
 }: {
   wordId: string;
+  sharedWith: SharedImageUse[];
   kind: WordMediaKind;
   symbol: string | null;
   label: string;
@@ -79,17 +92,29 @@ function Slot({
   const [pending, startTransition] = useTransition();
   const name = label.toLowerCase();
 
-  const upload = (file: File) => {
+  // A picked replacement for a shared picture, waiting on the dialog.
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+
+  const upload = (file: File, applyToShared = false) => {
     onError(null);
     const formData = new FormData();
     formData.set("wordId", wordId);
     formData.set("kind", kind);
     formData.set("file", file);
+    if (applyToShared) formData.set("applyToShared", "1");
     startTransition(async () => {
       const result = await uploadWordMedia(formData);
       if (result.error) onError(`${label}: ${result.error}`);
-      else toast(t("admin_word_media.upload_complete", "Upload complete"));
+      else if ((result.updated ?? 1) > 1) {
+        toast(t("admin_word_media.upload_complete_all", "Upload complete — {{count}} words updated", { count: result.updated ?? 1 }));
+      } else toast(t("admin_word_media.upload_complete", "Upload complete"));
     });
+  };
+
+  // Replacing a picture other decks use too asks first.
+  const picked = (file: File) => {
+    if (url && sharedWith.length > 0) setPendingFile(file);
+    else upload(file);
   };
 
   const remove = () => {
@@ -170,7 +195,7 @@ function Slot({
         onChange={(event) => {
           const file = event.target.files?.[0];
           event.target.value = "";
-          if (file) upload(file);
+          if (file) picked(file);
         }}
       />
       <button
@@ -199,6 +224,96 @@ function Slot({
           <X aria-hidden className="h-3 w-3" />
         </button>
       )}
+      {pendingFile && (
+        <SharedImageDialog
+          term={term}
+          uses={sharedWith}
+          onChoose={(applyToShared) => {
+            upload(pendingFile, applyToShared);
+            setPendingFile(null);
+          }}
+          onCancel={() => setPendingFile(null)}
+        />
+      )}
     </div>
+  );
+}
+
+export type SharedImageUse = { course: string; deck: string; term: string };
+
+// Asks whether a new picture should replace the old one only here, or in
+// every deck that uses the same file (copies of this deck in other courses).
+function SharedImageDialog({
+  term,
+  uses,
+  onChoose,
+  onCancel,
+}: {
+  term: string;
+  uses: SharedImageUse[];
+  onChoose: (applyToShared: boolean) => void;
+  onCancel: () => void;
+}) {
+  const t = useTranslations();
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    dialogRef.current?.showModal();
+  }, []);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      onCancel={onCancel}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onCancel();
+      }}
+      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-3xl border border-card-border bg-washi p-6 text-left text-sm font-normal text-sumi shadow-2xl backdrop:bg-sumi/40"
+    >
+      <h2 className="font-nunito text-lg font-extrabold">
+        {t("admin_word_media.shared_title", "This image is used in other decks too")}
+      </h2>
+      <p className="mt-2 text-sumi-soft">
+        {t(
+          "admin_word_media.shared_body",
+          "The picture for \"{{term}}\" is also used by {{count}} other word(s):",
+          { term, count: uses.length },
+        )}
+      </p>
+      <ul className="mt-3 max-h-40 space-y-1 overflow-y-auto rounded-xl border border-card-border bg-washi-soft p-3">
+        {uses.map((use, index) => (
+          <li key={index} className="text-sumi">
+            <span className="font-semibold">{use.term}</span>{" "}
+            <span className="text-sumi-soft">
+              — {use.course} · {use.deck}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-5 flex flex-col gap-2 sm:flex-row-reverse">
+        <button
+          type="button"
+          onClick={() => onChoose(true)}
+          className="h-10 rounded-full bg-ai px-5 font-semibold text-washi transition hover:bg-ai-dark"
+        >
+          {t("admin_word_media.shared_all", "Update all {{count}} decks", {
+            count: new Set(uses.map((use) => `${use.course}/${use.deck}`)).size + 1,
+          })}
+        </button>
+        <button
+          type="button"
+          onClick={() => onChoose(false)}
+          className="h-10 rounded-full border border-ghost-border px-5 font-semibold text-ghost-text transition hover:bg-ghost-hover"
+        >
+          {t("admin_word_media.shared_this", "Just this deck")}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="h-10 rounded-full px-5 font-semibold text-sumi-soft transition hover:text-sumi sm:mr-auto"
+        >
+          {t("common.cancel", "Cancel")}
+        </button>
+      </div>
+    </dialog>
   );
 }

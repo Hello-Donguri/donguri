@@ -9,6 +9,7 @@ import { WordMediaSlots } from "@/components/admin/word-media-slots";
 import { DeckMediaSummary } from "@/components/admin/deck-media-summary";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
 import { imageUrl } from "@/lib/bunny";
+import { prisma } from "@/lib/prisma";
 import { WordImage } from "@/components/ui/word-image";
 import { VisibilityToggle } from "@/components/ui/visibility-toggle";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
@@ -49,6 +50,27 @@ export default async function AdminCategoryWordsPage({ params, searchParams }: P
   }
 
   const shownWords = onlyMissingImages ? words.filter((word) => !word.imageKey) : words;
+
+  // Words in other decks using the very same picture file (a deck copied
+  // to another course shares its images), by file — so replacing one can
+  // ask whether to replace it everywhere.
+  const imageKeys = [...new Set(words.flatMap((word) => (word.imageKey ? [word.imageKey] : [])))];
+  const sharing = imageKeys.length
+    ? await prisma.word.findMany({
+        where: { imageKey: { in: imageKeys }, languageDeckId: { not: languageDeckId } },
+        select: {
+          imageKey: true,
+          term: true,
+          languageDeck: { select: { title: true, course: { select: { title: true } } } },
+        },
+      })
+    : [];
+  const sharedImages = new Map<string, { course: string; deck: string; term: string }[]>();
+  for (const other of sharing) {
+    const list = sharedImages.get(other.imageKey!) ?? [];
+    list.push({ course: other.languageDeck.course.title, deck: other.languageDeck.title, term: other.term });
+    sharedImages.set(other.imageKey!, list);
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -270,6 +292,7 @@ export default async function AdminCategoryWordsPage({ params, searchParams }: P
                 wordId={word.id}
                 term={word.term}
                 imageUrl={word.imageKey ? imageUrl(word.imageKey) : null}
+                sharedImageWith={word.imageKey ? sharedImages.get(word.imageKey) ?? [] : []}
                 audio={word.audio}
               />
 

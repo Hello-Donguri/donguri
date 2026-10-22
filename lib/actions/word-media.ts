@@ -45,7 +45,12 @@ async function revalidateWord(wordId: string) {
   revalidatePath(`/dashboard/courses/${slug}/decks/${word.languageDeckId}`);
 }
 
-export async function uploadWordMedia(formData: FormData): Promise<{ error?: string }> {
+// A new picture for a word whose current one is shared with words in other
+// decks (copied decks point at the same file — the admin deck page finds
+// these and asks which to update): with
+// `applyToShared` set, every word using the old picture gets the new one;
+// otherwise only this word changes. `updated` is how many words did.
+export async function uploadWordMedia(formData: FormData): Promise<{ error?: string; updated?: number }> {
   if (!(await isAdmin())) return { error: "You don't have permission to do that." };
 
   const wordId = formData.get("wordId");
@@ -77,11 +82,18 @@ export async function uploadWordMedia(formData: FormData): Promise<{ error?: str
     return { error: "Upload failed. Try again." };
   }
 
-  const updated = await prisma.word.updateMany({ where: { id: wordId }, data: { [COLUMN[kind]]: key } });
-  if (updated.count === 0) return { error: "That word no longer exists." };
+  const current = await prisma.word.findUnique({ where: { id: wordId }, select: { imageKey: true } });
+  if (!current) return { error: "That word no longer exists." };
 
-  await revalidateWord(wordId);
-  return {};
+  const applyToShared = kind === "image" && formData.get("applyToShared") === "1" && current.imageKey;
+  const affected = applyToShared
+    ? await prisma.word.findMany({ where: { imageKey: current.imageKey }, select: { id: true } })
+    : [{ id: wordId }];
+  const ids = affected.map((word) => word.id);
+  const updated = await prisma.word.updateMany({ where: { id: { in: ids } }, data: { [COLUMN[kind]]: key } });
+
+  await Promise.all(ids.map(revalidateWord));
+  return { updated: updated.count };
 }
 
 export async function removeWordMedia(wordId: string, kind: WordMediaKind): Promise<void> {
