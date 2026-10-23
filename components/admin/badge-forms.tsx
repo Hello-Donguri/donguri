@@ -21,7 +21,7 @@ import {
   type BadgeTimescale,
 } from "@/lib/badge-metrics";
 
-const IMAGE_ACCEPT = "image/webp,image/png,image/jpeg";
+const IMAGE_ACCEPT = "image/webp,image/png,image/jpeg,image/svg+xml";
 
 // The picked image, shown before it's uploaded — round, as learners see it.
 function useImagePreview() {

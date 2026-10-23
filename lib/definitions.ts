@@ -800,6 +800,15 @@ const BadgeFieldsSchema = {
     .max(10_000, { error: "That's too high." }),
 };
 
+// A badge's picture — an SVG too, since badges are often drawn as vectors
+// (checked for scripts on upload, as word images are — see isSafeSvg).
+const BADGE_IMAGE_SCHEMA = z
+  .file({ error: "Choose an image." })
+  .max(MAX_IMAGE_BYTES, { error: "Image must be under 5MB." })
+  .mime(["image/webp", "image/png", "image/jpeg", "image/svg+xml"], {
+    error: "Use a WebP, PNG, JPEG or SVG image.",
+  });
+
 export const CreateBadgeFormSchema = z
   .object({
     ...BadgeFieldsSchema,
@@ -809,12 +818,7 @@ export const CreateBadgeFormSchema = z
     timescale: z
       .union([z.enum(BADGE_TIMESCALES), z.literal("")])
       .transform((value) => value || null),
-    image: z
-      .file({ error: "Choose an image." })
-      .max(MAX_IMAGE_BYTES, { error: "Image must be under 5MB." })
-      .mime(["image/webp", "image/png", "image/jpeg"], {
-        error: "Use a WebP, PNG, or JPEG image.",
-      }),
+    image: BADGE_IMAGE_SCHEMA,
     awardExisting: z.boolean(),
   })
   .superRefine((badge, context) => {
@@ -842,7 +846,7 @@ export const CreateBadgeFormSchema = z
 export const UpdateBadgeFormSchema = z.object({
   badgeId: z.uuid({ error: "Missing badge." }),
   ...BadgeFieldsSchema,
-  image: IMAGE_FIELD_SCHEMA,
+  image: BADGE_IMAGE_SCHEMA.optional(),
 });
 
 // The world map's admin forms (lib/actions/world.ts) — countries, their

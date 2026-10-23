@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import { buildBadgeImageKey, uploadImage } from "@/lib/bunny";
+import { isSafeSvg, UNSAFE_SVG_MESSAGE } from "@/lib/svg";
 import {
   awardEarnedBadges,
   recordUsersAlreadyQualifying,
@@ -73,6 +74,9 @@ export async function createBadge(_state: BadgeFormState, formData: FormData): P
 
   const { name, threshold, xpReward, metric, courseId, image, awardExisting } = validated.data;
   const timescale = fixedTimescale(metric) ?? validated.data.timescale;
+  if (image.type === "image/svg+xml" && !(await isSafeSvg(image))) {
+    return { errors: { image: [UNSAFE_SVG_MESSAGE] } };
+  }
   const imageKey = buildBadgeImageKey(image.type);
   try {
     await uploadImage(image, imageKey);
@@ -118,6 +122,9 @@ export async function updateBadge(_state: BadgeFormState, formData: FormData): P
   const { badgeId, name, threshold, xpReward, image } = validated.data;
   let imageKey: string | undefined;
   if (image) {
+    if (image.type === "image/svg+xml" && !(await isSafeSvg(image))) {
+      return { errors: { image: [UNSAFE_SVG_MESSAGE] } };
+    }
     imageKey = buildBadgeImageKey(image.type);
     try {
       await uploadImage(image, imageKey);
