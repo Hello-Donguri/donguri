@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { getCourseHome, getCourseTitle, getLearntWords } from "@/lib/dal";
 import { getTranslator } from "@/lib/i18n/server";
 import { STAGE_LEVELS, STAGES, stageLabels } from "@/lib/srs";
-import { Breadcrumbs } from "@/components/ui/breadcrumbs";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
 import { WordList } from "@/components/vocab/word-list";
 import { WordGarden, type GardenLevel } from "@/components/vocab/word-garden";
@@ -23,7 +24,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 // page.
 export default async function LearntWordsPage({ params }: PageProps) {
   const { slug } = await params;
-  const [{ course }, words, { t, locale }] = await Promise.all([
+  // getCourseHome checks they're enrolled; nothing it returns is shown.
+  const [, words, { t, locale }] = await Promise.all([
     getCourseHome(slug),
     getLearntWords(slug),
     getTranslator(),
@@ -40,13 +42,15 @@ export default async function LearntWordsPage({ params }: PageProps) {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <Breadcrumbs
-          items={[
-            { href: "/dashboard", label: t("breadcrumbs.dashboard", "Dashboard") },
-            { href: `/dashboard/courses/${slug}`, label: course.title },
-            { label: t("word_list.learnt_title", "Learnt words") },
-          ]}
-        />
+        {/* Just a way back to the course, styled like the review page's. */}
+        <Link
+          href={`/dashboard/courses/${slug}`}
+          prefetch
+          className="group mb-2 inline-flex items-center gap-1.5 text-sm font-medium text-sumi-soft transition hover:text-sumi"
+        >
+          <ArrowLeft aria-hidden className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+          {t("test_session.back_to_course", "Back to course")}
+        </Link>
         <PageTitle>{t("word_list.learnt_title", "Learnt words")}</PageTitle>
         <PageSubtitle>
           {t("word_list.learnt_subtitle_short", "Open any word to revisit its lesson, or flag it to come back to.")}

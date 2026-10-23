@@ -3,8 +3,6 @@ import { connection } from "next/server";
 import { getCourseHome, getCourseTitle, getTestQueueForCourse, requireProfile } from "@/lib/dal";
 import { TestSession } from "@/components/vocab/test-session";
 import { FreshSession } from "@/components/vocab/fresh-session";
-import { Breadcrumbs, type BreadcrumbItem } from "@/components/ui/breadcrumbs";
-import { getTranslator } from "@/lib/i18n/server";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -29,19 +27,12 @@ export default async function TestPage({ params, searchParams }: PageProps) {
     .split(",")
     .filter(Boolean);
 
-  const [{ course }, quiz, profile, { t }] = await Promise.all([
+  // getCourseHome checks they're enrolled; nothing it returns is shown.
+  const [, quiz, profile] = await Promise.all([
     getCourseHome(slug),
     getTestQueueForCourse(slug, wordIds),
     requireProfile(),
-    getTranslator(),
   ]);
-
-  const breadcrumbItems: BreadcrumbItem[] = [
-    { href: "/dashboard", label: t("breadcrumbs.dashboard", "Dashboard") },
-    { href: "/dashboard/courses", label: t("breadcrumbs.courses", "Courses") },
-    { href: `/dashboard/courses/${slug}`, label: course.title, prefetch: true },
-    { label: t("test_page.breadcrumb_test", "Test") },
-  ];
 
   // An empty quiz is still handed to TestSession rather than rendering an
   // empty state here: it sends a learner who lands with nothing to test
@@ -49,7 +40,6 @@ export default async function TestPage({ params, searchParams }: PageProps) {
   // when this page re-renders underneath them (with the queue now empty).
   return (
     <div className="flex flex-col gap-6">
-      <Breadcrumbs items={breadcrumbItems} />
       <FreshSession>
         <TestSession
           quiz={quiz}

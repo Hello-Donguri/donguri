@@ -395,11 +395,14 @@ export const TestSession = ({
 
   // Laid out like a learn card (see LearnSession and WordLesson): a vocab
   // question puts the word's picture on the left and the question beside
-  // it; everything else is one column. Safe in either direction now the
-  // answer options never carry pictures of their own to match against.
+  // it; everything else is one column. Only when the prompt is the meaning
+  // ("drink" → find 飲), though — shown 飲 and asked what it means, the
+  // picture would give the answer away, so that direction is one column
+  // with no picture. (The review queue does the same — see ReviewSession.)
   const showPicture =
     (question.kind === "multiple-choice" || question.kind === "type-answer") &&
-    question.path === "vocab";
+    question.path === "vocab" &&
+    question.direction === "translation-to-term";
   const isTyped =
     question.kind === "type-form" ||
     question.kind === "custom-type" ||
