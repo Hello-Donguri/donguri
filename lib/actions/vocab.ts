@@ -66,15 +66,18 @@ const CONTRACTIONS: [RegExp, string][] = [
 
 // Lower-cased and trimmed, with the spacing around slashes and between
 // words evened out — so "he/she/it" and "He / she / it" compare equal —
-// curly apostrophes (as phone keyboards type them) made straight, and
-// contractions written out in full (see CONTRACTIONS).
+// curly apostrophes (as phone keyboards type them) made straight,
+// contractions written out in full (see CONTRACTIONS), and an English
+// verb's leading "to" dropped, so "eat" and "to eat" are the same answer
+// whichever one the word stores.
 function normaliseAnswer(text: string): string {
   let normalised = text
     .trim()
     .toLowerCase()
     .replace(/[’‘]/g, "'")
     .replace(/\s*\/\s*/g, "/")
-    .replace(/\s+/g, " ");
+    .replace(/\s+/g, " ")
+    .replace(/^to (?=\S)/, "");
   for (const [pattern, expansion] of CONTRACTIONS) {
     normalised = normalised.replace(pattern, expansion);
   }

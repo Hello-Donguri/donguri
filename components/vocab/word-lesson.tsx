@@ -307,7 +307,7 @@ export const WordLesson = ({
     );
   }
 
-  // A vocab word: the header bar across the top; the picture (whole, never
+  // A vocab word: the header bar across the top; a small picture tile (whole, never
   // cropped) beside the word — term, romanization, type and Listen, then the
   // meaning, its explanation and the main example; "More examples" below
   // as a grid of cards, the first two shown; and the session's actions as
@@ -377,15 +377,16 @@ function VocabLesson({
     <div className="flex flex-col gap-6">
       {header}
 
-      <div className="grid gap-6 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] md:items-start md:gap-8">
-        <div className="overflow-hidden rounded-3xl bg-ai-soft/60">
-          <WordImage src={word.image} alt={word.term} className="block h-auto w-full" />
+      {/* The picture as a small tilted tile — a hint, not the headline —
+          beside the word and its meaning (above them, centred, on phones). */}
+      <div className="flex flex-col items-center gap-6 md:flex-row md:items-center md:justify-center md:gap-12">
+        <div className="w-40 shrink-0 -rotate-3 rounded-3xl bg-ai-soft/60 p-2 shadow-md ring-4 ring-raised sm:w-48 lg:w-56">
+          <WordImage src={word.image} alt={word.term} className="block aspect-square h-auto w-full object-contain" />
         </div>
 
-        {/* The word, centred — and the column centred against the picture. */}
-        <div className="flex min-w-0 flex-col items-center gap-4 text-center md:self-center">
-          {/* Its type above; the word dead centre, with Listen hung beside
-              it (out of the flow, so it doesn't pull the word off centre —
+        <div className="flex w-full min-w-0 max-w-xl flex-col items-center gap-5 text-center md:w-auto">
+          {/* Its type above; the word centred, with Listen hung beside it
+              (out of the flow, so it doesn't pull the word off centre —
               below it on phones, where a long word leaves no room); the
               romanization underneath. */}
           <div className="flex flex-col items-center gap-3">
@@ -416,8 +417,8 @@ function VocabLesson({
             )}
           </div>
 
-          {/* The meaning. */}
-          <div className="flex flex-col items-center gap-2">
+          {/* The meaning, set off from the word by a short rule. */}
+          <div className="flex w-full flex-col items-center gap-2 border-t border-sumi/10 pt-5">
             <p
               lang={translationLang}
               className="font-nunito text-4xl leading-tight font-black tracking-tight text-sumi sm:text-5xl"
@@ -433,15 +434,14 @@ function VocabLesson({
               </p>
             )}
           </div>
-
-          {/* Not wider than a comfortable line of reading, centred under the word. */}
-          {mainExampleCard && <div className="w-full max-w-xl">{mainExampleCard}</div>}
-
-          {/* The session's skip / Got it, right under the example so the
-              next word is in reach without scrolling (phones float them). */}
-          {actions && <div className="hidden w-full max-w-xl md:block">{actions}</div>}
         </div>
       </div>
+
+      {/* The main example, centred to match the word above, then the session's skip / Got it
+          right under it so the next word is in reach without scrolling
+          (phones float them). */}
+      {mainExampleCard && <div className="mx-auto w-full max-w-3xl">{mainExampleCard}</div>}
+      {actions && <div className="mx-auto hidden w-full max-w-3xl md:block">{actions}</div>}
 
       {/* Its forms, full width under the picture and word. */}
       {formsBlock && <div className="border-t border-card-border pt-5 text-left">{formsBlock}</div>}

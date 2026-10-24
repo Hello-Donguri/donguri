@@ -2453,6 +2453,30 @@ function buildMultipleChoiceQuestion(
       ? { text: candidate.term, romanization: candidate.romanization, audio: wordAudio(candidate) }
       : { text: candidate.translation, romanization: null, audio: null };
 
+  // The same word can sit in more than one deck (食 "eat" in Actions and
+  // 食 "to eat" in Stage 1), and different words can share a meaning — so
+  // no option may repeat the right answer's term or any of its meanings,
+  // or another option's. Meanings compare without case, bracketed notes or
+  // a leading "to" ("to eat" is "eat").
+  const meaningsOf = (candidate: QuestionWord) =>
+    candidate.translation
+      .split(/[,/、，]/)
+      .map((reading) =>
+        reading
+          .replace(/[(（][^)）]*[)）]/g, "")
+          .trim()
+          .toLowerCase()
+          .replace(/^to\s+/, ""),
+      )
+      .filter(Boolean);
+  const taken = new Set([word.term.trim(), ...meaningsOf(word)]);
+  const clashes = (candidate: QuestionWord) =>
+    taken.has(candidate.term.trim()) || meaningsOf(candidate).some((meaning) => taken.has(meaning));
+  const take = (candidate: QuestionWord) => {
+    taken.add(candidate.term.trim());
+    for (const meaning of meaningsOf(candidate)) taken.add(meaning);
+  };
+
   const rest = pool.filter((candidate) => candidate.id !== word.id);
   const sameCategory = shuffle(
     rest.filter(
@@ -2465,18 +2489,21 @@ function buildMultipleChoiceQuestion(
     ),
   );
 
-  const picked: QuestionWord[] = [
-    ...sameCategory.slice(0, SAME_CATEGORY_DISTRACTORS),
-    ...otherCategory.slice(0, OTHER_CATEGORY_DISTRACTORS),
-  ];
+  // Up to `count` from `candidates` that clash with nothing taken so far.
+  const picked: QuestionWord[] = [];
+  const pickFrom = (candidates: QuestionWord[], count: number) => {
+    for (const candidate of candidates) {
+      if (count === 0) return;
+      if (picked.includes(candidate) || clashes(candidate)) continue;
+      picked.push(candidate);
+      take(candidate);
+      count -= 1;
+    }
+  };
 
-  if (picked.length < 3) {
-    const used = new Set(picked.map((candidate) => candidate.id));
-    const fallback = shuffle(
-      rest.filter((candidate) => !used.has(candidate.id)),
-    );
-    picked.push(...fallback.slice(0, 3 - picked.length));
-  }
+  pickFrom(sameCategory, SAME_CATEGORY_DISTRACTORS);
+  pickFrom(otherCategory, OTHER_CATEGORY_DISTRACTORS);
+  if (picked.length < 3) pickFrom(shuffle(rest), 3 - picked.length);
 
   const distractors = picked.map(toOption);
 
