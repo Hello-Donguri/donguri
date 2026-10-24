@@ -67,6 +67,7 @@ import {
   romanizeFromExamples,
   type ClozeMatch,
 } from "@/lib/cloze";
+import { blankInputs, fillInputs, inputAnswers, stripGrammarMarks } from "@/lib/grammar-marks";
 import { isLatinTypeable } from "@/lib/language";
 import { levelForXp, parseDonguriConfig, type AccessoryId } from "@/lib/levels";
 import {
@@ -2420,6 +2421,7 @@ type QuestionWord = {
   // blank "cloze" questions.
   forms?: { id: string; value: string }[];
   examples?: {
+    id?: string;
     en: string;
     ja: string;
     romanization: string | null;
@@ -2427,6 +2429,57 @@ type QuestionWord = {
     jaHighlight?: string | null;
   }[];
 };
+
+// The word's examples with any grammar marks (see lib/grammar-marks.ts)
+// taken out, for the form and term clozes, which find their own blank.
+function unmarkedExamples(word: QuestionWord) {
+  return (word.examples ?? []).map((example) => ({
+    ...example,
+    en: stripGrammarMarks(example.en),
+    ja: stripGrammarMarks(example.ja),
+  }));
+}
+
+// A grammar point's examples written with "&&&" blanks (see
+// lib/grammar-marks.ts), as cloze questions — every blank typed in its own
+// box. Only where the blanks can be typed (an English sentence, not a
+// Cantonese one); the rest of the word's examples are left to the
+// form-based clozes.
+function buildMarkedClozeQuestions(
+  word: QuestionWord,
+  course: { targetLanguage: string; sourceLanguage: string },
+): QuizQuestion[] {
+  if (word.path !== "grammar") return [];
+  const englishIsTarget = course.targetLanguage === "en";
+  return (word.examples ?? []).flatMap((example) => {
+    const target = englishIsTarget ? example.en : example.ja;
+    const translation = englishIsTarget ? example.ja : example.en;
+    const answers = inputAnswers(target);
+    if (!example.id || answers.length === 0 || !answers.every(isLatinTypeable)) return [];
+    const translationHighlight = englishIsTarget ? example.jaHighlight : example.enHighlight;
+    const plainTranslation = stripGrammarMarks(translation);
+    return [
+      {
+        kind: "type-form" as const,
+        wordId: word.id,
+        path: word.path,
+        formId: null,
+        clozeExampleId: example.id,
+        clozeInputs: answers.length,
+        clozeBlankWords: 1,
+        clozeSentence: blankInputs(target),
+        clozeSentenceJa: fillInputs(translation),
+        clozeHighlightJa:
+          translationHighlight && plainTranslation.includes(translationHighlight)
+            ? translationHighlight
+            : null,
+        clozeRomanization: null,
+        targetLanguage: course.targetLanguage,
+        image: wordImagePath(word),
+      },
+    ];
+  });
+}
 
 // Distractors lean heavily toward the word's own category: 2 of the 3 come
 // from the same languageDeck and 1 from elsewhere in the course, so together with
@@ -2684,9 +2737,13 @@ function buildTypedQuestion(
   course: { targetLanguage: string; sourceLanguage: string },
   grammarPool: GrammarPool | null = null,
 ): QuizQuestion {
+  // A grammar example written with "&&&" blanks is asked as it's written.
+  const marked = shuffle(buildMarkedClozeQuestions(word, course))[0];
+  if (marked) return marked;
+
   const clozeByForm = findClozeMatchesByForm(
     word.forms ?? [],
-    word.examples ?? [],
+    unmarkedExamples(word),
     course.targetLanguage,
   );
 
@@ -2697,7 +2754,7 @@ function buildTypedQuestion(
   const match =
     pickRandomClozeMatch(clozeByForm) ??
     (isLatinTypeable(word.term)
-      ? shuffle(findTermClozeMatches(word.term, word.examples ?? [], course.targetLanguage))[0]
+      ? shuffle(findTermClozeMatches(word.term, unmarkedExamples(word), course.targetLanguage))[0]
       : undefined);
 
   if (match) {
@@ -2753,9 +2810,13 @@ function buildGrammarQuizQuestions(
   course: { targetLanguage: string; sourceLanguage: string },
   grammarPool: GrammarPool | null,
 ): QuizQuestion[] {
+  // Examples written with "&&&" blanks come first, as written.
+  const marked = shuffle(buildMarkedClozeQuestions(word, course)).slice(0, GRAMMAR_QUIZ_QUESTIONS);
+  if (marked.length === GRAMMAR_QUIZ_QUESTIONS) return marked;
+
   const clozeByForm = findClozeMatchesByForm(
     word.forms ?? [],
-    word.examples ?? [],
+    unmarkedExamples(word),
     course.targetLanguage,
   );
 
@@ -2775,11 +2836,14 @@ function buildGrammarQuizQuestions(
     }
   }
 
-  if (picked.length === 0) {
+  if (picked.length === 0 && marked.length === 0) {
     return [buildTypedQuestion(word, course, grammarPool)];
   }
 
-  const questions = picked.map((match) => buildClozeQuestion(word, match, course, grammarPool));
+  const questions = [
+    ...marked,
+    ...picked.map((match) => buildClozeQuestion(word, match, course, grammarPool)),
+  ].slice(0, GRAMMAR_QUIZ_QUESTIONS);
   const hasOtherGrammar = grammarPool?.words.some((candidate) => candidate.id !== word.id);
   if (questions.length < GRAMMAR_QUIZ_QUESTIONS && grammarPool && hasOtherGrammar) {
     questions.push(buildMultipleChoiceQuestion(word, grammarPool.words, course));

@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import {
   submitAnswer,
   submitFormAnswer,
+  submitMarkedClozeAnswer,
   submitCustomAnswer,
   submitTypedAnswer,
   completeQuiz,
@@ -89,6 +90,9 @@ export const TestSession = ({
   const [pending, setPending] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [typedAnswer, setTypedAnswer] = useState("");
+  // A cloze with several blanks typed in place (see ClozeCard's `inputs`):
+  // what's in each.
+  const [blankAnswers, setBlankAnswers] = useState<string[]>([]);
   // A nearly-right answer being typed again (a tone or spelling slip).
   const [retry, setRetry] = useState<PendingRetry | null>(null);
   const [score, setScore] = useState({ correct: 0, incorrect: 0 });
@@ -106,6 +110,16 @@ export const TestSession = ({
   const [levelUpInfo, setLevelUpInfo] = useState<LevelUpInfo | null>(null);
 
   const question = quiz[quizIndex];
+  // How many blanks a "&&&"-marked grammar cloze has — typed in the
+  // sentence, every one needed before Check.
+  const markedBlanks =
+    question?.kind === "type-form" && question.clozeExampleId ? (question.clozeInputs ?? 1) : 0;
+  const answerReady =
+    markedBlanks > 0
+      ? Array.from({ length: markedBlanks }, (_, i) => blankAnswers[i] ?? "").every(
+          (value) => value.trim() !== "",
+        )
+      : typedAnswer.trim() !== "";
 
   const playAnswerSound = useAnswerSound();
 
@@ -178,9 +192,32 @@ export const TestSession = ({
   };
 
   const handleTypeFormSubmit = async () => {
-    if (feedback || pending || question.kind !== "type-form" || typedAnswer.trim() === "") return;
+    if (feedback || pending || question.kind !== "type-form" || !answerReady) return;
 
     setPending(true);
+
+    if (question.clozeExampleId) {
+      try {
+        const result = await submitMarkedClozeAnswer(
+          question.wordId,
+          question.clozeExampleId,
+          blankAnswers,
+          false,
+        );
+        setFeedback({
+          selected: blankAnswers.join(" "),
+          correct: result.correct,
+          correctAnswer: result.correctAnswer,
+          correctAnswers: result.correctAnswers,
+          blanksCorrect: result.blanksCorrect,
+        });
+        recordResult(result.correct);
+        setXp(result.xp);
+      } finally {
+        setPending(false);
+      }
+      return;
+    }
 
     try {
       applyTypedResult(
@@ -277,6 +314,7 @@ export const TestSession = ({
   const advance = () => {
     setFeedback(null);
     setTypedAnswer("");
+    setBlankAnswers([]);
 
     if (quizIndex + 1 < quiz.length) {
       setQuizIndex((current) => current + 1);
@@ -487,9 +525,34 @@ export const TestSession = ({
             blankWords={question.clozeBlankWords}
             path={question.path}
             feedback={feedback}
+            inputs={
+              markedBlanks > 0
+                ? {
+                    values: blankAnswers,
+                    onChange: (index, value) =>
+                      setBlankAnswers((current) => {
+                        const next = Array.from({ length: markedBlanks }, (_, i) => current[i] ?? "");
+                        next[index] = value;
+                        return next;
+                      }),
+                    onSubmit: handleTypeFormSubmit,
+                    disabled: pending || Boolean(feedback),
+                    inputRef: answerInputRef,
+                  }
+                : undefined
+            }
           />
         </div>
-        {question.kind === "type-form" ? (
+        {markedBlanks > 0 ? (
+          // The boxes are in the sentence; this is just what Check submits.
+          <form
+            id={TYPED_ANSWER_FORM}
+            onSubmit={(event) => {
+              event.preventDefault();
+              handleTypeFormSubmit();
+            }}
+          />
+        ) : question.kind === "type-form" ? (
           <>
             {retry && !feedback && <RetryNote retry={retry} />}
             {typedInput(
@@ -774,7 +837,7 @@ export const TestSession = ({
             <Button
               type="submit"
               form={TYPED_ANSWER_FORM}
-              disabled={pending || typedAnswer.trim() === ""}
+              disabled={pending || !answerReady}
               size="lg"
               fullWidth
               className="h-14 text-lg shadow-sm hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0"

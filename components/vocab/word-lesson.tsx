@@ -15,6 +15,8 @@ import {
 } from "@/lib/highlight-term";
 import { withStarMark } from "@/lib/star-mark";
 import { WordImage } from "@/components/ui/word-image";
+import { HintText } from "@/components/vocab/hint-text";
+import { fillInputs, stripGrammarMarks } from "@/lib/grammar-marks";
 import { useTranslations } from "@/components/i18n/locale-provider";
 
 // The card's accents. Light mode uses the theme's sage green for every
@@ -72,8 +74,10 @@ export const WordLesson = ({
   // Sentences stored with "*word*"/"**word**" marks (before those were
   // pulled out on save/import) show clean, with that part highlighted.
   const examples = word.examples.map((example) => {
-    const en = withStarMark(example.en, example.enHighlight);
-    const ja = withStarMark(example.ja, example.jaHighlight);
+    // A grammar example's "&&&" blanks (see lib/grammar-marks.ts) read as
+    // plain words here; its "$$" hints stay, for Highlighted to draw.
+    const en = withStarMark(fillInputs(example.en), example.enHighlight);
+    const ja = withStarMark(fillInputs(example.ja), example.jaHighlight);
     return { ...example, en: en.text, ja: ja.text, enHighlight: en.highlight, jaHighlight: ja.highlight };
   });
   const [mainExample, ...moreExamples] = examples;
@@ -96,7 +100,7 @@ export const WordLesson = ({
       ? (example.jaHighlight && example.ja.includes(example.jaHighlight)
           ? [example.jaHighlight]
           : targetValues
-        ).flatMap((value) => syllableRanges(example.ja, value, example.romanization!))
+        ).flatMap((value) => syllableRanges(stripGrammarMarks(example.ja), value, example.romanization!))
       : [];
 
   // `en` is always the English sentence and `ja` the other language's —
@@ -156,7 +160,7 @@ export const WordLesson = ({
           )}
         </div>
         <SpeakButton
-          text={englishIsTarget ? example.en : example.ja}
+          text={stripGrammarMarks(englishIsTarget ? example.en : example.ja)}
           language={word.targetLanguage}
         />
       </div>
@@ -618,10 +622,10 @@ const Highlighted = ({
   segments.map((segment, index) =>
     segment.match ? (
       <strong key={index} className={`font-bold ${className}`}>
-        {segment.text}
+        <HintText text={segment.text} />
       </strong>
     ) : (
-      segment.text
+      <HintText key={index} text={segment.text} />
     ),
   );
 

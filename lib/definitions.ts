@@ -448,6 +448,13 @@ type FormClozeQuestion = {
   // How many words the blank's answer is ("Does he" is 2), so the card
   // draws a box for each. Always 1 for answers without spaces (Chinese).
   clozeBlankWords: number;
+  // Set for a grammar example written with "&&&" blanks (see
+  // lib/grammar-marks.ts): the example it's from, which the answer is
+  // checked against, and how many separate blanks it has — each typed in
+  // its own box, in the sentence. `clozeSentence`/`clozeSentenceJa` keep
+  // their "$$" hints, drawn as a dotted underline.
+  clozeExampleId?: string;
+  clozeInputs?: number;
   targetLanguage: string;
   path: "vocab" | "grammar";
   // The word's picture — shown in the quiz's "Great job!" banner.

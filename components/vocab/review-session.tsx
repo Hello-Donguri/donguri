@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import {
   submitAnswer,
   submitFormAnswer,
+  submitMarkedClozeAnswer,
   submitTypedAnswer,
   completeQuiz,
   refreshDashboardHeader,
@@ -117,6 +118,9 @@ const ReviewSessionQuestions = ({
   const [pending, setPending] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [typedAnswer, setTypedAnswer] = useState("");
+  // A cloze with several blanks typed in place (see ClozeCard's `inputs`):
+  // what's in each.
+  const [blankAnswers, setBlankAnswers] = useState<string[]>([]);
   // A nearly-right answer being typed again (a tone or spelling slip).
   const [retry, setRetry] = useState<PendingRetry | null>(null);
   const [score, setScore] = useState({ correct: 0, incorrect: 0 });
@@ -151,6 +155,17 @@ const ReviewSessionQuestions = ({
     throw new Error(`ReviewSession received an unexpected question kind: ${question.kind}`);
   }
 
+  // How many blanks a "&&&"-marked grammar cloze has — typed in the
+  // sentence, every one needed before Check.
+  const markedBlanks =
+    question.kind === "type-form" && question.clozeExampleId ? (question.clozeInputs ?? 1) : 0;
+  const answerReady =
+    markedBlanks > 0
+      ? Array.from({ length: markedBlanks }, (_, i) => blankAnswers[i] ?? "").every(
+          (value) => value.trim() !== "",
+        )
+      : typedAnswer.trim() !== "";
+
   // Fetch this question's lesson in the background while it's being
   // answered, so it's ready to show the moment they get it wrong. A route
   // handler fetch at low priority, so it never holds up the answer itself.
@@ -178,9 +193,32 @@ const ReviewSessionQuestions = ({
   };
 
   const handleSubmit = async () => {
-    if (feedback || pending || typedAnswer.trim() === "") return;
+    if (feedback || pending || !answerReady) return;
 
     setPending(true);
+
+    if (question.kind === "type-form" && question.clozeExampleId) {
+      try {
+        const result = await submitMarkedClozeAnswer(
+          question.wordId,
+          question.clozeExampleId,
+          blankAnswers,
+          true,
+        );
+        setFeedback({
+          selected: blankAnswers.join(" "),
+          correct: result.correct,
+          correctAnswer: result.correctAnswer,
+          correctAnswers: result.correctAnswers,
+          blanksCorrect: result.blanksCorrect,
+        });
+        recordResult(result.correct);
+        updateXp(result.xp);
+      } finally {
+        setPending(false);
+      }
+      return;
+    }
 
     try {
       const result =
@@ -269,6 +307,7 @@ const ReviewSessionQuestions = ({
   const advance = () => {
     setFeedback(null);
     setTypedAnswer("");
+    setBlankAnswers([]);
 
     if (quizIndex + 1 < quiz.length) {
       setQuizIndex((current) => current + 1);
@@ -436,6 +475,22 @@ const ReviewSessionQuestions = ({
               blankWords={question.clozeBlankWords}
               path={question.path}
               feedback={feedback}
+              inputs={
+                markedBlanks > 0
+                  ? {
+                      values: blankAnswers,
+                      onChange: (index, value) =>
+                        setBlankAnswers((current) => {
+                          const next = Array.from({ length: markedBlanks }, (_, i) => current[i] ?? "");
+                          next[index] = value;
+                          return next;
+                        }),
+                      onSubmit: handleSubmit,
+                      disabled: pending || Boolean(feedback),
+                      inputRef: answerInputRef,
+                    }
+                  : undefined
+              }
             />
           ) : (
             <div className="w-full rounded-3xl border border-card-border bg-washi-soft p-7 text-center shadow-sm sm:p-9">
@@ -503,7 +558,8 @@ const ReviewSessionQuestions = ({
                   handleSubmit();
                 }}
               >
-                {question.kind === "type-answer" &&
+                {/* A marked cloze's boxes are in the sentence above. */}
+                {markedBlanks > 0 ? null : question.kind === "type-answer" &&
                 question.answerRomanized &&
                 question.targetLanguage === "yue" ? (
                   <JyutpingInput
@@ -537,7 +593,7 @@ const ReviewSessionQuestions = ({
                 {!feedback && (
                   <Button
                     type="submit"
-                    disabled={pending || typedAnswer.trim() === ""}
+                    disabled={pending || !answerReady}
                     size="lg"
                     fullWidth
                     className="shadow-sm hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0"

@@ -20,6 +20,7 @@ import { unlockEarnedAccessories } from "@/lib/accessory-unlocks";
 import { scheduleWeeklyCrownCheck } from "@/lib/weekly-crown";
 import type { OptionMeaning, QuizDirection } from "@/lib/definitions";
 import { isLatinTypeable } from "@/lib/language";
+import { inputAnswers } from "@/lib/grammar-marks";
 
 // How loosely a typed answer is read. Vocab answers are lenient: slashes
 // separate alternatives ("they / them") and a bracketed note is optional
@@ -681,6 +682,54 @@ export async function submitFormAnswer(
     correctAnswer: form.value,
     xp,
     meanings: await formOptionMeanings(form.word.languageDeck.course.id, optionTexts),
+  };
+}
+
+// A grammar example's "&&&" blanks (see buildMarkedClozeQuestions in
+// lib/dal.ts), each typed in its own box: right only when every one is.
+// Each blank is compared the same forgiving way as any typed form (case,
+// spacing, contractions). `blanksCorrect` says which were right, so the
+// card can mark each box.
+export async function submitMarkedClozeAnswer(
+  wordId: string,
+  exampleId: string,
+  typedAnswers: string[],
+  advancesStage: boolean,
+): Promise<{
+  correct: boolean;
+  retry: null;
+  correctAnswer: string;
+  correctAnswers: string[];
+  blanksCorrect: boolean[];
+  xp: number;
+}> {
+  const user = await requireLearner();
+  const example = await prisma.wordExample.findUniqueOrThrow({
+    where: { id: exampleId },
+    select: {
+      wordId: true,
+      en: true,
+      ja: true,
+      word: { select: { languageDeck: { select: { course: { select: { targetLanguage: true } } } } } },
+    },
+  });
+  if (example.wordId !== wordId) throw new Error("Example does not belong to the given word.");
+
+  const target = example.word.languageDeck.course.targetLanguage === "en" ? example.en : example.ja;
+  const answers = inputAnswers(target);
+  const blanksCorrect = answers.map(
+    (answer, index) => normaliseAnswer(typedAnswers[index] ?? "") === normaliseAnswer(answer),
+  );
+  const correct = blanksCorrect.length > 0 && blanksCorrect.every(Boolean);
+
+  const { xp } = await recordAnswer(user.id, wordId, correct, advancesStage);
+  return {
+    correct,
+    retry: null,
+    correctAnswer: answers.join(" … "),
+    correctAnswers: answers,
+    blanksCorrect,
+    xp,
   };
 }
 

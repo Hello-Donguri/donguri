@@ -6,6 +6,7 @@ import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { useRecording, useSpeech } from "@/lib/speech";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { Jyutping, ToneHelp } from "@/components/vocab/jyutping";
+import { HintText } from "@/components/vocab/hint-text";
 import type { MultipleChoiceQuestion, OptionMeaning, QuizOption, WordAudio } from "@/lib/definitions";
 import type { RetryReason } from "@/lib/actions/vocab";
 
@@ -213,6 +214,10 @@ export type ChoiceFeedback = {
   // What each multiple-choice option means, keyed by its text — revealed
   // under every option once answered.
   meanings?: Record<string, OptionMeaning>;
+  // A cloze with several blanks (see ClozeCard's `inputs`): each blank's
+  // answer, and whether the learner got it.
+  correctAnswers?: string[];
+  blanksCorrect?: boolean[];
 };
 
 // A nearly-right answer waiting to be typed again (see submitTypedAnswer's
@@ -592,6 +597,7 @@ export const ClozeCard = ({
   path,
   feedback,
   blankWords = 1,
+  inputs,
 }: {
   sentence: string;
   translation: string;
@@ -604,8 +610,19 @@ export const ClozeCard = ({
   // How many words the answer is — one box each, so "___ live here?" shows
   // two boxes for "Does he".
   blankWords?: number;
+  // A sentence with several blanks to type (a grammar example's "&&&"
+  // marks): a box in each blank, typed straight into the sentence. Enter
+  // in any of them submits.
+  inputs?: {
+    values: string[];
+    onChange: (index: number, value: string) => void;
+    onSubmit: () => void;
+    disabled: boolean;
+    inputRef?: React.Ref<HTMLInputElement>;
+  };
 }) => {
   const t = useTranslations();
+  const blankCount = sentence.split(BLANK).length - 1;
   const highlightIndex = highlight ? translation.indexOf(highlight) : -1;
   // Once answered, the right answer fills the boxes a word each — or all of
   // it in one box, if it's an accepted answer with a different word count.
@@ -621,6 +638,50 @@ export const ClozeCard = ({
     : feedback.correct
       ? "bg-matcha-soft text-matcha-dark ring-matcha"
       : "bg-shu/10 text-shu-dark ring-shu/60";
+  const answeredStyle = (correct: boolean) =>
+    correct ? "bg-matcha-soft text-matcha-dark ring-matcha" : "bg-shu/10 text-shu-dark ring-shu/60";
+
+  // One blank of a typed-in-place sentence: its box to type in, then — once
+  // checked — its answer, marked right or wrong on its own.
+  const inputSlot = (key: number) => {
+    const index = key - 1;
+    if (feedback?.correctAnswers) {
+      return (
+        <span
+          key={key}
+          className={`mx-1 inline-block min-w-[2.5em] rounded-lg px-2 ring-2 transition-colors ${answeredStyle(
+            feedback.blanksCorrect?.[index] ?? feedback.correct,
+          )}`}
+        >
+          {feedback.correctAnswers[index] ?? " "}
+        </span>
+      );
+    }
+    const value = inputs?.values[index] ?? "";
+    return (
+      <input
+        key={key}
+        ref={index === 0 ? inputs?.inputRef : undefined}
+        type="text"
+        value={value}
+        onChange={(event) => inputs?.onChange(index, event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            inputs?.onSubmit();
+          }
+        }}
+        disabled={inputs?.disabled}
+        aria-label={t("test_session.blank_n", "Blank {{n}}", { n: key })}
+        autoComplete="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        style={{ width: `${Math.max(value.length, 3) + 1.5}ch` }}
+        className={`mx-1 inline-block rounded-lg px-2 text-center align-baseline ring-2 outline-none transition focus:ring-4 disabled:opacity-60 ${slotStyle}`}
+      />
+    );
+  };
+  const typedInPlace = Boolean(inputs || feedback?.correctAnswers);
 
   const fill = (
     text: string,
@@ -636,14 +697,16 @@ export const ClozeCard = ({
   return (
     <div className="w-full rounded-3xl border border-card-border bg-washi-soft p-5 text-center shadow-sm sm:p-7">
       <p className="text-xs font-medium uppercase tracking-wide text-sumi-soft">
-        {t("test_session.fill_in_the_blank", "Fill in the blank")}
+        {blankCount > 1
+          ? t("test_session.fill_in_the_blanks", "Fill in the blanks")
+          : t("test_session.fill_in_the_blank", "Fill in the blank")}
       </p>
       <p className="mt-3 text-lg text-sumi-soft">
         {highlightIndex === -1 ? (
-          translation
+          <HintText text={translation} />
         ) : (
           <>
-            {translation.slice(0, highlightIndex)}
+            <HintText text={translation.slice(0, highlightIndex)} />
             <mark
               className={`rounded-md px-1 font-semibold ${
                 path === "grammar" ? "bg-matcha-soft text-matcha-dark" : "bg-ai-soft text-ai-dark"
@@ -651,12 +714,12 @@ export const ClozeCard = ({
             >
               {highlight}
             </mark>
-            {translation.slice(highlightIndex + (highlight?.length ?? 0))}
+            <HintText text={translation.slice(highlightIndex + (highlight?.length ?? 0))} />
           </>
         )}
       </p>
       <p className="mt-2 text-2xl font-semibold leading-relaxed text-sumi">
-        {fill(sentence, (key) => (
+        {fill(sentence, (key) => typedInPlace ? inputSlot(key) : (
           <span key={key} className="mx-1 inline-flex gap-1.5 align-baseline">
             {boxes.map((word, index) => (
               <span
@@ -667,7 +730,7 @@ export const ClozeCard = ({
               </span>
             ))}
           </span>
-        ))}
+        ), (part, key) => <HintText key={`part-${key}`} text={part} />)}
       </p>
       {romanization && (
         <p className="mt-2 text-sm text-sumi-soft">
