@@ -3,6 +3,8 @@
 import { useOptimistic, useRef, useState, useTransition } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { restartDeck, toggleDeckActivation } from "@/lib/actions/vocab";
+import { devResetDeck } from "@/lib/actions/dev";
+import { useDevMode } from "@/components/dashboard/dev-mode-context";
 import { LanguageDeckWords } from "@/components/vocab/language-deck-words";
 import { CompletedStamp } from "@/components/vocab/completed-stamp";
 import { DeckPreview } from "@/components/vocab/deck-preview";
@@ -307,6 +309,7 @@ export function DeckList({ slug, decks, activeDeckIds }: DeckListProps) {
                   >
                     {t("deck_list.preview", "Preview")}
                   </Button>
+                  <DevResetDeckButton slug={slug} deck={deck} />
                   {complete ? (
                     <RestartDeckButton slug={slug} deck={deck} />
                   ) : (
@@ -472,6 +475,43 @@ function RestartDeckButton({
         : confirming
           ? t("deck_list.restart_confirm", "Click again to restart")
           : t("deck_list.restart", "Restart deck")}
+    </Button>
+  );
+}
+
+// Dev mode only: wipes the admin's own progress on this one deck (learnt
+// words and review history — see devResetDeck), whether or not it's
+// finished, so it can be learnt and tested again from the start.
+function DevResetDeckButton({ slug, deck }: { slug: string; deck: LanguageDeckSummary }) {
+  const { enabled } = useDevMode();
+  const [pending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(false);
+
+  if (!enabled) return null;
+
+  function handleClick() {
+    if (!confirming) {
+      setConfirming(true);
+      return;
+    }
+    startTransition(async () => {
+      await devResetDeck(slug, deck.id);
+      setConfirming(false);
+    });
+  }
+
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      tone={confirming ? "danger" : "neutral"}
+      disabled={pending}
+      onClick={handleClick}
+      onBlur={() => setConfirming(false)}
+      className={`border-dashed border-kin ${confirming ? "bg-shu/5" : "hover:bg-kin/10"}`}
+    >
+      <RotateCcw className="h-4 w-4" aria-hidden="true" />
+      {pending ? "Resetting…" : confirming ? "Click again to reset" : "Reset deck (dev)"}
     </Button>
   );
 }

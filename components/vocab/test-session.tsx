@@ -31,6 +31,7 @@ import {
   type PendingRetry,
   type ChoiceFeedback,
 } from "@/components/vocab/session-ui";
+import { DevRawExample } from "@/components/vocab/dev-raw-example";
 import { WordImage } from "@/components/ui/word-image";
 import { XpCounter } from "@/components/xp/xp-counter";
 import { SessionResults } from "@/components/vocab/session-results";
@@ -542,6 +543,7 @@ export const TestSession = ({
                 : undefined
             }
           />
+          <DevRawExample exampleId={question.clozeExampleId} />
         </div>
         {markedBlanks > 0 ? (
           // The boxes are in the sentence; this is just what Check submits.

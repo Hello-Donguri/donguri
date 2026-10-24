@@ -29,6 +29,7 @@ import {
   type PendingRetry,
   type ChoiceFeedback,
 } from "@/components/vocab/session-ui";
+import { DevRawExample } from "@/components/vocab/dev-raw-example";
 import { WordImage } from "@/components/ui/word-image";
 import { XpGainToast, type XpGain } from "@/components/xp/xp-gain-toast";
 import { LiveScore } from "@/components/vocab/live-score";
@@ -467,31 +468,34 @@ const ReviewSessionQuestions = ({
           </div>
 
           {question.kind === "type-form" || question.kind === "form-choice" ? (
-            <ClozeCard
-              sentence={question.clozeSentence}
-              translation={question.clozeSentenceJa}
-              highlight={question.clozeHighlightJa}
-              romanization={question.clozeRomanization}
-              blankWords={question.clozeBlankWords}
-              path={question.path}
-              feedback={feedback}
-              inputs={
-                markedBlanks > 0
-                  ? {
-                      values: blankAnswers,
-                      onChange: (index, value) =>
-                        setBlankAnswers((current) => {
-                          const next = Array.from({ length: markedBlanks }, (_, i) => current[i] ?? "");
-                          next[index] = value;
-                          return next;
-                        }),
-                      onSubmit: handleSubmit,
-                      disabled: pending || Boolean(feedback),
-                      inputRef: answerInputRef,
-                    }
-                  : undefined
-              }
-            />
+            <>
+              <ClozeCard
+                sentence={question.clozeSentence}
+                translation={question.clozeSentenceJa}
+                highlight={question.clozeHighlightJa}
+                romanization={question.clozeRomanization}
+                blankWords={question.clozeBlankWords}
+                path={question.path}
+                feedback={feedback}
+                inputs={
+                  markedBlanks > 0
+                    ? {
+                        values: blankAnswers,
+                        onChange: (index, value) =>
+                          setBlankAnswers((current) => {
+                            const next = Array.from({ length: markedBlanks }, (_, i) => current[i] ?? "");
+                            next[index] = value;
+                            return next;
+                          }),
+                        onSubmit: handleSubmit,
+                        disabled: pending || Boolean(feedback),
+                        inputRef: answerInputRef,
+                      }
+                    : undefined
+                }
+              />
+              <DevRawExample exampleId={question.clozeExampleId} />
+            </>
           ) : (
             <div className="w-full rounded-3xl border border-card-border bg-washi-soft p-7 text-center shadow-sm sm:p-9">
               {/* Only when the prompt is the meaning (type the Cantonese for
