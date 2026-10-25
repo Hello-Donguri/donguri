@@ -11,12 +11,15 @@ import { WordImage } from "@/components/ui/word-image";
 import { WordFormsFields } from "@/components/admin/word-forms-fields";
 import { WordAlternateAnswersFields } from "@/components/admin/word-alternate-answers-fields";
 import { WordAudioFields } from "@/components/admin/word-audio-fields";
+import { LinkedWordsPicker } from "@/components/admin/linked-words-picker";
 import { useTranslations } from "@/components/i18n/locale-provider";
+import type { LinkableWord } from "@/lib/dal";
 import { WORD_TYPES, type AdminWordSummary, type WordCategoryOption } from "@/lib/definitions";
 
 type EditWordFormProps = {
   word: AdminWordSummary;
-  links: { linkedTerms: string[]; linkedFromTerms: string[] };
+  links: { linkedIds: string[]; linkedFromTerms: string[] };
+  linkableWords: LinkableWord[];
   currentImageSrc: string;
   categories: WordCategoryOption[];
 };
@@ -34,7 +37,7 @@ const PATH_OPTIONS = [
 
 const sectionHeadingClass = "text-sm font-semibold uppercase tracking-wide text-sumi-soft";
 
-export function EditWordForm({ word, links, currentImageSrc, categories }: EditWordFormProps) {
+export function EditWordForm({ word, links, linkableWords, currentImageSrc, categories }: EditWordFormProps) {
   const t = useTranslations();
   const [state, action, pending] = useActionState(updateWord, undefined);
 
@@ -142,18 +145,16 @@ export function EditWordForm({ word, links, currentImageSrc, categories }: EditW
 
       <section className="flex flex-col gap-4 border-t border-sumi/10 pt-6">
         <h2 className={sectionHeadingClass}>{t("admin_word_form.section_linked", "Linked words")}</h2>
-        <TextField
-          label={t("admin_word_form.linked_words", "Linked words")}
-          name="linkedWords"
-          required={false}
-          placeholder={t("admin_word_form.linked_words_placeholder", "e.g. an; the")}
-          defaultValue={links.linkedTerms.join("; ")}
+        <LinkedWordsPicker
+          words={linkableWords}
+          wordId={word.id}
+          initialIds={links.linkedIds}
           errors={state?.errors?.linkedWords}
         />
         <p className="-mt-2 text-sm text-sumi-soft">
           {t(
             "admin_word_form.linked_words_help",
-            "Terms of words from this course to learn around the same time, separated by semicolons. Once a learner learns one, the others come up in their next few words.",
+            "Words from this course to learn around the same time. Once a learner learns one, the others come up in their next few words.",
           )}
         </p>
         {links.linkedFromTerms.length > 0 && (

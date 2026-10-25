@@ -351,7 +351,13 @@ export type WordAlternateAnswerSummary = {
 // the browser's read-through is used.
 export type WordAudio = { female: string | null; male: string | null };
 
+// One of a word's linked words (see WordLink), as debug mode shows it on
+// the learn card: already learnt, coming up in this batch, or still to come.
+export type LinkedWordStatus = { term: string; status: "learnt" | "this-batch" | "later" };
+
 export type RevealWord = {
+  // Only on the learn queue's words — see LinkedWordStatus.
+  linkedWords?: LinkedWordStatus[];
   id: string;
   term: string;
   translation: string;

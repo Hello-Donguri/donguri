@@ -511,7 +511,7 @@ function DevResetDeckButton({ slug, deck }: { slug: string; deck: LanguageDeckSu
       className={`border-dashed border-kin ${confirming ? "bg-shu/5" : "hover:bg-kin/10"}`}
     >
       <RotateCcw className="h-4 w-4" aria-hidden="true" />
-      {pending ? "Resetting…" : confirming ? "Click again to reset" : "Reset deck (dev)"}
+      {pending ? "Resetting…" : confirming ? "Click again to reset" : "Reset deck (debug)"}
     </Button>
   );
 }

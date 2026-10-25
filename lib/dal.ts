@@ -34,6 +34,7 @@ import type {
   QuizQuestion,
   ReviewQueueDebugEntry,
   ReviewQueueSummary,
+  LinkedWordStatus,
   RevealWord,
   UserRole,
   WordCategoryOption,
@@ -512,7 +513,7 @@ export const getAdminWord = cache(async (wordId: string) => {
       examples: { orderBy: { position: "asc" } },
       alternateAnswers: { orderBy: { position: "asc" } },
       category: { select: { id: true, name: true, color: true } },
-      links: { select: { linkedWord: { select: { term: true } } } },
+      links: { select: { linkedWord: { select: { id: true, term: true } } } },
       linkedFrom: { select: { word: { select: { term: true } } } },
     },
   });
@@ -526,12 +527,30 @@ export const getAdminWord = cache(async (wordId: string) => {
     // Its linked words (see WordLink): the ones it lists, and the ones that
     // list it (linked both ways, but only editable from their own word).
     links: {
-      linkedTerms: [...new Set(word.links.map((link) => link.linkedWord.term))],
+      linkedIds: word.links.map((link) => link.linkedWord.id),
       linkedFromTerms: [...new Set(word.linkedFrom.map((link) => link.word.term))],
     },
     languageDeck: { id: word.languageDeck.id, title: word.languageDeck.title },
     course: word.languageDeck.course,
   };
+});
+
+// Every word in a course, for picking a word's linked words on the admin
+// word form (see LinkedWordsPicker).
+export type LinkableWord = { id: string; term: string; translation: string; deckTitle: string };
+
+export const getLinkableWords = cache(async (courseSlug: string): Promise<LinkableWord[]> => {
+  const words = await prisma.word.findMany({
+    where: { languageDeck: { course: { slug: courseSlug } } },
+    orderBy: [{ languageDeck: { position: "asc" } }, { position: "asc" }],
+    select: { id: true, term: true, translation: true, languageDeck: { select: { title: true } } },
+  });
+  return words.map((word) => ({
+    id: word.id,
+    term: word.term,
+    translation: word.translation,
+    deckTitle: word.languageDeck.title,
+  }));
 });
 
 // Every word category, for the admin word-category management page and the
@@ -1897,8 +1916,8 @@ export const getLearnQueueForCourse = cache(
       include: {
         forms: { orderBy: { position: "asc" } },
         examples: { orderBy: { position: "asc" } },
-        links: { select: { linkedWordId: true } },
-        linkedFrom: { select: { wordId: true } },
+        links: { select: { linkedWordId: true, linkedWord: { select: { term: true } } } },
+        linkedFrom: { select: { wordId: true, word: { select: { term: true } } } },
       },
     });
 
@@ -1928,8 +1947,23 @@ export const getLearnQueueForCourse = cache(
 
     const newWords = withinAllowance(ordered, allowance).slice(0, SET_SIZE);
 
+    // Each word's linked words and where the learner is with them, for
+    // debug mode's panel on the learn card (see LinkedWordsDebug).
+    const learntIds = new Set(learnt.map((row) => row.wordId));
+    const batchIds = new Set(newWords.map((word) => word.id));
+    const linkedWordsOf = (word: (typeof newWords)[number]): LinkedWordStatus[] => {
+      const partners = new Map([
+        ...word.links.map((link) => [link.linkedWordId, link.linkedWord.term] as const),
+        ...word.linkedFrom.map((link) => [link.wordId, link.word.term] as const),
+      ]);
+      return [...partners].map(([id, term]) => ({
+        term,
+        status: learntIds.has(id) ? "learnt" : batchIds.has(id) ? "this-batch" : "later",
+      }));
+    };
+
     return {
-      words: newWords.map((word) => toRevealWord(word, course)),
+      words: newWords.map((word) => ({ ...toRevealWord(word, course), linkedWords: linkedWordsOf(word) })),
       limitReached: newWords.length === 0 && candidates.length > 0,
     };
   },

@@ -14,6 +14,7 @@ import {
   useEnterToContinue,
 } from "@/components/vocab/session-ui";
 import { WordLesson, lessonAccent } from "@/components/vocab/word-lesson";
+import { LinkedWordsDebug } from "@/components/vocab/linked-words-debug";
 import { Button } from "@/components/ui/button";
 import { LearnComplete } from "@/components/vocab/learn-complete";
 import { useTranslations } from "@/components/i18n/locale-provider";
@@ -234,6 +235,8 @@ export const LearnSession = ({ words, courseSlug }: LearnSessionProps) => {
           />
         </motion.div>
       </AnimatePresence>
+
+      <LinkedWordsDebug linkedWords={word.linkedWords} />
 
       {isGrammar && <div className="mx-auto mt-8 hidden w-full max-w-md md:block">{stackedActions(false)}</div>}
 

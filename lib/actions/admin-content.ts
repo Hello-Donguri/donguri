@@ -643,6 +643,8 @@ async function saveWordAudio(
 // A new image replaces the old one (fresh key, old bunny.net object left
 // orphaned rather than deleted — not worth the extra failure handling for an
 // admin-only tool); omitting the image keeps whatever is already there.
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function updateWord(
   _state: UpdateWordFormState,
   formData: FormData,
@@ -705,33 +707,27 @@ export async function updateWord(
     return { message: "That word no longer exists." };
   }
 
-  // Its linked words, by Term, from anywhere in the course — checked before
-  // anything's saved, so a typo doesn't half-save the form.
-  const linkedTerms = String(formData.get("linkedWords") ?? "")
-    .split(/[;|]/)
-    .map((value) => value.trim())
-    .filter((value) => value !== "");
-  const courseWords =
-    linkedTerms.length > 0
-      ? await prisma.word.findMany({
-          where: { languageDeck: { course: { slug: existing.languageDeck.course.slug } } },
-          select: { id: true, term: true },
-        })
-      : [];
-  const linkedIds = new Set<string>();
-  const unknownTerms: string[] = [];
-  for (const linkedTerm of linkedTerms) {
-    const matches = courseWords.filter(
-      (word) => word.id !== wordId && word.term.trim().toLowerCase() === linkedTerm.toLowerCase(),
+  // Its linked words, picked from the course's words (see
+  // LinkedWordsPicker) — any id that isn't one of them is dropped.
+  const pickedIds = formData
+    .getAll("linkedWordIds")
+    .filter(
+      (value): value is string =>
+        typeof value === "string" && value !== wordId && UUID_PATTERN.test(value),
     );
-    if (matches.length === 0) unknownTerms.push(linkedTerm);
-    for (const match of matches) linkedIds.add(match.id);
-  }
-  if (unknownTerms.length > 0) {
-    return {
-      errors: { linkedWords: [`Not in this course: ${unknownTerms.join(", ")}.`] },
-    };
-  }
+  const linkedIds = new Set(
+    pickedIds.length > 0
+      ? (
+          await prisma.word.findMany({
+            where: {
+              id: { in: pickedIds },
+              languageDeck: { course: { slug: existing.languageDeck.course.slug } },
+            },
+            select: { id: true },
+          })
+        ).map((word) => word.id)
+      : [],
+  );
 
   let imageKey = existing.imageKey;
 

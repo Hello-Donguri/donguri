@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { requireAdminProfile, getAdminWord, getWordCategories } from "@/lib/dal";
+import { requireAdminProfile, getAdminWord, getLinkableWords, getWordCategories } from "@/lib/dal";
 import { EditWordForm } from "@/components/admin/edit-word-form";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
@@ -26,7 +26,11 @@ export default async function EditWordPage({ params }: PageProps) {
     redirect(`/dashboard/admin/courses/${courseSlug}`);
   }
 
-  const [categories, { t }] = await Promise.all([getWordCategories(), getTranslator()]);
+  const [categories, linkableWords, { t }] = await Promise.all([
+    getWordCategories(),
+    getLinkableWords(courseSlug),
+    getTranslator(),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -54,6 +58,7 @@ export default async function EditWordPage({ params }: PageProps) {
         <EditWordForm
           word={word}
           links={links}
+          linkableWords={linkableWords}
           currentImageSrc={wordImagePath(word)}
           categories={categories}
         />
