@@ -10,7 +10,7 @@ const MAX_SUGGESTIONS = 8;
 
 // The admin word form's linked words (see WordLink): the chosen words as
 // pills, each with an × to take it off, and a box that suggests words from
-// the course as you type — only those can be added, so a link can't point
+// the same deck as you type — only those can be added, so a link can't point
 // at a word that doesn't exist. Submits each as a hidden `linkedWordIds`.
 export function LinkedWordsPicker({
   words,
@@ -90,7 +90,6 @@ export function LinkedWordsPicker({
                 className="inline-flex items-center gap-1 rounded-full bg-ai-soft py-1 pr-1 pl-3 text-sm font-semibold text-ai-dark"
               >
                 {word.term}
-                <span className="font-normal opacity-70">· {word.deckTitle}</span>
                 <button
                   type="button"
                   onClick={(event) => {
@@ -117,7 +116,7 @@ export function LinkedWordsPicker({
             autoComplete="off"
             value={query}
             placeholder={
-              selected.length === 0 ? t("admin_word_form.linked_words_search", "Search this course's words…") : ""
+              selected.length === 0 ? t("admin_word_form.linked_words_search", "Search this deck's words…") : ""
             }
             onChange={(event) => {
               setQuery(event.target.value);
@@ -165,7 +164,7 @@ export function LinkedWordsPicker({
                 }}
                 onMouseEnter={() => setActive(index)}
                 className={cn(
-                  "flex cursor-pointer items-baseline justify-between gap-3 px-3 py-2 text-sm",
+                  "flex cursor-pointer items-baseline gap-3 px-3 py-2 text-sm",
                   index === active && "bg-ai-soft/60",
                 )}
               >
@@ -173,7 +172,6 @@ export function LinkedWordsPicker({
                   <span className="font-semibold text-sumi">{word.term}</span>
                   <span className="text-sumi-soft"> — {word.translation}</span>
                 </span>
-                <span className="shrink-0 text-xs text-sumi-soft">{word.deckTitle}</span>
               </li>
             ))}
           </ul>

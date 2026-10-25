@@ -28,7 +28,7 @@ export default async function EditWordPage({ params }: PageProps) {
 
   const [categories, linkableWords, { t }] = await Promise.all([
     getWordCategories(),
-    getLinkableWords(courseSlug),
+    getLinkableWords(languageDeckId),
     getTranslator(),
   ]);
 

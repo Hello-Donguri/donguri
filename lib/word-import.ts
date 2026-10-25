@@ -269,7 +269,7 @@ function addInstructionsSheet(workbook: ExcelJS.Workbook, cleanCategoryNames: st
     ],
     [
       "Linked words",
-      'Optional. Other words a learner should meet around the same time as this one — e.g. "an" on the row for "a". Give their Terms, separated by a semicolon ( ; ) or a pipe ( | ). They can be in any deck of this course, or new rows in this file. Once a learner learns one, the words linked to it come up in the same or their next few words in Learn, with other words mixed in. A link works both ways, so it only needs adding on one of the rows. Re-uploading a row replaces its links with what the cell now says.',
+      'Optional. Other words a learner should meet around the same time as this one — e.g. "an" on the row for "a". Give their Terms, separated by a semicolon ( ; ) or a pipe ( | ). They must be in this same deck — already there, or new rows in this file. Once a learner learns one, the words linked to it come up in the same or their next few words in Learn, with other words mixed in. A link works both ways, so it only needs adding on one of the rows. Re-uploading a row replaces its links with what the cell now says.',
     ],
     [
       "Word ID",

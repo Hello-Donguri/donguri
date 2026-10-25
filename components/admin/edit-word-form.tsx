@@ -154,7 +154,7 @@ export function EditWordForm({ word, links, linkableWords, currentImageSrc, cate
         <p className="-mt-2 text-sm text-sumi-soft">
           {t(
             "admin_word_form.linked_words_help",
-            "Words from this course to learn around the same time. Once a learner learns one, the others come up in their next few words.",
+            "Words from this deck to learn around the same time. Once a learner learns one, the others come up in their next few words.",
           )}
         </p>
         {links.linkedFromTerms.length > 0 && (

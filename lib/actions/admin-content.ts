@@ -707,7 +707,7 @@ export async function updateWord(
     return { message: "That word no longer exists." };
   }
 
-  // Its linked words, picked from the course's words (see
+  // Its linked words, picked from its own deck's words (see
   // LinkedWordsPicker) — any id that isn't one of them is dropped.
   const pickedIds = formData
     .getAll("linkedWordIds")
@@ -719,10 +719,7 @@ export async function updateWord(
     pickedIds.length > 0
       ? (
           await prisma.word.findMany({
-            where: {
-              id: { in: pickedIds },
-              languageDeck: { course: { slug: existing.languageDeck.course.slug } },
-            },
+            where: { id: { in: pickedIds }, languageDeckId: existing.languageDeckId },
             select: { id: true },
           })
         ).map((word) => word.id)
@@ -1303,14 +1300,14 @@ function processWordSheet(
   };
 }
 
-// Turns each row's "Linked words" Terms into word links: a Term matches a
-// row in this file first, then any word in the course with that Term
-// (ignoring case) — every one, if the course has it in more than one deck.
-// A Term that matches nothing is a warning, and that link is left out.
+// Turns each row's "Linked words" Terms into word links within this deck:
+// a Term matches a row in this file first, then a word already in the deck
+// with that Term (ignoring case). A Term that matches nothing is a
+// warning, and that link is left out.
 function resolveLinkedWords(
   linkedTermsByWordId: Map<string, string[]>,
   fileRows: { id: string; term: string }[],
-  courseWords: { id: string; term: string }[],
+  deckWords: { id: string; term: string }[],
   warnings: string[],
 ): { wordId: string; linkedWordId: string }[] {
   const idsByTerm = (words: { id: string; term: string }[]) => {
@@ -1322,16 +1319,16 @@ function resolveLinkedWords(
     return map;
   };
   const inFile = idsByTerm(fileRows);
-  const inCourse = idsByTerm(courseWords);
+  const inDeck = idsByTerm(deckWords);
   const termById = new Map(fileRows.map((row) => [row.id, row.term]));
 
   const links = new Map<string, { wordId: string; linkedWordId: string }>();
   for (const [wordId, terms] of linkedTermsByWordId) {
     for (const term of terms) {
       const key = term.toLowerCase();
-      const ids = (inFile.get(key) ?? inCourse.get(key) ?? []).filter((id) => id !== wordId);
+      const ids = (inFile.get(key) ?? inDeck.get(key) ?? []).filter((id) => id !== wordId);
       if (ids.length === 0) {
-        warnings.push(`"${termById.get(wordId)}": linked word "${term}" isn't in this course — left out.`);
+        warnings.push(`"${termById.get(wordId)}": linked word "${term}" isn't in this deck — left out.`);
         continue;
       }
       for (const linkedWordId of ids) links.set(`${wordId}:${linkedWordId}`, { wordId, linkedWordId });
@@ -1383,7 +1380,7 @@ export async function importWordsFromSpreadsheet(
 
   const languageDeck = await prisma.languageDeck.findUnique({
     where: { id: languageDeckId },
-    select: { id: true, courseId: true, course: { select: { slug: true } } },
+    select: { id: true, course: { select: { slug: true } } },
   });
 
   if (!languageDeck) {
@@ -1603,13 +1600,7 @@ export async function importWordsFromSpreadsheet(
     ...(parsed.linkedWordsColumn.grammar ? grammar.linkedTermsByWordId : []),
   ]);
   if (linkedTermsByWordId.size > 0) {
-    const courseWords = [...linkedTermsByWordId.values()].some((terms) => terms.length > 0)
-      ? await prisma.word.findMany({
-          where: { languageDeck: { courseId: languageDeck.courseId } },
-          select: { id: true, term: true },
-        })
-      : [];
-    const links = resolveLinkedWords(linkedTermsByWordId, validRows, courseWords, warnings);
+    const links = resolveLinkedWords(linkedTermsByWordId, validRows, existingWords, warnings);
     ops.push(prisma.wordLink.deleteMany({ where: { wordId: { in: [...linkedTermsByWordId.keys()] } } }));
     if (links.length > 0) ops.push(prisma.wordLink.createMany({ data: links, skipDuplicates: true }));
   }

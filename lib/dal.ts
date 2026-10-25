@@ -535,23 +535,17 @@ export const getAdminWord = cache(async (wordId: string) => {
   };
 });
 
-// Every word in a course, for picking a word's linked words on the admin
-// word form (see LinkedWordsPicker).
-export type LinkableWord = { id: string; term: string; translation: string; deckTitle: string };
+// Every word in a deck, for picking a word's linked words on the admin
+// word form (see LinkedWordsPicker) — links stay within one deck.
+export type LinkableWord = { id: string; term: string; translation: string };
 
-export const getLinkableWords = cache(async (courseSlug: string): Promise<LinkableWord[]> => {
-  const words = await prisma.word.findMany({
-    where: { languageDeck: { course: { slug: courseSlug } } },
-    orderBy: [{ languageDeck: { position: "asc" } }, { position: "asc" }],
-    select: { id: true, term: true, translation: true, languageDeck: { select: { title: true } } },
-  });
-  return words.map((word) => ({
-    id: word.id,
-    term: word.term,
-    translation: word.translation,
-    deckTitle: word.languageDeck.title,
-  }));
-});
+export const getLinkableWords = cache(async (languageDeckId: string): Promise<LinkableWord[]> =>
+  prisma.word.findMany({
+    where: { languageDeckId },
+    orderBy: { position: "asc" },
+    select: { id: true, term: true, translation: true },
+  }),
+);
 
 // Every word category, for the admin word-category management page and the
 // dropdown on the word create/edit forms. Small, unfiltered, ordered for
