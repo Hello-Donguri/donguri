@@ -1910,6 +1910,7 @@ export const getLearnQueueForCourse = cache(
       include: {
         forms: { orderBy: { position: "asc" } },
         examples: { orderBy: { position: "asc" } },
+        languageDeck: { select: { title: true } },
         links: { select: { linkedWordId: true, linkedWord: { select: { term: true } } } },
         linkedFrom: { select: { wordId: true, word: { select: { term: true } } } },
       },
@@ -1966,6 +1967,7 @@ export const getLearnQueueForCourse = cache(
 const revealWordInclude = {
   forms: { orderBy: { position: "asc" } },
   examples: { orderBy: { position: "asc" } },
+  languageDeck: { select: { title: true } },
 } as const;
 
 // What the learn card shows for one word — shared by the learn queue and
@@ -2007,6 +2009,7 @@ function toRevealWord(
     targetLanguage: course.targetLanguage,
     path: word.path as "vocab" | "grammar",
     audio: wordAudio(word),
+    deckTitle: word.languageDeck.title,
   };
 }
 

@@ -51,19 +51,15 @@ export function lessonAccent(path: RevealWord["path"]) {
 // Everything the learn card shows about one word — term, romanization,
 // meaning, explanation, examples, forms — without the card around it or
 // the session's controls, so the learn session and the quiz's lesson
-// modal render the same thing. `header` sits above the term (the learn
-// session's progress; for a vocab word, a bar across the top of the card).
-// `actions` (the learn session's skip / Got it) sit under a vocab word's
-// main example on wider screens — the session floats its own copy at the
-// bottom on phones.
+// modal render the same thing. `header` goes on the left of the card's top
+// row (the learn session's deck name), with the word's category on the
+// right. The session's skip / Got it are its own, in a bar at the bottom.
 export const WordLesson = ({
   word,
   header,
-  actions,
 }: {
   word: RevealWord;
   header?: ReactNode;
-  actions?: ReactNode;
 }) => {
   const t = useTranslations();
   const isGrammar = word.path === "grammar";
@@ -180,29 +176,64 @@ export const WordLesson = ({
           : mainExample.ja
         : null;
 
-  const mainExampleCard = mainExample && (
-    <div className={`w-full rounded-2xl px-6 py-5 text-left ${accent.panel}`}>
-      <p
-        className={`mb-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium uppercase tracking-[0.14em] ${accent.label}`}
-      >
-        <MessageSquareQuote aria-hidden className="h-3.5 w-3.5" />
-        {t("learn_session.example", "Example")}
-      </p>
-      {renderExample(mainExample, true)}
+  // A vocab word's picture illustrates its first example, so it sits in
+  // the example's panel, beside the sentence (above it on phones).
+  const exampleImage = !isGrammar && (
+    <WordImage
+      src={word.image}
+      alt={word.term}
+      className="h-19 w-19 shrink-0 object-contain sm:h-24 sm:w-24"
+    />
+  );
+  const mainExampleCard = mainExample ? (
+    <div className={`flex w-full flex-col items-center gap-4 rounded-2xl px-6 py-5 text-left sm:flex-row sm:gap-6 ${accent.panel}`}>
+      {exampleImage}
+      <div className="w-full min-w-0 flex-1">
+        <p
+          className={`mb-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium uppercase tracking-[0.14em] ${accent.label}`}
+        >
+          <MessageSquareQuote aria-hidden className="h-3.5 w-3.5" />
+          {t("learn_session.example", "Example")}
+        </p>
+        {renderExample(mainExample, true)}
+      </div>
+    </div>
+  ) : (
+    exampleImage && <div className="flex justify-center">{exampleImage}</div>
+  );
+
+  // Its word type(s) (Noun, Pronoun…) for the card's top corner.
+  const wordTypePills = wordTypes.length > 0 && (
+    <div className="flex flex-wrap justify-end gap-1.5">
+      {wordTypes.map((type) => (
+        <span
+          key={type}
+          className="rounded-full bg-sumi/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-sumi-soft"
+        >
+          {wordTypeLabel(type, t)}
+        </span>
+      ))}
+    </div>
+  );
+  // The card's top row: whatever the caller puts there (the learn
+  // session's deck name) on the left, the word type on the right.
+  const topRow = (header || wordTypePills) && (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      {header ?? <span />}
+      {wordTypePills}
     </div>
   );
 
   const wordPanel = (
     <div className="flex flex-col items-center text-center">
-      {header}
 
       {isGrammar && parsePattern(word.term) ? (
-        <div className={header ? "mt-8" : "mt-2"}>
+        <div className={topRow ? "mt-6" : "mt-2"}>
           <PatternChart term={word.term} />
         </div>
       ) : (
         <p
-          className={`${header ? "mt-8" : "mt-2"} font-nunito font-black tracking-tight text-sumi ${
+          className={`${topRow ? "mt-6" : "mt-2"} font-nunito font-black tracking-tight text-sumi ${
             isGrammar ? "text-4xl sm:text-5xl" : "text-6xl sm:text-7xl"
           }`}
         >
@@ -228,24 +259,9 @@ export const WordLesson = ({
       {/* The meaning, set apart from the word and its sound so it reads as the
           answer — the biggest thing on the card after the word itself. */}
       <div className="mt-7 flex w-full flex-col items-center border-t border-sumi/10 pt-6">
-        {/* Its word type, and a second one beside it when it has one (e.g.
-            Irregular verb · Phrase). */}
-        {wordTypes.length > 0 && (
-          <div className="flex flex-wrap justify-center gap-1.5">
-            {wordTypes.map((type) => (
-              <span
-                key={type}
-                className="rounded-full bg-sumi/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-sumi-soft"
-              >
-                {wordTypeLabel(type, t)}
-              </span>
-            ))}
-          </div>
-        )}
-
         <p
           lang={englishIsTarget ? otherLang : "en"}
-          className={`${wordTypes.length > 0 ? "mt-3" : ""} font-nunito text-3xl font-black leading-tight tracking-tight text-sumi sm:text-4xl`}
+          className={`font-nunito text-3xl font-black leading-tight tracking-tight text-sumi sm:text-4xl`}
         >
           {word.translation}
         </p>
@@ -274,12 +290,14 @@ export const WordLesson = ({
         className={`grid grid-cols-1 gap-2 ${word.forms.length > 1 ? "sm:grid-cols-2" : ""} ${FORM_COLUMNS[Math.min(word.forms.length, 6)]}`}
       >
         {word.forms.map((form) => (
-          <div key={form.id} className="rounded-xl bg-washi-soft px-4 py-3">
+          // A column, the value pushed to the bottom, so the words line up
+          // across the row even when a label wraps onto two lines.
+          <div key={form.id} className="flex flex-col items-center rounded-xl bg-washi-soft px-4 py-3 text-center">
             <dt className="text-xs text-sumi-soft">
               {form.labelEn}
               <span className="opacity-70"> / {form.labelJa}</span>
             </dt>
-            <dd className="mt-0.5 text-lg font-semibold text-sumi">{form.value}</dd>
+            <dd className="mt-auto pt-0.5 text-lg font-semibold text-sumi">{form.value}</dd>
           </div>
         ))}
       </dl>
@@ -305,23 +323,22 @@ export const WordLesson = ({
   if (isGrammar) {
     return (
       <>
+        {topRow}
         <div className="px-2 pt-4 sm:px-6">{wordPanel}</div>
         {hasMoreExamples && <div className="mt-6 border-t border-card-border pt-6">{moreExamplesBlock}</div>}
       </>
     );
   }
 
-  // A vocab word: the header bar across the top; a small picture tile (whole, never
-  // cropped) beside the word — term, romanization, type and Listen, then the
-  // meaning, its explanation and the main example; "More examples" below
-  // as a grid of cards, the first two shown; and the session's actions as
-  // a footer. Phones stack it all.
+  // A vocab word: the top row (deck, word type); the word centred — Listen,
+  // term, romanization, then its meaning; under it, one column the
+  // width of the example: the main example with the picture it
+  // illustrates, the forms, and "More examples" stacked, the first two
+  // shown.
   return (
     <VocabLesson
       word={word}
-      header={header}
-      actions={actions}
-      wordTypes={wordTypes.map((type) => wordTypeLabel(type, t))}
+      topRow={topRow}
       translationLang={englishIsTarget ? otherLang : "en"}
       mainExampleCard={mainExampleCard}
       formsBlock={formsBlock}
@@ -355,18 +372,14 @@ const FORM_COLUMNS: Record<number, string> = {
 
 function VocabLesson({
   word,
-  header,
-  actions,
-  wordTypes,
+  topRow,
   translationLang,
   mainExampleCard,
   formsBlock,
   moreExamples,
 }: {
   word: RevealWord;
-  header?: ReactNode;
-  actions?: ReactNode;
-  wordTypes: string[];
+  topRow: ReactNode;
   translationLang: string;
   mainExampleCard: ReactNode;
   formsBlock: ReactNode;
@@ -379,109 +392,80 @@ function VocabLesson({
 
   return (
     <div className="flex flex-col gap-6">
-      {header}
+      {topRow}
 
-      {/* The picture as a small tilted tile — a hint, not the headline —
-          beside the word and its meaning (above them, centred, on phones). */}
-      <div className="flex flex-col items-center gap-6 md:flex-row md:items-center md:justify-center md:gap-12">
-        <div className="w-40 shrink-0 -rotate-3 rounded-3xl bg-ai-soft/60 p-2 shadow-md ring-4 ring-raised sm:w-48 lg:w-56">
-          <WordImage src={word.image} alt={word.term} className="block aspect-square h-auto w-full object-contain" />
+      {/* The word, centred: Listen above it, the word, the romanization;
+          then, set off by a short rule, the meaning. */}
+      <div className="mx-auto flex w-full max-w-xl flex-col items-center gap-5 text-center">
+        <div className="flex flex-col items-center gap-3">
+          <ListenButton text={word.term} language={word.targetLanguage} audio={word.audio} />
+          <p className="font-nunito text-7xl leading-none font-black tracking-tight text-sumi sm:text-8xl">
+            {word.term}
+          </p>
+          {word.romanization && (
+            <p className="text-xl leading-none">
+              <Jyutping text={word.romanization} />
+            </p>
+          )}
         </div>
 
-        <div className="flex w-full min-w-0 max-w-xl flex-col items-center gap-5 text-center md:w-auto">
-          {/* Its type above; the word centred, with Listen hung beside it
-              (out of the flow, so it doesn't pull the word off centre —
-              below it on phones, where a long word leaves no room); the
-              romanization underneath. */}
-          <div className="flex flex-col items-center gap-3">
-            {wordTypes.length > 0 && (
-              <div className="flex flex-wrap justify-center gap-1.5">
-                {wordTypes.map((type) => (
-                  <span
-                    key={type}
-                    className="rounded-full bg-sumi/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-sumi-soft"
-                  >
-                    {type}
-                  </span>
-                ))}
-              </div>
-            )}
-            <div className="relative flex flex-col items-center gap-3 md:block">
-              <p className="font-nunito text-7xl leading-none font-black tracking-tight text-sumi sm:text-8xl">
-                {word.term}
-              </p>
-              <div className="whitespace-nowrap md:absolute md:top-1/2 md:left-full md:ml-5 md:-translate-y-1/2">
-                <ListenButton text={word.term} language={word.targetLanguage} audio={word.audio} />
-              </div>
-            </div>
-            {word.romanization && (
-              <p className="text-xl leading-none">
-                <Jyutping text={word.romanization} />
-              </p>
-            )}
-          </div>
-
-          {/* The meaning, set off from the word by a short rule. */}
-          <div className="flex w-full flex-col items-center gap-2 border-t border-sumi/10 pt-5">
-            <p
-              lang={translationLang}
-              className="font-nunito text-4xl leading-tight font-black tracking-tight text-sumi sm:text-5xl"
-            >
-              {word.translation}
+        <div className="flex w-full flex-col items-center gap-2 border-t border-sumi/10 pt-5">
+          <p
+            lang={translationLang}
+            className="font-nunito text-4xl leading-tight font-black tracking-tight text-sumi sm:text-5xl"
+          >
+            {word.translation}
+          </p>
+          {explanation && <p className="text-lg text-sumi-soft">{explanation.lead}</p>}
+          {word.explanationJa && <p className="text-sumi-soft">{word.explanationJa}</p>}
+          {explanation?.tip && (
+            <p className="mt-1 inline-flex items-start gap-2 rounded-xl bg-sumi/5 px-3.5 py-2.5 text-left text-sm text-sumi">
+              <Lightbulb aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-acorn" />
+              {explanation.tip}
             </p>
-            {explanation && <p className="text-lg text-sumi-soft">{explanation.lead}</p>}
-            {word.explanationJa && <p className="text-sumi-soft">{word.explanationJa}</p>}
-            {explanation?.tip && (
-              <p className="mt-1 inline-flex items-start gap-2 rounded-xl bg-sumi/5 px-3.5 py-2.5 text-left text-sm text-sumi">
-                <Lightbulb aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-acorn" />
-                {explanation.tip}
-              </p>
-            )}
-          </div>
+          )}
         </div>
       </div>
 
-      {/* The main example, centred to match the word above, then the session's skip / Got it
-          right under it so the next word is in reach without scrolling
-          (phones float them). */}
-      {mainExampleCard && <div className="mx-auto w-full max-w-3xl">{mainExampleCard}</div>}
-      {actions && <div className="mx-auto hidden w-full max-w-3xl md:block">{actions}</div>}
+      {/* The main example with its picture, then the forms and the other
+          examples — all one width, centred under the word. */}
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+        {mainExampleCard}
 
-      {/* Its forms, full width under the picture and word. */}
-      {formsBlock && <div className="border-t border-card-border pt-5 text-left">{formsBlock}</div>}
+        {formsBlock && <div className="border-t border-card-border pt-5 text-left">{formsBlock}</div>}
 
-      {moreExamples.length > 0 && (
-        <section className="border-t border-card-border pt-5">
-          <h3 className="mb-3 font-nunito text-xl font-extrabold text-sumi">
-            {t("learn_session.more_examples_title", "More examples")}
-          </h3>
-          <ul className="grid gap-3 md:grid-cols-2">
-            {shown.map((example) => (
-              <li key={example.id} className="rounded-2xl border border-card-border bg-raised p-4">
-                {example.node}
-              </li>
-            ))}
-          </ul>
-          {moreExamples.length > MORE_EXAMPLES_SHOWN && (
-            <div className="mt-3 flex justify-center">
-              <button
-                type="button"
-                onClick={() => setShowAll((current) => !current)}
-                aria-expanded={showAll}
-                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold text-ai-dark transition hover:bg-ai-soft"
-              >
-                {showAll
-                  ? t("learn_session.show_fewer_examples", "Show fewer examples")
-                  : t("learn_session.show_more_examples", "Show {{count}} more examples", {
-                      count: moreExamples.length - MORE_EXAMPLES_SHOWN,
-                    })}
-                <ChevronDown aria-hidden className={`h-4 w-4 transition-transform ${showAll ? "rotate-180" : ""}`} />
-              </button>
-            </div>
-          )}
-        </section>
-      )}
-
+        {moreExamples.length > 0 && (
+          <section className="border-t border-card-border pt-5">
+            <h3 className="mb-3 font-nunito text-xl font-extrabold text-sumi">
+              {t("learn_session.more_examples_title", "More examples")}
+            </h3>
+            <ul className="flex flex-col gap-3">
+              {shown.map((example) => (
+                <li key={example.id} className="rounded-2xl border border-card-border bg-raised-bright p-4">
+                  {example.node}
+                </li>
+              ))}
+            </ul>
+            {moreExamples.length > MORE_EXAMPLES_SHOWN && (
+              <div className="mt-3 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setShowAll((current) => !current)}
+                  aria-expanded={showAll}
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold text-ai-dark transition hover:bg-ai-soft"
+                >
+                  {showAll
+                    ? t("learn_session.show_fewer_examples", "Show fewer examples")
+                    : t("learn_session.show_more_examples", "Show {{count}} more examples", {
+                        count: moreExamples.length - MORE_EXAMPLES_SHOWN,
+                      })}
+                  <ChevronDown aria-hidden className={`h-4 w-4 transition-transform ${showAll ? "rotate-180" : ""}`} />
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+      </div>
     </div>
   );
 }

@@ -16,15 +16,20 @@ const STATUS_STYLE: Record<LinkedWordStatus["status"], string> = {
   later: "bg-sumi/5 text-sumi-soft",
 };
 
-// Debug mode only: under the learn card, the word's linked words (see
-// WordLink) and where the learner is with each — so the ordering in
-// orderLearnCandidates can be checked. Admin-only tooling, so not translated.
+// Debug mode only: floating in the bottom left corner like a toast (just
+// above the learn page's action bar), the
+// word's linked words (see WordLink) and where the learner is with each —
+// so the ordering in orderLearnCandidates can be checked. Admin-only
+// tooling, so not translated.
 export function LinkedWordsDebug({ linkedWords }: { linkedWords: LinkedWordStatus[] | undefined }) {
   const { enabled } = useDevMode();
   if (!enabled) return null;
 
   return (
-    <div className="mt-4 rounded-2xl border border-dashed border-kin bg-kin/10 px-4 py-3 text-sm text-sumi">
+    <div
+      role="status"
+      className="fixed bottom-36 left-4 z-40 sm:bottom-24 w-72 max-w-[calc(100vw-2rem)] rounded-2xl border border-dashed border-kin bg-raised px-4 py-3 text-sm text-sumi shadow-lg"
+    >
       <p className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-acorn">
         <Link2 aria-hidden className="h-3.5 w-3.5" />
         Linked words

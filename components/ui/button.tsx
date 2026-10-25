@@ -12,6 +12,9 @@ export const buttonVariants = cva(
       variant: {
         primary: "bg-ai text-washi hover:bg-ai-dark",
         secondary: "bg-matcha text-washi hover:bg-matcha-dark",
+        // The theme's sage green, matching the learn card's border and
+        // example panel — for a go-ahead action on a green surface.
+        green: "bg-matcha text-washi hover:bg-matcha-dark",
         accent: "bg-sakura text-washi hover:bg-sakura-dark",
         outline:
           "border border-ghost-border bg-transparent text-ghost-text hover:bg-ghost-hover",

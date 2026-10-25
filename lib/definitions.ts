@@ -380,6 +380,8 @@ export type RevealWord = {
   // other.
   path: "vocab" | "grammar";
   audio: WordAudio | null;
+  // The deck it's from, named in the learn card's header.
+  deckTitle: string;
 };
 
 // A multiple-choice option — text only, never a picture (see toOption in

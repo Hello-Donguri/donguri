@@ -19,6 +19,9 @@
   /* A card lifted above the page — product previews, step cards. Warm
      ivory so it stands forward from the cream page and cards. */
   --raised: #fffcf4;
+  /* Lighter still, nearly white — the learn card, where there's a lot to
+     read and the picture should sit on clean paper. */
+  --raised-bright: #fffefb;
   /* Donguri's acorn cap — a small warm accent for labels and icons,
      never a main button colour. */
   --acorn: #7d5733;
@@ -107,6 +110,7 @@
   --color-sumi-soft: var(--sumi-soft);
   --color-neutral-soft: var(--neutral-soft);
   --color-raised: var(--raised);
+  --color-raised-bright: var(--raised-bright);
   --color-acorn: var(--acorn);
   --color-acorn-soft: var(--acorn-soft);
   --color-ink-on-light: var(--ink-on-light);
@@ -161,6 +165,7 @@
   --neutral-soft: #3a3020;
   /* Same as --washi here, so raised cards look exactly as they did. */
   --raised: #17130f;
+  --raised-bright: #17130f;
   --acorn: #d9a86c;
   --acorn-soft: #3a2a1a;
   --ai: #4e9cff;
