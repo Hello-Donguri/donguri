@@ -63,6 +63,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
           orderBy: { position: "asc" },
           select: { prompt: true, promptJa: true, options: true, correctIndex: true },
         },
+        links: { select: { linkedWord: { select: { term: true } } } },
       },
     }),
   ]);
@@ -94,6 +95,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       options: quiz.options,
       correctIndex: quiz.correctIndex,
     })),
+    linkedTerms: [...new Set(word.links.map((link) => link.linkedWord.term))],
   }));
 
   const buffer = await buildWordExportWorkbook(

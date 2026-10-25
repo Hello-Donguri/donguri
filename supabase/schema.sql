@@ -2155,3 +2155,27 @@ alter table public.words add column if not exists audio_male_key text;
 -- settings' email notifications, alongside the leaderboard crown email.
 
 alter table public.profiles add column if not exists email_followed boolean not null default true;
+
+-- 61. Linked words ---------------------------------------------------------------------------
+-- Words worth meeting close together ("a" and "an", 這 and 嗰), set on the
+-- admin word form or the spreadsheet's "Linked words" column. Stored one
+-- way (the word whose row lists the link), read both ways: once a learner
+-- learns one, the others it's linked to come up in their next learn batch,
+-- or the same one (see getLearnQueueForCourse in lib/dal.ts).
+
+create table if not exists public.word_links (
+  word_id uuid not null references public.words (id) on delete cascade,
+  linked_word_id uuid not null references public.words (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (word_id, linked_word_id),
+  constraint word_links_not_self check (word_id <> linked_word_id)
+);
+
+create index if not exists word_links_linked_word_id_idx on public.word_links (linked_word_id);
+
+alter table public.word_links enable row level security;
+
+drop policy if exists "Authenticated users can view word links" on public.word_links;
+create policy "Authenticated users can view word links"
+  on public.word_links for select
+  using (auth.role() = 'authenticated');

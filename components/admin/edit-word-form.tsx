@@ -16,6 +16,7 @@ import { WORD_TYPES, type AdminWordSummary, type WordCategoryOption } from "@/li
 
 type EditWordFormProps = {
   word: AdminWordSummary;
+  links: { linkedTerms: string[]; linkedFromTerms: string[] };
   currentImageSrc: string;
   categories: WordCategoryOption[];
 };
@@ -33,7 +34,7 @@ const PATH_OPTIONS = [
 
 const sectionHeadingClass = "text-sm font-semibold uppercase tracking-wide text-sumi-soft";
 
-export function EditWordForm({ word, currentImageSrc, categories }: EditWordFormProps) {
+export function EditWordForm({ word, links, currentImageSrc, categories }: EditWordFormProps) {
   const t = useTranslations();
   const [state, action, pending] = useActionState(updateWord, undefined);
 
@@ -138,6 +139,31 @@ export function EditWordForm({ word, currentImageSrc, categories }: EditWordForm
       <div className="border-t border-sumi/10 pt-6">
         <WordAlternateAnswersFields initialAlternateAnswers={word.alternateAnswers} />
       </div>
+
+      <section className="flex flex-col gap-4 border-t border-sumi/10 pt-6">
+        <h2 className={sectionHeadingClass}>{t("admin_word_form.section_linked", "Linked words")}</h2>
+        <TextField
+          label={t("admin_word_form.linked_words", "Linked words")}
+          name="linkedWords"
+          required={false}
+          placeholder={t("admin_word_form.linked_words_placeholder", "e.g. an; the")}
+          defaultValue={links.linkedTerms.join("; ")}
+          errors={state?.errors?.linkedWords}
+        />
+        <p className="-mt-2 text-sm text-sumi-soft">
+          {t(
+            "admin_word_form.linked_words_help",
+            "Terms of words from this course to learn around the same time, separated by semicolons. Once a learner learns one, the others come up in their next few words.",
+          )}
+        </p>
+        {links.linkedFromTerms.length > 0 && (
+          <p className="text-sm text-sumi-soft">
+            {t("admin_word_form.linked_from", "Also linked from: {{terms}}", {
+              terms: links.linkedFromTerms.join(", "),
+            })}
+          </p>
+        )}
+      </section>
 
       <section className="flex flex-col gap-4 border-t border-sumi/10 pt-6">
         <h2 className={sectionHeadingClass}>{t("admin_word_form.section_audio", "Pronunciation")}</h2>

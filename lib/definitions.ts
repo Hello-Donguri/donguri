@@ -1167,7 +1167,7 @@ export const UpdateWordFormSchema = z.object({
 
 export type UpdateWordFormState =
   | {
-      errors?: WordFieldErrors & { wordId?: string[] };
+      errors?: WordFieldErrors & { wordId?: string[]; linkedWords?: string[] };
       message?: string;
     }
   | undefined;
@@ -1252,6 +1252,8 @@ export const WordImportRowSchema = z.object({
   examplesEn: z.string().trim().max(3000).optional(),
   examplesJa: z.string().trim().max(3000).optional(),
   examplesRomanization: z.string().trim().max(3000).optional(),
+  // Terms of other words, semicolon- or pipe-separated (see WordLink).
+  linkedWords: z.string().trim().max(1000).optional(),
   wordId: z.string().trim().max(100).optional(),
 });
 

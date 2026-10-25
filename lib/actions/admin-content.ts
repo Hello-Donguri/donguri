@@ -705,6 +705,34 @@ export async function updateWord(
     return { message: "That word no longer exists." };
   }
 
+  // Its linked words, by Term, from anywhere in the course — checked before
+  // anything's saved, so a typo doesn't half-save the form.
+  const linkedTerms = String(formData.get("linkedWords") ?? "")
+    .split(/[;|]/)
+    .map((value) => value.trim())
+    .filter((value) => value !== "");
+  const courseWords =
+    linkedTerms.length > 0
+      ? await prisma.word.findMany({
+          where: { languageDeck: { course: { slug: existing.languageDeck.course.slug } } },
+          select: { id: true, term: true },
+        })
+      : [];
+  const linkedIds = new Set<string>();
+  const unknownTerms: string[] = [];
+  for (const linkedTerm of linkedTerms) {
+    const matches = courseWords.filter(
+      (word) => word.id !== wordId && word.term.trim().toLowerCase() === linkedTerm.toLowerCase(),
+    );
+    if (matches.length === 0) unknownTerms.push(linkedTerm);
+    for (const match of matches) linkedIds.add(match.id);
+  }
+  if (unknownTerms.length > 0) {
+    return {
+      errors: { linkedWords: [`Not in this course: ${unknownTerms.join(", ")}.`] },
+    };
+  }
+
   let imageKey = existing.imageKey;
 
   if (validImage) {
@@ -745,6 +773,13 @@ export async function updateWord(
 
   await replaceWordFormsAndExamples(wordId, formData);
   await replaceWordAlternateAnswers(wordId, formData);
+  await prisma.$transaction([
+    prisma.wordLink.deleteMany({ where: { wordId } }),
+    prisma.wordLink.createMany({
+      data: [...linkedIds].map((linkedWordId) => ({ wordId, linkedWordId })),
+      skipDuplicates: true,
+    }),
+  ]);
 
   const courseSlug = existing.languageDeck.course.slug;
   revalidatePath(`/dashboard/admin/courses/${courseSlug}/categories/${existing.languageDeckId}`);
@@ -1014,6 +1049,9 @@ type ProcessedWordSheet = {
   formsByWordId: Map<string, ImportedFormRow[]>;
   examplesByWordId: Map<string, ImportedExampleRow[]>;
   quizByWordId: Map<string, ImportedQuizRow[]>;
+  // Every row's "Linked words" Terms, empty when the cell is — see
+  // resolveLinkedWords.
+  linkedTermsByWordId: Map<string, string[]>;
 };
 
 // One path's worth of a spreadsheet import — called once for the Words/Quiz
@@ -1056,6 +1094,7 @@ function processWordSheet(
   const alternateAnswersByWordId = new Map<string, string[]>();
   const formsByWordId = new Map<string, ImportedFormRow[]>();
   const examplesByWordId = new Map<string, ImportedExampleRow[]>();
+  const linkedTermsByWordId = new Map<string, string[]>();
 
   for (const row of rows) {
     const result = WordImportRowSchema.safeParse(row.values);
@@ -1169,6 +1208,14 @@ function processWordSheet(
       if (values.length > 0) alternateAnswersByWordId.set(id, values);
     }
 
+    linkedTermsByWordId.set(
+      id,
+      (data.linkedWords ?? "")
+        .split(/[;|]/)
+        .map((value) => value.trim())
+        .filter((value) => value !== ""),
+    );
+
     if (formsResult.forms.length > 0) {
       formsByWordId.set(
         id,
@@ -1248,7 +1295,53 @@ function processWordSheet(
     quizByWordId.set(wordId, quizQuestions);
   }
 
-  return { rowErrors, warnings, validRows, alternateAnswersByWordId, formsByWordId, examplesByWordId, quizByWordId };
+  return {
+    rowErrors,
+    warnings,
+    validRows,
+    alternateAnswersByWordId,
+    formsByWordId,
+    examplesByWordId,
+    quizByWordId,
+    linkedTermsByWordId,
+  };
+}
+
+// Turns each row's "Linked words" Terms into word links: a Term matches a
+// row in this file first, then any word in the course with that Term
+// (ignoring case) — every one, if the course has it in more than one deck.
+// A Term that matches nothing is a warning, and that link is left out.
+function resolveLinkedWords(
+  linkedTermsByWordId: Map<string, string[]>,
+  fileRows: { id: string; term: string }[],
+  courseWords: { id: string; term: string }[],
+  warnings: string[],
+): { wordId: string; linkedWordId: string }[] {
+  const idsByTerm = (words: { id: string; term: string }[]) => {
+    const map = new Map<string, string[]>();
+    for (const word of words) {
+      const key = word.term.trim().toLowerCase();
+      map.set(key, [...(map.get(key) ?? []), word.id]);
+    }
+    return map;
+  };
+  const inFile = idsByTerm(fileRows);
+  const inCourse = idsByTerm(courseWords);
+  const termById = new Map(fileRows.map((row) => [row.id, row.term]));
+
+  const links = new Map<string, { wordId: string; linkedWordId: string }>();
+  for (const [wordId, terms] of linkedTermsByWordId) {
+    for (const term of terms) {
+      const key = term.toLowerCase();
+      const ids = (inFile.get(key) ?? inCourse.get(key) ?? []).filter((id) => id !== wordId);
+      if (ids.length === 0) {
+        warnings.push(`"${termById.get(wordId)}": linked word "${term}" isn't in this course — left out.`);
+        continue;
+      }
+      for (const linkedWordId of ids) links.set(`${wordId}:${linkedWordId}`, { wordId, linkedWordId });
+    }
+  }
+  return [...links.values()];
 }
 
 // Bulk-creates words (plus their forms, example sentences, and hand-authored
@@ -1294,7 +1387,7 @@ export async function importWordsFromSpreadsheet(
 
   const languageDeck = await prisma.languageDeck.findUnique({
     where: { id: languageDeckId },
-    select: { id: true, course: { select: { slug: true } } },
+    select: { id: true, courseId: true, course: { select: { slug: true } } },
   });
 
   if (!languageDeck) {
@@ -1505,6 +1598,24 @@ export async function importWordsFromSpreadsheet(
   if (quizData.length > 0) ops.push(prisma.wordQuizQuestion.createMany({ data: quizData }));
   if (alternateAnswersData.length > 0) {
     ops.push(prisma.wordAlternateAnswer.createMany({ data: alternateAnswersData }));
+  }
+
+  // Linked words: each row's links replaced by what its cell now says —
+  // only for a sheet that has the column, so an older file leaves them be.
+  const linkedTermsByWordId = new Map([
+    ...(parsed.linkedWordsColumn.vocab ? vocab.linkedTermsByWordId : []),
+    ...(parsed.linkedWordsColumn.grammar ? grammar.linkedTermsByWordId : []),
+  ]);
+  if (linkedTermsByWordId.size > 0) {
+    const courseWords = [...linkedTermsByWordId.values()].some((terms) => terms.length > 0)
+      ? await prisma.word.findMany({
+          where: { languageDeck: { courseId: languageDeck.courseId } },
+          select: { id: true, term: true },
+        })
+      : [];
+    const links = resolveLinkedWords(linkedTermsByWordId, validRows, courseWords, warnings);
+    ops.push(prisma.wordLink.deleteMany({ where: { wordId: { in: [...linkedTermsByWordId.keys()] } } }));
+    if (links.length > 0) ops.push(prisma.wordLink.createMany({ data: links, skipDuplicates: true }));
   }
 
   // Only when the admin explicitly ticked the "deactivate missing" checkbox

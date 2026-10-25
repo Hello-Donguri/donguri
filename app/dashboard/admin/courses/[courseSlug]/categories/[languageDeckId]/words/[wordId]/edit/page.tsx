@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function EditWordPage({ params }: PageProps) {
   await requireAdminProfile();
   const { courseSlug, languageDeckId, wordId } = await params;
-  const { word, languageDeck, course } = await getAdminWord(wordId);
+  const { word, links, languageDeck, course } = await getAdminWord(wordId);
 
   if (course.slug !== courseSlug || languageDeck.id !== languageDeckId) {
     redirect(`/dashboard/admin/courses/${courseSlug}`);
@@ -51,7 +51,12 @@ export default async function EditWordPage({ params }: PageProps) {
       </div>
 
       <div className="max-w-3xl rounded-2xl border border-card-border bg-washi-soft p-8">
-        <EditWordForm word={word} currentImageSrc={wordImagePath(word)} categories={categories} />
+        <EditWordForm
+          word={word}
+          links={links}
+          currentImageSrc={wordImagePath(word)}
+          categories={categories}
+        />
       </div>
     </div>
   );

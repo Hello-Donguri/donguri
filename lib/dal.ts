@@ -68,6 +68,7 @@ import {
   type ClozeMatch,
 } from "@/lib/cloze";
 import { blankInputs, fillInputs, inputAnswers, stripGrammarMarks } from "@/lib/grammar-marks";
+import { orderLearnCandidates } from "@/lib/learn-order";
 import { isLatinTypeable } from "@/lib/language";
 import { levelForXp, parseDonguriConfig, type AccessoryId } from "@/lib/levels";
 import {
@@ -511,6 +512,8 @@ export const getAdminWord = cache(async (wordId: string) => {
       examples: { orderBy: { position: "asc" } },
       alternateAnswers: { orderBy: { position: "asc" } },
       category: { select: { id: true, name: true, color: true } },
+      links: { select: { linkedWord: { select: { term: true } } } },
+      linkedFrom: { select: { word: { select: { term: true } } } },
     },
   });
 
@@ -520,6 +523,12 @@ export const getAdminWord = cache(async (wordId: string) => {
 
   return {
     word: toAdminWordSummary(word),
+    // Its linked words (see WordLink): the ones it lists, and the ones that
+    // list it (linked both ways, but only editable from their own word).
+    links: {
+      linkedTerms: [...new Set(word.links.map((link) => link.linkedWord.term))],
+      linkedFromTerms: [...new Set(word.linkedFrom.map((link) => link.word.term))],
+    },
     languageDeck: { id: word.languageDeck.id, title: word.languageDeck.title },
     course: word.languageDeck.course,
   };
@@ -1888,10 +1897,36 @@ export const getLearnQueueForCourse = cache(
       include: {
         forms: { orderBy: { position: "asc" } },
         examples: { orderBy: { position: "asc" } },
+        links: { select: { linkedWordId: true } },
+        linkedFrom: { select: { wordId: true } },
       },
     });
 
-    const newWords = withinAllowance(shuffle(candidates), allowance).slice(0, SET_SIZE);
+    // Linked words ("a" and "an") come up close together — see
+    // orderLearnCandidates. A link counts both ways, whichever word set it.
+    const withLinks = candidates.map((word) => ({
+      ...word,
+      linkedIds: [
+        ...word.links.map((link) => link.linkedWordId),
+        ...word.linkedFrom.map((link) => link.wordId),
+      ],
+    }));
+    const partnerIds = [...new Set(withLinks.flatMap((word) => word.linkedIds))];
+    const learnt =
+      partnerIds.length > 0
+        ? await prisma.userWordProgress.findMany({
+            where: { userId: user.id, wordId: { in: partnerIds } },
+            select: { wordId: true },
+          })
+        : [];
+    const ordered = orderLearnCandidates(
+      withLinks,
+      new Set(learnt.map((row) => row.wordId)),
+      SET_SIZE,
+      shuffle,
+    );
+
+    const newWords = withinAllowance(ordered, allowance).slice(0, SET_SIZE);
 
     return {
       words: newWords.map((word) => toRevealWord(word, course)),

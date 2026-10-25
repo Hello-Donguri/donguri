@@ -52,6 +52,7 @@ const WORD_COLUMNS = [
   { header: "Examples (English)", key: "examplesEn", width: 40 },
   { header: "Examples (Japanese)", key: "examplesJa", width: 40 },
   { header: "Examples (Romanization)", key: "examplesRomanization", width: 40 },
+  { header: "Linked words", key: "linkedWords", width: 28 },
   { header: "Word ID", key: "wordId", width: 38 },
 ] as const;
 
@@ -267,6 +268,10 @@ function addInstructionsSheet(workbook: ExcelJS.Workbook, cleanCategoryNames: st
       'Optional. A pronunciation aid for each example in the "Examples (Japanese)" column (e.g. Jyutping for a Cantonese sentence), "|"-separated in the same order. Leave it blank, or give one entry per example — an entry can be left empty (e.g. "ngo5 hai6 hok6 saang1.| |nei5 hou2.") to skip one example.',
     ],
     [
+      "Linked words",
+      'Optional. Other words a learner should meet around the same time as this one — e.g. "an" on the row for "a". Give their Terms, separated by a semicolon ( ; ) or a pipe ( | ). They can be in any deck of this course, or new rows in this file. Once a learner learns one, the words linked to it come up in the same or their next few words in Learn, with other words mixed in. A link works both ways, so it only needs adding on one of the rows. Re-uploading a row replaces its links with what the cell now says.',
+    ],
+    [
       "Word ID",
       'Don\'t fill this in by hand. Filled in automatically by "Download current words" — it\'s how re-uploading that file updates the existing word (replacing its Forms/Examples/Alternative spellings/quiz questions with what\'s now in the row) instead of creating a duplicate. Leave it blank on a genuinely new word. A row with no Word ID whose Term matches an existing word in the deck (e.g. re-uploading the blank template with a word already here) still updates that word rather than duplicating it — the Word ID only matters for telling two same-named words apart, or when a word\'s Term has changed since it was exported.',
     ],
@@ -433,6 +438,8 @@ export type WordExportRow = {
   forms: WordExportForm[];
   examples: WordExportExample[];
   quizQuestions: WordExportQuizQuestion[];
+  // The Terms of the words this one links to (see WordLink).
+  linkedTerms: string[];
 };
 
 // Inverse of parseFormsCell/parseExamplesColumns below — kept next to them
@@ -515,6 +522,7 @@ function writeWordsAndQuizSheets(
       examplesRomanization: word.examples.some((example) => example.romanization)
         ? serializeExamplesColumn(word.examples.map((example) => example.romanization ?? ""))
         : "",
+      linkedWords: word.linkedTerms.join("; "),
       wordId: word.id,
     });
 
@@ -592,6 +600,9 @@ export type ParsedWorkbook =
       // error) when either is missing from the uploaded file.
       grammarRows: ParsedWordImportRow[];
       grammarQuizRows: ParsedSheetRow[];
+      // Whether each sheet has a "Linked words" column — a file from before
+      // it existed leaves links alone rather than clearing them.
+      linkedWordsColumn: { vocab: boolean; grammar: boolean };
     }
   | { ok: false; message: string };
 
@@ -825,7 +836,19 @@ export async function parseWordImportWorkbook(buffer: Buffer): Promise<ParsedWor
     quizRows: quizSheet ? parseSheetRows(quizSheet, QUIZ_COLUMNS) : [],
     grammarRows: grammarSheet ? parseSheetRows(grammarSheet, WORD_COLUMNS) : [],
     grammarQuizRows: grammarQuizSheet ? parseSheetRows(grammarQuizSheet, QUIZ_COLUMNS) : [],
+    linkedWordsColumn: {
+      vocab: hasHeader(wordsSheet, "Linked words"),
+      grammar: grammarSheet ? hasHeader(grammarSheet, "Linked words") : false,
+    },
   };
+}
+
+function hasHeader(sheet: ExcelJS.Worksheet, header: string): boolean {
+  let found = false;
+  sheet.getRow(1).eachCell((cell) => {
+    if (cellText(cell.value).toLowerCase() === header.toLowerCase()) found = true;
+  });
+  return found;
 }
 
 // cellText, but with each bold run of a rich-text cell wrapped in
