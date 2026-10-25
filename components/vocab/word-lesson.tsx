@@ -16,8 +16,9 @@ import {
 import { withStarMark } from "@/lib/star-mark";
 import { WordImage } from "@/components/ui/word-image";
 import { HintText } from "@/components/vocab/hint-text";
-import { fillInputs, stripGrammarMarks } from "@/lib/grammar-marks";
+import { fillInputs, grammarSegments, hasGrammarMarks, inputAnswers, stripGrammarMarks } from "@/lib/grammar-marks";
 import { useTranslations } from "@/components/i18n/locale-provider";
+import { useDevMode } from "@/components/dashboard/dev-mode-context";
 
 // The card's accents. Light mode uses the theme's sage green for every
 // card — green border, sage example panel, green highlights — on cream.
@@ -77,6 +78,9 @@ export const WordLesson = ({
     return { ...example, en: en.text, ja: ja.text, enHighlight: en.highlight, jaHighlight: ja.highlight };
   });
   const [mainExample, ...moreExamples] = examples;
+  // The examples as stored ("&&&I&&& …"), for debug mode.
+  const { enabled: debug } = useDevMode();
+  const rawExamples = new Map(word.examples.map((example) => [example.id, example]));
   const accent = lessonAccent(word.path);
 
   // What to pick out in the examples. A grammar "term" is a structure
@@ -110,8 +114,16 @@ export const WordLesson = ({
     const primaryClass = featured ? "text-xl leading-snug text-sumi" : "leading-snug text-sumi";
     const secondaryClass = `mt-1.5 text-sumi-soft ${featured ? "" : "text-sm"}`;
 
+    // A grammar example written with "&&&"/"$$" marks shows them as the
+    // pattern chart does (see GrammarMarked), straight from the stored text.
+    const raw = rawExamples.get(example.id);
+    const marked = isGrammar && raw && hasGrammarMarks(raw.en + raw.ja) ? raw : null;
+
     const english = (className: string) => (
       <p lang="en" className={className}>
+        {marked ? (
+          <GrammarMarked {...withStarMark(marked.en, marked.enHighlight)} />
+        ) : (
         <Highlighted
           segments={
             highlightMarked(example.en, example.enHighlight) ??
@@ -119,10 +131,14 @@ export const WordLesson = ({
           }
           className={accent.highlight}
         />
+        )}
       </p>
     );
     const other = (className: string) => (
       <p lang={otherLang} className={className}>
+        {marked ? (
+          <GrammarMarked {...withStarMark(marked.ja, marked.jaHighlight)} />
+        ) : (
         <Highlighted
           segments={
             highlightMarked(example.ja, example.jaHighlight) ??
@@ -130,6 +146,7 @@ export const WordLesson = ({
           }
           className={accent.highlight}
         />
+        )}
       </p>
     );
     const romanization = example.romanization && (
@@ -154,6 +171,15 @@ export const WordLesson = ({
               {english(secondaryClass)}
             </>
           )}
+          {/* Debug mode: a grammar example as stored, marks and all. */}
+          {debug && isGrammar && rawExamples.get(example.id) && (
+            <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 rounded-lg border border-dashed border-kin bg-kin/10 px-3 py-2 font-mono text-xs text-sumi">
+              <dt className="text-sumi-soft">en</dt>
+              <dd className="break-words">{rawExamples.get(example.id)!.en}</dd>
+              <dt className="text-sumi-soft">ja</dt>
+              <dd className="break-words">{rawExamples.get(example.id)!.ja}</dd>
+            </dl>
+          )}
         </div>
         <SpeakButton
           text={stripGrammarMarks(englishIsTarget ? example.en : example.ja)}
@@ -166,9 +192,16 @@ export const WordLesson = ({
   // What "Listen" reads out. A vocab word is its term; a grammar pattern
   // ("X 係 Y", "can + verb") would be read as nonsense, so it's the key
   // word(s) instead — or, failing those, the first example.
+  // A grammar example's "&&&" parts are that key part ("I am").
+  const rawMain = mainExample ? rawExamples.get(mainExample.id) : undefined;
+  const keyPart = rawMain
+    ? inputAnswers(englishIsTarget ? rawMain.en : rawMain.ja).join(englishIsTarget ? " " : "")
+    : "";
   const listenText = !isGrammar
     ? word.term
-    : formValues.length > 0
+    : keyPart
+      ? keyPart
+      : formValues.length > 0
       ? formValues.join(englishIsTarget ? ", " : "，")
       : mainExample
         ? englishIsTarget
@@ -595,6 +628,30 @@ function wordTypeLabel(type: WordType, t: ReturnType<typeof useTranslations>): s
       return t("word_type.particle", "Particle");
   }
 }
+
+// A grammar example's marked parts, drawn like the pattern chart's boxes:
+// what the pattern says ("I am", 私) in a solid green box, the word it
+// wraps around ("hungry") in a dashed one. See grammarSegments.
+const GrammarMarked = ({ text, highlight }: { text: string; highlight: string | null }) =>
+  grammarSegments(text, highlight).map((segment, index) =>
+    segment.kind === "key" ? (
+      <strong
+        key={index}
+        className="rounded-md border-[1.5px] border-matcha/80 bg-matcha-soft px-1.5 font-bold text-sumi box-decoration-clone dark:border-matcha/40 dark:bg-matcha-soft/60"
+      >
+        {segment.text}
+      </strong>
+    ) : segment.kind === "slot" ? (
+      <span
+        key={index}
+        className="rounded-md border-[1.5px] border-dashed border-sumi/30 bg-washi/60 px-1.5 box-decoration-clone dark:bg-transparent"
+      >
+        {segment.text}
+      </span>
+    ) : (
+      segment.text
+    ),
+  );
 
 const Highlighted = ({
   segments,

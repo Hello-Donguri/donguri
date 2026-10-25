@@ -55,3 +55,47 @@ export function hintSegments(text: string): HintSegment[] {
   if (last < text.length) segments.push({ text: text.slice(last), hint: false });
   return segments.map((segment) => ({ ...segment, text: segment.text.replaceAll("$$", "") }));
 }
+
+// Whether the text has any grammar marks at all.
+export function hasGrammarMarks(text: string): boolean {
+  return /&&&[^&]+?&&&|\$\$[^$]+?\$\$/.test(text);
+}
+
+export type GrammarSegment = { text: string; kind: "key" | "slot" | "plain" };
+
+// A grammar example split the way the learn card draws it, like the
+// pattern chart: "key" for what the pattern itself says ("&&&" parts, and
+// the "**" highlight — 私 in 私は…), "slot" for the word it wraps around
+// ("$$" parts), "plain" for the rest. The highlight is only picked out
+// when it isn't already one of the "&&&" parts.
+export function grammarSegments(text: string, highlight: string | null): GrammarSegment[] {
+  const segments: GrammarSegment[] = [];
+  let last = 0;
+  for (const match of text.matchAll(/&&&([^&]+?)&&&|\$\$([^$]+?)\$\$/g)) {
+    if (match.index > last) segments.push({ text: text.slice(last, match.index), kind: "plain" });
+    segments.push(match[1] !== undefined ? { text: match[1], kind: "key" } : { text: match[2], kind: "slot" });
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) segments.push({ text: text.slice(last), kind: "plain" });
+
+  const clean = segments.map((segment) => ({
+    ...segment,
+    text: segment.text.replaceAll("&&&", "").replaceAll("$$", ""),
+  }));
+  const wanted = highlight?.trim();
+  if (!wanted || clean.some((segment) => segment.kind === "key" && segment.text.trim() === wanted)) {
+    return clean;
+  }
+
+  // The highlight's first appearance in the plain text becomes a key part.
+  const index = clean.findIndex((segment) => segment.kind === "plain" && segment.text.includes(wanted));
+  if (index === -1) return clean;
+  const { text: plain } = clean[index];
+  const at = plain.indexOf(wanted);
+  const pieces: GrammarSegment[] = [
+    { text: plain.slice(0, at), kind: "plain" as const },
+    { text: wanted, kind: "key" as const },
+    { text: plain.slice(at + wanted.length), kind: "plain" as const },
+  ].filter((piece) => piece.text !== "");
+  return [...clean.slice(0, index), ...pieces, ...clean.slice(index + 1)];
+}
