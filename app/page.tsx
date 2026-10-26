@@ -30,19 +30,21 @@ export default async function Home() {
   // Shown on the pricing card; left off rather than failing the page if
   // Stripe can't be reached. Next.js's own interruptions (a background
   // prerender ending mid-fetch) are handed back to it, not logged.
-  const priceLabel = await getMembershipPriceLabel(locale, t("billing.per_month", "month")).catch(
-    (error) => {
-      unstable_rethrow(error);
-      console.error("Couldn't load the membership price:", error);
-      return null;
-    },
-  );
+  const priceLabel = await getMembershipPriceLabel(
+    locale,
+    t("billing.per_month", "month"),
+  ).catch((error) => {
+    unstable_rethrow(error);
+    console.error("Couldn't load the membership price:", error);
+    return null;
+  });
 
   return (
     <div className="flex min-h-screen flex-col bg-washi">
       <SiteHeader />
 
       <main className="flex-1">
+        <button onClick={() => alert("test")}>test</button>
         <Hero t={t} />
         <Decks t={t} />
         <Story t={t} />
