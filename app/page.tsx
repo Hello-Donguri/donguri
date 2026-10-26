@@ -14,6 +14,7 @@ import { Story } from "@/components/landing/story/story";
 import { Progress } from "@/components/landing/progress";
 import { ForJapaneseSpeakers } from "@/components/landing/for-japanese-speakers";
 import { FinalCta } from "@/components/landing/final-cta";
+import { TestButton } from "@/components/landing/test-button";
 
 export default async function Home() {
   const user = await getSession();
@@ -44,7 +45,7 @@ export default async function Home() {
       <SiteHeader />
 
       <main className="flex-1">
-        <button onClick={() => alert("test")}>test</button>
+        <TestButton />
         <Hero t={t} />
         <Decks t={t} />
         <Story t={t} />
