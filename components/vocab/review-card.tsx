@@ -6,6 +6,7 @@ import { Lock } from "lucide-react";
 import { FakeButton } from "@/components/ui/fake-button";
 import { CountBadge } from "@/components/ui/count-badge";
 import { NextReviewCountdown } from "@/components/vocab/next-review-countdown";
+import { ClearReviewQueueButton } from "@/components/vocab/clear-review-queue-button";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { onReviewQueueChanged } from "@/lib/review-sync";
 
@@ -241,7 +242,7 @@ function LiveReviewCard({
     </>
   );
 
-  return hasReviews ? (
+  const card = hasReviews ? (
     <Link
       href={`/dashboard/courses/${courseSlug}/review`}
       className={`group ${CARD_CLASS} transition duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.015] hover:brightness-105 hover:shadow-md`}
@@ -255,6 +256,15 @@ function LiveReviewCard({
       style={{ backgroundImage: "url(/images/red-bg.webp)" }}
     >
       {content}
+    </div>
+  );
+
+  // Dev mode's "remove words from queue" sits over the card's top right —
+  // beside the link, not in it, since a button can't go inside a link.
+  return (
+    <div className="relative grid">
+      {card}
+      <ClearReviewQueueButton courseSlug={courseSlug} className="absolute top-4 right-4 z-20" />
     </div>
   );
 }

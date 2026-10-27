@@ -584,6 +584,12 @@ export const MultipleChoiceOptions = ({
 
 const BLANK = "___";
 
+// Hands an element to a ref passed in from outside, whichever kind it is.
+function setRef<T>(ref: React.Ref<T> | undefined, value: T | null) {
+  if (typeof ref === "function") ref(value);
+  else if (ref) ref.current = value;
+}
+
 // A fill-in-the-blank prompt: the learner's-language translation, the
 // target sentence with the blank picked out as a coloured slot (green for
 // grammar, blue for vocab), and — when there is one — the romanization
@@ -623,6 +629,8 @@ export const ClozeCard = ({
 }) => {
   const t = useTranslations();
   const blankCount = sentence.split(BLANK).length - 1;
+  // Each blank's box, for Space to move on to the next one.
+  const blankRefs = useRef<(HTMLInputElement | null)[]>([]);
   const highlightIndex = highlight ? translation.indexOf(highlight) : -1;
   // Once answered, the right answer fills the boxes a word each — or all of
   // it in one box, if it's an accepted answer with a different word count.
@@ -661,14 +669,25 @@ export const ClozeCard = ({
     return (
       <input
         key={key}
-        ref={index === 0 ? inputs?.inputRef : undefined}
+        ref={(element) => {
+          blankRefs.current[index] = element;
+          if (index === 0) setRef(inputs?.inputRef, element);
+        }}
         type="text"
         value={value}
         onChange={(event) => inputs?.onChange(index, event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+          if (event.nativeEvent.isComposing) return;
+          if (event.key === "Enter") {
             event.preventDefault();
             inputs?.onSubmit();
+          }
+          // Space moves on to the next blank, since a blank holds a single
+          // word. In the last blank it types a space as usual.
+          const next = blankRefs.current[index + 1];
+          if (event.key === " " && next) {
+            event.preventDefault();
+            next.focus();
           }
         }}
         disabled={inputs?.disabled}

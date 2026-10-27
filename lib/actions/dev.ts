@@ -27,6 +27,25 @@ export async function devResetDeck(courseSlug: string, deckId: string): Promise<
   revalidatePath(`/dashboard/courses/${courseSlug}`, "layout");
 }
 
+// "Clear review queue": the same as "Reset deck", but for every word the
+// course page's review queue panel lists (see getReviewQueueDebug) — they
+// go back to unlearnt, ready to be learnt again.
+export async function devClearReviewQueue(courseSlug: string): Promise<void> {
+  const profile = await requireAdminUser();
+  const inCourse = {
+    userId: profile.id,
+    word: {
+      languageDeck: { course: { slug: courseSlug }, active: true },
+      active: true,
+    },
+  };
+  await prisma.$transaction([
+    prisma.reviewEvent.deleteMany({ where: inCourse }),
+    prisma.userWordProgress.deleteMany({ where: inCourse }),
+  ]);
+  revalidatePath(`/dashboard/courses/${courseSlug}`, "layout");
+}
+
 // A question's example sentence as stored, marks and all ("&&&I&&& …"),
 // for checking how a grammar cloze was read. Never sent with the question
 // itself, since it holds the answers.
