@@ -517,6 +517,7 @@ export const JyutpingInput = ({
           autoFocus={autoFocus}
           autoComplete="off"
           autoCapitalize="off"
+          autoCorrect="off"
           spellCheck={false}
           placeholder={placeholder}
           // The typed text itself is invisible — the tone-coloured copy on

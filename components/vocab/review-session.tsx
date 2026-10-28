@@ -584,6 +584,7 @@ const ReviewSessionQuestions = ({
                     ref={answerInputRef}
                     autoComplete="off"
                     autoCapitalize="off"
+                    autoCorrect="off"
                     spellCheck={false}
                     placeholder={
                       question.kind === "type-answer" && question.answerRomanized

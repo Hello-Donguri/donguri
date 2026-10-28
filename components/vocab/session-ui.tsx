@@ -694,6 +694,7 @@ export const ClozeCard = ({
         aria-label={t("test_session.blank_n", "Blank {{n}}", { n: key })}
         autoComplete="off"
         autoCapitalize="off"
+        autoCorrect="off"
         spellCheck={false}
         style={{ width: `${Math.max(value.length, 3) + 1.5}ch` }}
         className={`mx-1 inline-block rounded-lg px-2 text-center align-baseline ring-2 outline-none transition focus:ring-4 disabled:opacity-60 ${slotStyle}`}

@@ -199,7 +199,7 @@ function DailyChallengeChat({
   const [isSkipping, startSkip] = useTransition();
   const skipDialogRef = useRef<HTMLDialogElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   const feedbackRef = useRef<HTMLElement>(null);
   const completionRef = useRef<HTMLDivElement>(null);
   const quackRef = useRef<HTMLAudioElement | null>(null);
@@ -602,7 +602,7 @@ function DailyChallengeChat({
                           className={cn(
                             "rounded-[1.25rem] px-4 py-2.5 text-[0.95rem] leading-snug shadow-sm",
                             isUser
-                              ? "rounded-br-md bg-linear-to-br from-ai to-ai-dark text-washi shadow-ai/25"
+                              ? "rounded-br-md whitespace-pre-line bg-linear-to-br from-ai to-ai-dark text-washi shadow-ai/25"
                               : "rounded-bl-md bg-washi text-sumi ring-1 ring-card-border/60",
                           )}
                         >
@@ -740,7 +740,7 @@ function DailyChallengeChat({
 
             <form
               onSubmit={handleSubmit}
-              className="flex items-center gap-2 border-t border-card-border/70 bg-washi/90 px-3 py-3 backdrop-blur"
+              className="flex items-end gap-2 border-t border-card-border/70 bg-washi/90 px-3 py-3 backdrop-blur"
             >
               <label htmlFor="message" className="sr-only">
                 {t("chat.your_message", "Your message")}
@@ -772,21 +772,32 @@ function DailyChallengeChat({
                   />
                 </div>
               ) : (
-                <input
-                  ref={inputRef}
+                // Enter sends; Shift+Enter starts a new line. Grows with
+                // what's typed, up to a few lines.
+                <textarea
+                  ref={(element) => {
+                    inputRef.current = element;
+                  }}
                   id="message"
                   name="message"
+                  rows={1}
                   value={draft}
                   maxLength={500}
                   autoComplete="off"
                   onChange={(event) => setDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                      event.preventDefault();
+                      event.currentTarget.form?.requestSubmit();
+                    }
+                  }}
                   placeholder={
                     isComplete
                       ? t("chat.session_complete_short", "Session complete!")
                       : t("chat.type_a_message", "Type a message")
                   }
                   disabled={isReplying || isComplete}
-                  className="h-11 min-w-0 flex-1 rounded-full border border-card-border bg-washi-soft/60 px-4 text-sumi outline-none transition placeholder:text-sumi-soft/70 focus:border-ai/50 focus:bg-washi focus:ring-4 focus:ring-ai/10 disabled:opacity-60"
+                  className="field-sizing-content max-h-32 min-h-11 min-w-0 flex-1 resize-none rounded-[1.375rem] border border-card-border bg-washi-soft/60 px-4 py-2.5 leading-normal text-sumi outline-none transition placeholder:text-sumi-soft/70 focus:border-ai/50 focus:bg-washi focus:ring-4 focus:ring-ai/10 disabled:opacity-60"
                 />
               )}
               <button
