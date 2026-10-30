@@ -71,6 +71,7 @@ import {
 import { blankInputs, fillInputs, inputAnswers, stripGrammarMarks } from "@/lib/grammar-marks";
 import { orderLearnCandidates } from "@/lib/learn-order";
 import { isLatinTypeable } from "@/lib/language";
+import { testDeckFilter } from "@/lib/deck-visibility";
 import { levelForXp, parseDonguriConfig, type AccessoryId } from "@/lib/levels";
 import {
   pickChallengeTarget,
@@ -322,6 +323,7 @@ export const getEnrolledCourses = cache(
         course: {
           include: {
             languageDecks: {
+              where: testDeckFilter(user),
               select: {
                 words: {
                   select: {
@@ -405,14 +407,17 @@ export const getAdminCategoryOverview = cache(
     const languageDecks = await prisma.languageDeck.findMany({
       where: { courseId: course.id },
       orderBy: { position: "asc" },
-      include: { words: { select: { path: true } } },
+      include: {
+        words: { select: { path: true, imageKey: true, audioFemaleKey: true, audioMaleKey: true } },
+      },
     });
 
     return {
       course: toCourseSummary(course),
       categories: languageDecks.map((languageDeck) => {
-        const vocabCount = languageDeck.words.filter((word) => word.path === "vocab").length;
-        const grammarCount = languageDeck.words.length - vocabCount;
+        const { words } = languageDeck;
+        const vocabCount = words.filter((word) => word.path === "vocab").length;
+        const grammarCount = words.length - vocabCount;
 
         return {
           id: languageDeck.id,
@@ -422,6 +427,16 @@ export const getAdminCategoryOverview = cache(
           position: languageDeck.position,
           active: languageDeck.active,
           tags: languageDeck.tags,
+          isTest: languageDeck.isTest,
+          subheading: languageDeck.subheading,
+          coverImage: deckCoverImagePath(languageDeck),
+          media: {
+            total: words.length,
+            images: words.filter((word) => word.imageKey).length,
+            svgImages: words.filter((word) => word.imageKey?.toLowerCase().endsWith(".svg")).length,
+            femaleVoice: words.filter((word) => word.audioFemaleKey).length,
+            maleVoice: words.filter((word) => word.audioMaleKey).length,
+          },
         };
       }),
     };
@@ -790,7 +805,7 @@ export const getFlaggedWords = cache(async (courseSlug: string): Promise<Flagged
     where: {
       userId: user.id,
       flaggedAt: { not: null },
-      word: { active: true, languageDeck: { courseId: course.id, active: true } },
+      word: { active: true, languageDeck: { courseId: course.id, active: true, ...testDeckFilter(user) } },
     },
     orderBy: { flaggedAt: "desc" },
     select: {
@@ -812,7 +827,7 @@ export const getLearntWords = cache(async (courseSlug: string): Promise<LearntWo
     where: {
       userId: user.id,
       skipped: false,
-      word: { active: true, languageDeck: { courseId: course.id, active: true } },
+      word: { active: true, languageDeck: { courseId: course.id, active: true, ...testDeckFilter(user) } },
     },
     orderBy: { introducedAt: "desc" },
     select: {
@@ -932,7 +947,7 @@ export const getCourseDecks = cache(async (courseSlug: string) => {
 
   const [languageDecks, activeDeckIds] = await Promise.all([
     prisma.languageDeck.findMany({
-      where: { courseId: course.id, active: true },
+      where: { courseId: course.id, active: true, ...testDeckFilter(user) },
       orderBy: { position: "asc" },
       include: {
         words: {
@@ -968,8 +983,9 @@ export const getCourseDecks = cache(async (courseSlug: string) => {
 // (see `ensureDeckActivations`) once the user changes their selection.
 const getActiveDeckIds = cache(
   async (courseId: string, userId: string): Promise<string[]> => {
+    const user = await requireLearner();
     const activations = await prisma.userDeckActivation.findMany({
-      where: { userId, languageDeck: { courseId } },
+      where: { userId, languageDeck: { courseId, ...testDeckFilter(user) } },
       select: { languageDeckId: true, active: true },
     });
 
@@ -981,7 +997,7 @@ const getActiveDeckIds = cache(
 
     // Guests (see lib/access.ts) start with nothing selected — choosing
     // their decks is part of trying Donguri out.
-    if ((await requireLearner()).is_guest) return [];
+    if (user.is_guest) return [];
 
     const firstDeck = await getDefaultDeck(courseId);
 
@@ -991,7 +1007,7 @@ const getActiveDeckIds = cache(
 
 function getDefaultDeck(courseId: string) {
   return prisma.languageDeck.findFirst({
-    where: { courseId, active: true },
+    where: { courseId, active: true, isTest: false },
     orderBy: { position: "asc" },
     select: { id: true },
   });
@@ -1035,7 +1051,7 @@ export const getDeckDetail = cache(
     const { user, course } = await requireEnrolledCourse(courseSlug);
 
     const languageDeck = await prisma.languageDeck.findFirst({
-      where: { id: deckId, courseId: course.id, active: true },
+      where: { id: deckId, courseId: course.id, active: true, ...testDeckFilter(user) },
       include: {
         words: {
           where: { active: true },
@@ -1066,7 +1082,7 @@ export const getDeckDetail = cache(
 export const getPublicDeckDetail = cache(
   async (courseSlug: string, deckId: string) => {
     const languageDeck = await prisma.languageDeck.findFirst({
-      where: { id: deckId, active: true, course: { slug: courseSlug, active: true } },
+      where: { id: deckId, active: true, isTest: false, course: { slug: courseSlug, active: true } },
       include: {
         course: true,
         words: {
@@ -2124,7 +2140,7 @@ export const getTestQueueForCourse = cache(
       lastSeenAt: null,
       skipped: false,
       word: {
-        languageDeck: { courseId: course.id, active: true },
+        languageDeck: { courseId: course.id, active: true, ...testDeckFilter(user) },
         active: true,
       },
     } as const;
@@ -2173,7 +2189,7 @@ export const getTestQueueForCourse = cache(
       .map((progress) => ({ ...progress.word, path: "vocab" as const }));
 
     const grammarPool =
-      grammarWords.length > 0 ? await loadGrammarPool(course) : null;
+      grammarWords.length > 0 ? await loadGrammarPool(course, user) : null;
     const grammarQuestions = grammarWords.flatMap((word) =>
       buildGrammarQuizQuestions(word, course, grammarPool),
     );
@@ -2182,7 +2198,7 @@ export const getTestQueueForCourse = cache(
     if (vocabWords.length > 0) {
       const distractorPool = await prisma.word.findMany({
         where: {
-          languageDeck: { courseId: course.id, active: true },
+          languageDeck: { courseId: course.id, active: true, ...testDeckFilter(user) },
           path: "vocab",
           active: true,
         },
@@ -2220,12 +2236,12 @@ export const getTestQueueForCourse = cache(
 // whose quiz was skipped mustn't drop out of the schedule for good.
 // Answering it in review marks it seen, which also takes it out of the
 // pending quiz (see `getTestQueueForCourse`).
-function reviewableWhere(userId: string, courseId: string) {
+function reviewableWhere(profile: { id: string; role: string }, courseId: string) {
   return {
-    userId,
+    userId: profile.id,
     stage: { lt: MAX_STAGE },
     word: {
-      languageDeck: { courseId, active: true },
+      languageDeck: { courseId, active: true, ...testDeckFilter(profile) },
       active: true,
     },
   } as const;
@@ -2258,7 +2274,7 @@ export const getReviewQueueSummary = cache(
   async (courseSlug: string): Promise<ReviewQueueSummary> => {
     const { user, course } = await requireEnrolledCourse(courseSlug);
     const now = new Date();
-    const reviewable = reviewableWhere(user.id, course.id);
+    const reviewable = reviewableWhere(user, course.id);
 
     const cutoff = await dueCutoff(reviewable, now);
     const [dueCount, next, upcomingDue] = await Promise.all([
@@ -2328,7 +2344,7 @@ export async function getReviewDueStatus(): Promise<ReviewDueStatus[]> {
 
   return Promise.all(
     enrollments.map(async ({ course }) => {
-      const reviewable = reviewableWhere(profile.id, course.id);
+      const reviewable = reviewableWhere(profile, course.id);
       const cutoff = await dueCutoff(reviewable, now);
       const [dueCount, upcoming, upcomingDue] = await Promise.all([
         prisma.userWordProgress.count({ where: { ...reviewable, nextReviewAt: { lte: cutoff } } }),
@@ -2402,7 +2418,7 @@ export const getReviewQueue = cache(
   async (courseSlug: string): Promise<QuizQuestion[]> => {
     const { user, course } = await requireEnrolledCourse(courseSlug);
 
-    const reviewable = reviewableWhere(user.id, course.id);
+    const reviewable = reviewableWhere(user, course.id);
     const dueProgress = await prisma.userWordProgress.findMany({
       where: {
         ...reviewable,
@@ -2423,7 +2439,7 @@ export const getReviewQueue = cache(
     }
 
     const grammarPool = dueProgress.some((progress) => progress.word.path === "grammar")
-      ? await loadGrammarPool(course)
+      ? await loadGrammarPool(course, user)
       : null;
 
     return shuffle(
@@ -2654,14 +2670,14 @@ type GrammarPool = {
   words: QuestionWord[];
 };
 
-async function loadGrammarPool(course: {
-  id: string;
-  targetLanguage: string;
-}): Promise<GrammarPool> {
+async function loadGrammarPool(
+  course: { id: string; targetLanguage: string },
+  profile: { role: string },
+): Promise<GrammarPool> {
   const courseId = course.id;
   const words = await prisma.word.findMany({
     where: {
-      languageDeck: { courseId, active: true },
+      languageDeck: { courseId, active: true, ...testDeckFilter(profile) },
       path: "grammar",
       active: true,
     },

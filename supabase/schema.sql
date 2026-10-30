@@ -2179,3 +2179,11 @@ drop policy if exists "Authenticated users can view word links" on public.word_l
 create policy "Authenticated users can view word links"
   on public.word_links for select
   using (auth.role() = 'authenticated');
+
+-- 62. Test decks ----------------------------------------------------------------------------
+-- A flag for decks kept to try things out that will never go live. Only
+-- admins see them, anywhere — everyone else's deck lists, learn, quiz,
+-- review and daily challenge leave them out (see lib/deck-visibility.ts) —
+-- and the admin course page lists them apart from the live decks.
+
+alter table public.language_decks add column if not exists is_test boolean not null default false;

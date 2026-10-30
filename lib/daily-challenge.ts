@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { addDays, startOfUTCDay } from "@/lib/srs";
 import { parseCourseLevel, type CourseLevel } from "@/lib/definitions";
+import { canSeeTestDecks } from "@/lib/deck-visibility";
 
 // What a daily-challenge attempt asks the learner to use in their chat with
 // Charles Duck: a vocab word, a grammar point, or one of each (anywhere in
@@ -561,7 +562,7 @@ export async function pickChallengeTarget(
   challengeDate: Date,
   attemptIndex: number,
 ): Promise<ChallengeTarget | null> {
-  const [words, profile, course, todaysAttempts, enrollment] = await Promise.all([
+  const [learntWords, profile, course, todaysAttempts, enrollment] = await Promise.all([
     prisma.word.findMany({
       where: {
         active: true,
@@ -571,10 +572,11 @@ export async function pickChallengeTarget(
       select: {
         ...challengeWordSelect,
         progress: { where: { userId }, select: { introducedAt: true } },
+        languageDeck: { select: { isTest: true } },
       },
       orderBy: { id: "asc" },
     }),
-    prisma.profile.findUnique({ where: { id: userId }, select: { xp: true } }),
+    prisma.profile.findUnique({ where: { id: userId }, select: { xp: true, role: true } }),
     prisma.course.findUniqueOrThrow({ where: { id: courseId }, select: { targetLanguage: true } }),
     prisma.dailyChallengeAttempt.findMany({
       where: { userId, courseId, challengeDate },
@@ -586,6 +588,10 @@ export async function pickChallengeTarget(
     }),
   ]);
 
+  // Test decks are admin-only — filtered here rather than in the query so
+  // the profile lookup can still run alongside it.
+  const showTestDecks = canSeeTestDecks(profile);
+  const words = learntWords.filter((word) => showTestDecks || !word.languageDeck.isTest);
   if (words.length === 0) return null;
 
   const usedToday = new Set(todaysAttempts.flatMap((attempt) => attempt.targetTerms));

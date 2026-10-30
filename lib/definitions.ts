@@ -1317,6 +1317,12 @@ export type AdminCategorySummary = {
   position: number;
   active: boolean;
   tags: string[];
+  isTest: boolean;
+  subheading: string | null;
+  coverImage: string | null;
+  // How many of the deck's words have each kind of media — what's left to
+  // make before the deck can go live. `svgImages` is a subset of `images`.
+  media: { total: number; images: number; svgImages: number; femaleVoice: number; maleVoice: number };
 };
 
 // Loaded by the admin deck-edit page to prefill `EditCategoryForm` — the

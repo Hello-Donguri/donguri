@@ -838,6 +838,25 @@ export async function setCategoryActive(languageDeckId: string, active: boolean)
   revalidatePath(`/dashboard/courses/${languageDeck.course.slug}`);
 }
 
+// Marks a deck as a test deck (never going live, admins only — see
+// lib/deck-visibility.ts) or back to a real one.
+export async function setCategoryTest(languageDeckId: string, isTest: boolean): Promise<void> {
+  const profile = await requireProfile();
+
+  if (profile.role !== "admin") {
+    return;
+  }
+
+  const languageDeck = await prisma.languageDeck.update({
+    where: { id: languageDeckId },
+    data: { isTest },
+    select: { course: { select: { slug: true } } },
+  });
+
+  revalidatePath(`/dashboard/admin/courses/${languageDeck.course.slug}`);
+  revalidatePath(`/dashboard/courses/${languageDeck.course.slug}`);
+}
+
 // Unlike setCategoryActive (reversible — hide the deck, keep everything),
 // this is permanent: every Word in it cascade-deletes, which cascades
 // further to each word's WordForm/WordExample/WordQuizQuestion/
