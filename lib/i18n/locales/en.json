@@ -71,6 +71,7 @@
   "admin_category_words.svg": "SVG",
   "admin_course_decks.confirm_delete": "Permanently delete \"{{label}}\" and all {{count}} of its words? This also deletes every learner's progress on them. This can't be undone — use the show/hide toggle instead if you just want to hide it.",
   "admin_course_decks.new_deck": "New deck",
+  "admin_course_decks.readiness_aria": "{{percent}}% ready",
   "admin_course_decks.no_decks": "No decks yet.",
   "admin_course_decks.subtitle": "Decks in this course.",
   "admin_course_decks.live_decks": "Live decks",

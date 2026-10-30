@@ -43,6 +43,49 @@ function sumMedia(categories: AdminCategorySummary[]): Media {
   );
 }
 
+// How ready a deck is to go live: the share of its four media slots
+// (image, SVG image, female voice, male voice per word) that are filled.
+function readiness(media: Media): number {
+  if (media.total === 0) return 0;
+  const filled = media.images + media.svgImages + media.femaleVoice + media.maleVoice;
+  return Math.round((filled / (media.total * 4)) * 100);
+}
+
+function ReadinessRing({ media }: { media: Media }) {
+  const t = useTranslations();
+  const percent = readiness(media);
+  const radius = 16;
+  const circumference = 2 * Math.PI * radius;
+  const stroke = percent === 100 ? "stroke-matcha" : percent === 0 ? "stroke-shu" : "stroke-kin";
+
+  return (
+    <div
+      role="img"
+      aria-label={t("admin_course_decks.readiness_aria", "{{percent}}% ready", { percent })}
+      title={t("admin_course_decks.readiness_aria", "{{percent}}% ready", { percent })}
+      className="relative h-11 w-11 shrink-0"
+    >
+      <svg viewBox="0 0 40 40" className="h-full w-full -rotate-90" aria-hidden>
+        <circle cx="20" cy="20" r={radius} fill="none" strokeWidth="4" className="stroke-sumi/10" />
+        <circle
+          cx="20"
+          cy="20"
+          r={radius}
+          fill="none"
+          strokeWidth="4"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - percent / 100)}
+          className={`${stroke} transition-[stroke-dashoffset]`}
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold tabular-nums text-sumi">
+        {percent}%
+      </span>
+    </div>
+  );
+}
+
 function MediaSummary({ media }: { media: Media }) {
   const t = useTranslations();
 
@@ -100,11 +143,15 @@ function DeckCard({
 
   return (
     <div
-      className={`flex flex-col gap-3 rounded-2xl border bg-washi-soft p-4 shadow-sm ${
+      className={`relative flex flex-col gap-3 rounded-2xl border bg-washi-soft p-4 shadow-sm ${
         category.isTest ? "border-dashed border-sumi/25" : "border-card-border"
       }`}
     >
-      <Link href={href} className="group flex items-start gap-3">
+      <div className="absolute right-3 top-3">
+        <ReadinessRing media={category.media} />
+      </div>
+
+      <Link href={href} className="group flex items-start gap-3 pr-12">
         <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-washi shadow-sm">
           {category.coverImage ? (
             <WordImage src={category.coverImage} alt="" className="h-full w-full object-cover" fallback={initial} />
