@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Check,
-  Loader2,
+  Clock,
   RefreshCw,
   Save,
   Shapes,
@@ -34,6 +34,9 @@ import {
 import {
   CHECKERBOARD,
   CharacterPicker,
+  FaceToggle,
+  FullSizeHint,
+  LoadingPicture,
   ImageModelPicker,
   RecommendedModelsNote,
   SELECT_CLASS,
@@ -75,8 +78,10 @@ type Item = {
   svgs: Partial<Record<SvgOptionKey, SvgResult>> | null;
   chosen: string | null;
   error: string | null;
-  // The latest log line, so a running card says what it's doing.
+  // The latest log line, so a running card says what it's doing, and when
+  // the current step started, for its timer.
   activity: string | null;
+  startedAt: number | null;
 };
 
 type WordFilter = "missing" | "not-svg" | "all";
@@ -124,6 +129,12 @@ function choiceFor(item: Item, key: string | null): Choice | null {
       : null;
   const result = item.svgs?.[key as SvgOptionKey];
   return result?.ok ? { type: "image/svg+xml", svg: result.svg } : null;
+}
+
+// When a card's step starts, for its timer — read when the step is kicked
+// off, never during render.
+function stepStart() {
+  return Date.now();
 }
 
 // Runs `work` over `items`, `limit` at a time, until they're done or
@@ -241,7 +252,9 @@ function BatchCard({
           <ImageLightbox
             src={shown.src}
             alt={`${item.term} — ${shown.label}`}
-            className="block h-full w-full"
+            className="group block h-full w-full"
+            inspect
+            backgroundStyle={CHECKERBOARD}
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- a data URL, not a hosted file. */}
             <img
@@ -249,19 +262,23 @@ function BatchCard({
               alt={`${item.term} — ${shown.label}`}
               className="h-full w-full object-contain"
             />
+            {!working && <FullSizeHint label={t("admin_batch_images.full_size", "Full size")} />}
           </ImageLightbox>
         ) : item.status === "failed" ? (
           <p className="flex h-full items-center justify-center p-2 text-center text-[11px] text-shu-dark">
             {item.error}
           </p>
+        ) : item.status === "drawing" ? (
+          <LoadingPicture
+            label={t("admin_batch_images.drawing", "Drawing…")}
+            activity={item.activity}
+            startedAt={item.startedAt}
+            compact
+          />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-1 text-[11px] text-sumi-soft">
-            {item.status === "drawing" ? (
-              <Loader2 aria-hidden className="h-5 w-5 animate-spin" />
-            ) : null}
-            {item.status === "drawing"
-              ? t("admin_batch_images.drawing", "Drawing…")
-              : t("admin_batch_images.queued", "Waiting")}
+          <div className="flex h-full flex-col items-center justify-center gap-1.5 border-2 border-dashed border-sumi/10 text-[11px] font-semibold text-sumi-soft">
+            <Clock aria-hidden className="h-5 w-5" />
+            {t("admin_batch_images.queued", "Waiting in line")}
           </div>
         )}
         {previewed && !working && item.status !== "saved" && (
@@ -272,12 +289,19 @@ function BatchCard({
           </span>
         )}
         {working && item.picture && (
-          <div className="absolute inset-x-0 bottom-0 flex items-center gap-1 bg-washi/85 px-2 py-1 text-[10px] text-sumi">
-            <Loader2 aria-hidden className="h-3 w-3 shrink-0 animate-spin" />
-            <span className="truncate">
-              {item.activity ?? t("admin_batch_images.working", "Working…")}
-            </span>
-          </div>
+          <LoadingPicture
+            label={
+              item.status === "tracing"
+                ? t("admin_batch_images.making_svgs", "Making SVGs…")
+                : item.status === "saving"
+                  ? t("admin_batch_images.saving", "Saving…")
+                  : t("admin_batch_images.drawing", "Drawing…")
+            }
+            activity={item.activity}
+            startedAt={item.status === "saving" ? null : item.startedAt}
+            overlay
+            compact
+          />
         )}
         {item.status === "saved" && (
           <span className="absolute top-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-matcha text-washi">
@@ -450,6 +474,7 @@ export function BatchWordImages({
   const candidates = presetWords ?? loadedWords;
   const [loadingWords, setLoadingWords] = useState(false);
   const [characterIds, setCharacterIds] = useState<WordImageCharacterId[]>([]);
+  const [face, setFace] = useState(true);
   const [sceneId, setSceneId] = useState<SceneChoice>("auto");
   const [items, setItems] = useState<Item[]>([]);
   const [running, setRunning] = useState<"draw" | "trace" | "save" | null>(
@@ -558,6 +583,7 @@ export function BatchWordImages({
       chosen: null,
       error: null,
       activity: null,
+      startedAt: stepStart(),
     });
     const failed = await streamFor(
       id,
@@ -566,6 +592,7 @@ export function BatchWordImages({
         wordId: id,
         characterIds,
         sceneId,
+        face,
         imageModel: settings.models.imageModel,
         quality: settings.models.quality,
       },
@@ -610,6 +637,7 @@ export function BatchWordImages({
         chosen: null,
         error: null,
         activity: null,
+        startedAt: null,
       })),
     );
     void run("draw", (signal) =>
@@ -631,6 +659,7 @@ export function BatchWordImages({
           svgs: {},
           error: null,
           activity: null,
+          startedAt: stepStart(),
         });
         const failed = await streamFor(
           item.id,
@@ -896,6 +925,9 @@ export function BatchWordImages({
                 onChange={setCharacterIds}
                 disabled={running !== null}
               />
+              {characterIds.length === 0 && (
+                <FaceToggle value={face} onChange={setFace} disabled={running !== null} />
+              )}
               {/* No custom scene: one description can't suit every word. */}
               <ScenePicker
                 sceneId={sceneId}

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Coins, Lightbulb } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Check, Coins, Lightbulb, Loader2, Maximize2 } from "lucide-react";
 import { WORD_IMAGE_CHARACTERS, type WordImageCharacterId } from "@/lib/word-image-characters";
 import {
   CUSTOM_SCENE_ID,
@@ -475,5 +475,90 @@ export function SvgModelPicker({ settings, disabled }: { settings: WordImageSett
         </span>
       )}
     </label>
+  );
+}
+
+// With no characters: whether the drawn thing gets a cute face, like the
+// style reference's. Shown only then — characters have their own faces.
+export function FaceToggle({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: boolean;
+  onChange: (value: boolean) => void;
+  disabled: boolean;
+}) {
+  const t = useTranslations();
+  return (
+    <label className="-mt-1 flex w-fit cursor-pointer items-center gap-2 text-xs font-semibold text-sumi has-disabled:cursor-not-allowed has-disabled:opacity-60">
+      <input
+        type="checkbox"
+        role="switch"
+        checked={value}
+        onChange={(event) => onChange(event.target.checked)}
+        disabled={disabled}
+        className="peer sr-only"
+      />
+      <span
+        aria-hidden
+        className="relative h-5 w-9 shrink-0 rounded-full bg-sumi/20 transition peer-checked:bg-ai peer-focus-visible:ring-2 peer-focus-visible:ring-ai-soft after:absolute after:top-0.5 after:left-0.5 after:h-4 after:w-4 after:rounded-full after:bg-washi after:shadow-sm after:transition peer-checked:after:translate-x-4"
+      />
+      {t("admin_category_words.cute_face", "Cute face on the object")}
+    </label>
+  );
+}
+
+// In place of a picture that's on its way: a pulsing panel with a big
+// spinner, what's happening, how long it's been going and the latest line
+// from its log — so it's obvious it's working, not stuck. Over a picture
+// already there (`overlay`), it's see-through, so the picture shows behind.
+export function LoadingPicture({
+  label,
+  activity,
+  startedAt,
+  overlay = false,
+  compact = false,
+}: {
+  label: string;
+  activity?: string | null;
+  startedAt?: number | null;
+  overlay?: boolean;
+  compact?: boolean;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(timer);
+  }, []);
+  const seconds = startedAt ? Math.max(0, Math.floor((now - startedAt) / 1000)) : null;
+
+  return (
+    <div
+      role="status"
+      className={cn(
+        "flex h-full w-full flex-col items-center justify-center gap-2 p-3 text-center",
+        overlay ? "absolute inset-0 bg-washi/80" : "animate-pulse bg-ai-soft",
+      )}
+    >
+      <Loader2 aria-hidden className={cn("animate-spin text-ai", compact ? "h-6 w-6" : "h-10 w-10")} />
+      <span className={cn("font-nunito font-extrabold text-ai-dark", compact ? "text-xs" : "text-sm")}>
+        {label}
+        {seconds !== null && <span className="ml-1.5 font-semibold tabular-nums text-sumi-soft">{seconds}s</span>}
+      </span>
+      {activity && (
+        <span className={cn("line-clamp-2 max-w-full text-sumi-soft", compact ? "text-[10px]" : "text-xs")}>{activity}</span>
+      )}
+    </div>
+  );
+}
+
+// On a preview that opens full size: a corner badge saying so.
+export function FullSizeHint({ label }: { label: string }) {
+  return (
+    <span className="pointer-events-none absolute right-1.5 bottom-1.5 flex items-center gap-1 rounded-full bg-sumi/75 px-2 py-0.5 text-[10px] font-semibold text-washi">
+      <Maximize2 aria-hidden className="h-3 w-3" />
+      {label}
+    </span>
   );
 }

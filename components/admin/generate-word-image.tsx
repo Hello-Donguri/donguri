@@ -32,6 +32,9 @@ import {
 import {
   CHECKERBOARD,
   CharacterPicker,
+  FaceToggle,
+  FullSizeHint,
+  LoadingPicture,
   CostEstimate,
   ImageModelPicker,
   RecommendedModelsNote,
@@ -78,10 +81,13 @@ function OptionTile({
   option,
   selected,
   onSelect,
+  startedAt,
 }: {
   option: Option;
   selected: boolean;
   onSelect: () => void;
+  // When the SVGs step started, for a still-working tile's timer.
+  startedAt: number | null;
 }) {
   const t = useTranslations();
   const tooBig = option.bytes !== null && option.bytes > GENERATED_IMAGE_MAX_BYTES;
@@ -96,7 +102,13 @@ function OptionTile({
       )}
     >
       {option.src ? (
-        <ImageLightbox src={option.src} alt={option.label}>
+        <ImageLightbox
+          src={option.src}
+          alt={option.label}
+          className="relative block"
+          inspect
+          backgroundStyle={CHECKERBOARD}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element -- a data URL, not a hosted file. */}
           <img
             src={option.src}
@@ -107,11 +119,15 @@ function OptionTile({
               tooBig && "opacity-60",
             )}
           />
+          <FullSizeHint label={t("admin_batch_images.full_size", "Full size")} />
         </ImageLightbox>
       ) : option.pending ? (
-        <div className="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-md border border-dashed border-card-border bg-washi-soft text-[10px] text-sumi-soft">
-          <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
-          {t("admin_category_words.option_working", "Working…")}
+        <div className="aspect-square w-full overflow-hidden rounded-md border border-ai/30">
+          <LoadingPicture
+            label={t("admin_category_words.option_working", "Working…")}
+            startedAt={startedAt}
+            compact
+          />
         </div>
       ) : (
         <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-md border border-dashed border-shu/50 bg-shu/5 p-1 text-center text-[10px] text-shu-dark">
@@ -281,6 +297,7 @@ export function GenerateWordImage({ wordId, term }: { wordId: string; term: stri
   const abortRef = useRef<AbortController | null>(null);
 
   const [characterIds, setCharacterIds] = useState<WordImageCharacterId[]>([]);
+  const [face, setFace] = useState(true);
   const [sceneId, setSceneId] = useState<SceneChoice>("auto");
   const [customScene, setCustomScene] = useState("");
   const needsCustomScene = sceneId === CUSTOM_SCENE_ID && !cleanCustomScene(customScene);
@@ -358,6 +375,7 @@ export function GenerateWordImage({ wordId, term }: { wordId: string; term: stri
       characterIds,
       sceneId,
       customScene: sceneId === CUSTOM_SCENE_ID ? cleanCustomScene(customScene) : undefined,
+      face,
       imageModel: models.imageModel,
       quality: models.quality,
     });
@@ -530,6 +548,7 @@ export function GenerateWordImage({ wordId, term }: { wordId: string; term: stri
             {/* Step 1: the picture. */}
             <div className="flex flex-col gap-3">
               <CharacterPicker value={characterIds} onChange={setCharacterIds} disabled={running !== null} />
+              {characterIds.length === 0 && <FaceToggle value={face} onChange={setFace} disabled={running !== null} />}
               <ScenePicker
                 sceneId={sceneId}
                 onSceneChange={setSceneId}
@@ -546,30 +565,38 @@ export function GenerateWordImage({ wordId, term }: { wordId: string; term: stri
               >
                 {png ? (
                   <>
-                    <ImageLightbox src={png.dataUrl} alt={term} className="block h-full w-full">
+                    <ImageLightbox
+                      src={png.dataUrl}
+                      alt={term}
+                      className="relative block h-full w-full"
+                      inspect
+                      backgroundStyle={CHECKERBOARD}
+                    >
                       {/* eslint-disable-next-line @next/next/no-img-element -- a data URL, not a hosted file. */}
                       <img src={png.dataUrl} alt={term} className="h-full w-full object-contain" />
+                      {running !== "picture" && (
+                        <FullSizeHint label={t("admin_batch_images.full_size", "Full size")} />
+                      )}
                     </ImageLightbox>
                     {running === "picture" && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-washi/70 text-xs font-semibold text-sumi">
-                        <Loader2 aria-hidden className="h-6 w-6 animate-spin" />
-                        {t("admin_category_words.editing_picture", "Editing the picture…")}
-                      </div>
+                      <LoadingPicture
+                        label={t("admin_category_words.editing_picture", "Editing the picture…")}
+                        activity={log[log.length - 1]?.message}
+                        startedAt={startedAt}
+                        overlay
+                      />
                     )}
                   </>
+                ) : running === "picture" ? (
+                  <LoadingPicture
+                    label={t("admin_category_words.log_drawing", "Drawing the picture…")}
+                    activity={log[log.length - 1]?.message}
+                    startedAt={startedAt}
+                  />
                 ) : (
                   <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-4 text-center text-xs text-sumi-soft">
-                    {running === "picture" ? (
-                      <>
-                        <Loader2 aria-hidden className="h-6 w-6 animate-spin" />
-                        {t("admin_category_words.log_drawing", "Drawing the picture…")}
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles aria-hidden className="h-6 w-6" />
-                        {t("admin_category_words.picture_empty", "The picture shows here — check it before making SVGs.")}
-                      </>
-                    )}
+                    <Sparkles aria-hidden className="h-6 w-6" />
+                    {t("admin_category_words.picture_empty", "The picture shows here — check it before making SVGs.")}
                   </div>
                 )}
               </div>
@@ -706,6 +733,7 @@ export function GenerateWordImage({ wordId, term }: { wordId: string; term: stri
                       option={option}
                       selected={option.key === selectedKey}
                       onSelect={() => setSelectedKey(option.key === selectedKey ? null : option.key)}
+                      startedAt={startedAt}
                     />
                   ))}
                 </div>

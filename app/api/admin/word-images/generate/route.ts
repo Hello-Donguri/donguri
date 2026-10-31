@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
     customScene?: unknown;
     imageModel?: unknown;
     quality?: unknown;
+    face?: unknown;
   } | null;
   if (typeof body?.wordId !== "string")
     return Response.json({ error: "Missing word." }, { status: 400 });
@@ -56,6 +57,7 @@ export async function POST(request: NextRequest) {
         characterIds,
         sceneId,
         customScene,
+        face: body.face !== false,
         imageModel,
         quality,
         origin: request.nextUrl.origin,

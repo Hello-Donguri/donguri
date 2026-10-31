@@ -176,6 +176,7 @@ export async function generateWordPicture(
     characterIds,
     sceneId,
     customScene,
+    face,
     imageModel,
     quality,
     origin,
@@ -185,6 +186,9 @@ export async function generateWordPicture(
     characterIds: WordImageCharacterId[];
     sceneId: WordImageSceneId;
     customScene: string;
+    // With no characters: whether the thing drawn gets a cute face, as the
+    // style reference has. Characters have their own faces either way.
+    face: boolean;
     imageModel: ImageModel;
     quality: ImageQuality;
     origin: string;
@@ -234,6 +238,9 @@ export async function generateWordPicture(
         `A simple, friendly illustration of the English word "${word.english}" for a language-learning flashcard.`,
         scene.withoutCharacter,
         `The reference image is only a guide to the style: draw "${word.english}" in the same style — the same outline weight and colour, flat colours, simple rounded shapes and cute, friendly look — but don't draw what's in the reference image or copy its subject.`,
+        face
+          ? "Give the main object a simple cute face like the reference's: two small dot eyes and a little smile."
+          : "No faces: nothing in the picture has eyes, a mouth or an expression. The reference's face belongs to its subject, not the style.",
       ].join(" ");
   const imageLog = logger("Image");
   const references = await Promise.all(
