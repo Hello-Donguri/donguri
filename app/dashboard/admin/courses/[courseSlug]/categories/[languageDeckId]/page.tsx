@@ -6,6 +6,7 @@ import { requireAdminProfile, getAdminCategoryWords } from "@/lib/dal";
 import { setWordActive } from "@/lib/actions/admin-content";
 import { DeleteWordButton } from "@/components/admin/delete-word-button";
 import { WordMediaSlots } from "@/components/admin/word-media-slots";
+import { GenerateWordImage } from "@/components/admin/generate-word-image";
 import { DeckMediaSummary } from "@/components/admin/deck-media-summary";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
 import { imageUrl } from "@/lib/bunny";
@@ -308,6 +309,8 @@ export default async function AdminCategoryWordsPage({ params, searchParams }: P
                 sharedImageWith={word.imageKey ? sharedImages.get(word.imageKey) ?? [] : []}
                 audio={word.audio}
               />
+
+              <GenerateWordImage wordId={word.id} term={word.term} />
 
               {word.exampleSentence && (
                 <p className="line-clamp-2 text-sm text-sumi-soft">

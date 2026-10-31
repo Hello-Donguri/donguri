@@ -5,6 +5,7 @@ import { requireProfile } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import { buildWordAudioKey, buildWordImageKey, uploadImage } from "@/lib/bunny";
 import { isSafeSvg, UNSAFE_SVG_MESSAGE } from "@/lib/svg";
+import { GENERATED_IMAGE_MAX_BYTES } from "@/lib/generated-word-image";
 import {
   AUDIO_MAX_BYTES,
   AUDIO_SIZE_ERROR,
@@ -94,6 +95,41 @@ export async function uploadWordMedia(formData: FormData): Promise<{ error?: str
 
   await Promise.all(ids.map(revalidateWord));
   return { updated: updated.count };
+}
+
+// Sets a picture generated on the deck page (see generateWordImage) as the
+// word's image: an SVG trace as its text, or the PNG as base64. Only this
+// word changes, even if its current picture is shared with other decks.
+// The size cap is checked here too, not just by the button.
+export async function chooseGeneratedWordImage(
+  wordId: string,
+  image: { type: "image/svg+xml"; svg: string } | { type: "image/png"; base64: string },
+): Promise<{ error?: string }> {
+  if (!(await isAdmin())) return { error: "You don't have permission to do that." };
+
+  const file =
+    image.type === "image/svg+xml"
+      ? new File([image.svg], "generated.svg", { type: image.type })
+      : new File([Buffer.from(image.base64, "base64")], "generated.png", { type: image.type });
+
+  if (file.size > GENERATED_IMAGE_MAX_BYTES) {
+    return { error: `Too big to use — keep it under ${GENERATED_IMAGE_MAX_BYTES / 1024}KB.` };
+  }
+  if (image.type === "image/svg+xml" && !(await isSafeSvg(file))) return { error: UNSAFE_SVG_MESSAGE };
+
+  const key = buildWordImageKey(file.type);
+  try {
+    await uploadImage(file, key);
+  } catch (error) {
+    console.error("Bunny upload failed:", error);
+    return { error: "Upload failed. Try again." };
+  }
+
+  const updated = await prisma.word.updateMany({ where: { id: wordId }, data: { imageKey: key } });
+  if (updated.count === 0) return { error: "That word no longer exists." };
+
+  await revalidateWord(wordId);
+  return {};
 }
 
 export async function removeWordMedia(wordId: string, kind: WordMediaKind): Promise<void> {
