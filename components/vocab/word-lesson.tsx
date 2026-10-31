@@ -214,6 +214,7 @@ export const WordLesson = ({
   const exampleImage = !isGrammar && (
     <WordImage
       src={word.image}
+      svg={word.imageSvg}
       alt={word.term}
       className="h-19 w-19 shrink-0 object-contain sm:h-24 sm:w-24"
     />

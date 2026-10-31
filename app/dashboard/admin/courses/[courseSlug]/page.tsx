@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireAdminProfile, getAdminCategoryOverview } from "@/lib/dal";
 import { AdminDeckGrid } from "@/components/admin/admin-deck-grid";
+import { BatchWordImages } from "@/components/admin/batch-word-images";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
@@ -39,9 +40,15 @@ export default async function AdminCourseCategoriesPage({ params }: PageProps) {
           <PageTitle>{course.title}</PageTitle>
           <PageSubtitle>{t("admin_course_decks.subtitle", "Decks in this course.")}</PageSubtitle>
         </div>
-        <Button href={`/dashboard/admin/courses/${courseSlug}/categories/new`} size="sm">
-          {t("admin_course_decks.new_deck", "New deck")}
-        </Button>
+        <div className="flex items-center gap-2">
+          <BatchWordImages
+            courseSlug={courseSlug}
+            decks={categories.map((category) => ({ id: category.id, title: category.title }))}
+          />
+          <Button href={`/dashboard/admin/courses/${courseSlug}/categories/new`} size="sm">
+            {t("admin_course_decks.new_deck", "New deck")}
+          </Button>
+        </div>
       </div>
 
       {categories.length === 0 && (

@@ -268,6 +268,7 @@ function WordTile({
         ) : (
           <WordImage
             src={word.image}
+            svg={word.imageSvg}
             alt=""
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
             fallback={initialLetter}

@@ -7,6 +7,7 @@ import { setWordActive } from "@/lib/actions/admin-content";
 import { DeleteWordButton } from "@/components/admin/delete-word-button";
 import { WordMediaSlots } from "@/components/admin/word-media-slots";
 import { GenerateWordImage } from "@/components/admin/generate-word-image";
+import { WordBatchSelection, WordSelectCheckbox } from "@/components/admin/word-batch-selection";
 import { DeckMediaSummary } from "@/components/admin/deck-media-summary";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
 import { imageUrl } from "@/lib/bunny";
@@ -242,134 +243,145 @@ export default async function AdminCategoryWordsPage({ params, searchParams }: P
         // A grid rather than one long single-column stack — with a deck's
         // worth of imported words (spreadsheet imports easily run to the
         // hundreds), a single column meant scrolling through a very tall
-        // page to find anything.
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {shownWords.map((word) => (
-            <div
-              key={word.id}
-              className="flex flex-col gap-3 rounded-2xl border border-card-border bg-washi-soft p-4"
-            >
-              <div className="flex items-center gap-3">
-                {/* An uploaded picture opens full size; the naming-convention
-                    fallback may not exist, so it stays a plain thumbnail. */}
-                {word.imageKey ? (
-                  <ImageLightbox src={imageUrl(word.imageKey)} alt={word.term} className="shrink-0">
-                    <WordImage
-                      src={imageUrl(word.imageKey)}
-                      alt={word.term}
-                      className={cn(
-                        "h-12 w-12 rounded-lg object-cover",
-                        // An SVG upload (crisp at any size) gets a gold frame.
-                        isSvgImage(word.imageKey) && "border-2 border-kin",
-                      )}
-                    />
-                  </ImageLightbox>
-                ) : (
-                  // No uploaded picture: a dashed red placeholder, hard to miss
-                  // when scanning a deck for what still needs one.
-                  <span
-                    title={t("admin_category_words.no_image", "No image")}
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-shu/50 bg-shu/5 text-shu"
-                  >
-                    <ImageOff aria-hidden className="h-5 w-5" />
-                  </span>
-                )}
-                <div className="min-w-0">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <h2 className="truncate font-semibold text-sumi">
-                      {word.term} — {word.translation}
-                    </h2>
-                    {!word.imageKey && (
-                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-shu/10 px-2 py-0.5 text-[11px] font-bold text-shu-dark">
-                        <ImageOff aria-hidden className="h-3 w-3" />
-                        {t("admin_category_words.no_image", "No image")}
-                      </span>
-                    )}
-                    {isSvgImage(word.imageKey) && (
-                      <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-kin/20 px-2 py-0.5 text-[11px] font-bold text-acorn">
-                        <Check aria-hidden className="h-3 w-3" strokeWidth={3} />
-                        {t("admin_category_words.svg", "SVG")}
-                      </span>
-                    )}
-                  </div>
-                  {word.romanization && (
-                    <p className="truncate text-sm text-sumi-soft">
-                      {word.romanization}
-                    </p>
+        // page to find anything. Words can be ticked to draw their
+        // pictures together (see WordBatchSelection).
+        <WordBatchSelection
+          courseSlug={courseSlug}
+          deckTitle={languageDeck.title}
+          words={words.filter((word) => word.path === "vocab").map((word) => ({ id: word.id, term: word.term }))}
+          shownIds={shownWords.filter((word) => word.path === "vocab").map((word) => word.id)}
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {shownWords.map((word) => (
+              <div
+                key={word.id}
+                className="flex flex-col gap-3 rounded-2xl border border-card-border bg-washi-soft p-4 transition has-[[data-word-select]:checked]:border-ai has-[[data-word-select]:checked]:bg-ai-soft/40"
+              >
+                <div className="flex items-center gap-3">
+                  {word.path === "vocab" && (
+                    <WordSelectCheckbox wordId={word.id} label={`${word.term} — ${word.translation}`} />
                   )}
-                </div>
-              </div>
-
-              {/* Its picture and recordings, uploaded right here — no
-                  need to open the word. */}
-              <WordMediaSlots
-                wordId={word.id}
-                term={word.term}
-                imageUrl={word.imageKey ? imageUrl(word.imageKey) : null}
-                sharedImageWith={word.imageKey ? sharedImages.get(word.imageKey) ?? [] : []}
-                audio={word.audio}
-              />
-
-              <GenerateWordImage wordId={word.id} term={word.term} />
-
-              {word.exampleSentence && (
-                <p className="line-clamp-2 text-sm text-sumi-soft">
-                  {word.exampleSentence}
-                </p>
-              )}
-
-              {(word.category || word.wordType || word.secondaryWordType) && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {word.category && (
+                  {/* An uploaded picture opens full size; the naming-convention
+                      fallback may not exist, so it stays a plain thumbnail. */}
+                  {word.imageKey ? (
+                    <ImageLightbox src={imageUrl(word.imageKey)} alt={word.term} className="shrink-0">
+                      <WordImage
+                        src={imageUrl(word.imageKey)}
+                        alt={word.term}
+                        className={cn(
+                          "h-12 w-12 rounded-lg object-cover",
+                          // An SVG upload (crisp at any size) gets a gold frame.
+                          isSvgImage(word.imageKey) && "border-2 border-kin",
+                        )}
+                      />
+                    </ImageLightbox>
+                  ) : (
+                    // No uploaded picture: a dashed red placeholder, hard to miss
+                    // when scanning a deck for what still needs one.
                     <span
-                      className={cn(
-                        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-                        getContrastTextClass(word.category.color),
-                      )}
-                      style={{ backgroundColor: word.category.color }}
+                      title={t("admin_category_words.no_image", "No image")}
+                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-shu/50 bg-shu/5 text-shu"
                     >
-                      {word.category.name}
+                      <ImageOff aria-hidden className="h-5 w-5" />
                     </span>
                   )}
-                  {[word.wordType, word.secondaryWordType].map(
-                    (type) =>
-                      type && (
-                        <span
-                          key={type}
-                          className="inline-flex items-center rounded-full border border-sumi/15 px-2.5 py-0.5 text-xs font-medium text-sumi-soft"
-                        >
-                          {type.replace(/_/g, " ")}
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <h2 className="truncate font-semibold text-sumi">
+                        {word.term} — {word.translation}
+                      </h2>
+                      {!word.imageKey && (
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-shu/10 px-2 py-0.5 text-[11px] font-bold text-shu-dark">
+                          <ImageOff aria-hidden className="h-3 w-3" />
+                          {t("admin_category_words.no_image", "No image")}
                         </span>
-                      ),
-                  )}
+                      )}
+                      {isSvgImage(word.imageKey) && (
+                        <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-kin/20 px-2 py-0.5 text-[11px] font-bold text-acorn">
+                          <Check aria-hidden className="h-3 w-3" strokeWidth={3} />
+                          {t("admin_category_words.svg", "SVG")}
+                        </span>
+                      )}
+                    </div>
+                    {word.romanization && (
+                      <p className="truncate text-sm text-sumi-soft">
+                        {word.romanization}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              )}
 
-              <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
-                <Button
-                  href={`/dashboard/admin/courses/${courseSlug}/categories/${languageDeckId}/words/${word.id}/quiz`}
-                  variant="outline"
-                  size="sm"
-                >
-                  {t("admin_category_words.quiz", "Quiz")}
-                </Button>
-                <Button
-                  href={`/dashboard/admin/courses/${courseSlug}/categories/${languageDeckId}/words/${word.id}/edit`}
-                  variant="outline"
-                  size="sm"
-                >
-                  {t("admin_category_words.edit", "Edit")}
-                </Button>
-                <VisibilityToggle
-                  active={word.active}
-                  toggleAction={setWordActive.bind(null, word.id)}
-                  label={`${word.term} — ${word.translation}`}
+                {/* Its picture and recordings, uploaded right here — no
+                    need to open the word. */}
+                <WordMediaSlots
+                  wordId={word.id}
+                  term={word.term}
+                  imageUrl={word.imageKey ? imageUrl(word.imageKey) : null}
+                  sharedImageWith={word.imageKey ? sharedImages.get(word.imageKey) ?? [] : []}
+                  audio={word.audio}
                 />
-                <DeleteWordButton wordId={word.id} label={`${word.term} — ${word.translation}`} />
+
+                <GenerateWordImage wordId={word.id} term={word.term} />
+
+                {word.exampleSentence && (
+                  <p className="line-clamp-2 text-sm text-sumi-soft">
+                    {word.exampleSentence}
+                  </p>
+                )}
+
+                {(word.category || word.wordType || word.secondaryWordType) && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {word.category && (
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                          getContrastTextClass(word.category.color),
+                        )}
+                        style={{ backgroundColor: word.category.color }}
+                      >
+                        {word.category.name}
+                      </span>
+                    )}
+                    {[word.wordType, word.secondaryWordType].map(
+                      (type) =>
+                        type && (
+                          <span
+                            key={type}
+                            className="inline-flex items-center rounded-full border border-sumi/15 px-2.5 py-0.5 text-xs font-medium text-sumi-soft"
+                          >
+                            {type.replace(/_/g, " ")}
+                          </span>
+                        ),
+                    )}
+                  </div>
+                )}
+
+                <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
+                  <Button
+                    href={`/dashboard/admin/courses/${courseSlug}/categories/${languageDeckId}/words/${word.id}/quiz`}
+                    variant="outline"
+                    size="sm"
+                  >
+                    {t("admin_category_words.quiz", "Quiz")}
+                  </Button>
+                  <Button
+                    href={`/dashboard/admin/courses/${courseSlug}/categories/${languageDeckId}/words/${word.id}/edit`}
+                    variant="outline"
+                    size="sm"
+                  >
+                    {t("admin_category_words.edit", "Edit")}
+                  </Button>
+                  <VisibilityToggle
+                    active={word.active}
+                    toggleAction={setWordActive.bind(null, word.id)}
+                    label={`${word.term} — ${word.translation}`}
+                  />
+                  <DeleteWordButton wordId={word.id} label={`${word.term} — ${word.translation}`} />
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </WordBatchSelection>
       )}
     </div>
   );

@@ -5,8 +5,11 @@
 // dollars per million tokens, as listed in October 2026; update them here
 // if OpenAI changes them.
 
-// Shown in pence; close enough for an estimate.
-export const GBP_PER_USD = 0.75;
+// Costs are shown in pence and yen at today's rates (see
+// lib/exchange-rates.ts); these stand in until they've loaded, or if they
+// can't be.
+export type ExchangeRates = { gbp: number; jpy: number; date: string | null };
+export const FALLBACK_EXCHANGE_RATES: ExchangeRates = { gbp: 0.75, jpy: 155, date: null };
 
 const PER_MILLION = 1 / 1_000_000;
 
@@ -151,10 +154,11 @@ export const imageEstimateKey = (model: ImageModel, quality: ImageQuality, input
   `image:${model.id}:${quality}:${inputImages}`;
 export const svgEstimateKey = (model: SvgModel) => `svg:${model.id}`;
 
-// "0.4p", "17p", "£1.20".
-export function formatCost(usd: number) {
-  const pence = usd * GBP_PER_USD * 100;
-  if (pence >= 100) return `£${(pence / 100).toFixed(2)}`;
-  if (pence < 10) return `${pence.toFixed(1)}p`;
-  return `${Math.round(pence)}p`;
+// "0.4p · ¥0.8", "17p · ¥35", "£1.20 · ¥246".
+export function formatCost(usd: number, rates: ExchangeRates = FALLBACK_EXCHANGE_RATES) {
+  const pence = usd * rates.gbp * 100;
+  const yen = usd * rates.jpy;
+  const gbp = pence >= 100 ? `£${(pence / 100).toFixed(2)}` : pence < 10 ? `${pence.toFixed(1)}p` : `${Math.round(pence)}p`;
+  const jpy = yen < 10 ? `¥${yen.toFixed(1)}` : `¥${Math.round(yen).toLocaleString("en-GB")}`;
+  return `${gbp} · ${jpy}`;
 }

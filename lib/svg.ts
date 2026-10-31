@@ -7,7 +7,12 @@
 const UNSAFE_SVG = [/<script[\s>]/i, /\son[a-z]+\s*=/i, /javascript:/i, /<foreignObject[\s>]/i];
 
 export async function isSafeSvg(file: File): Promise<boolean> {
-  const text = await file.text();
+  return isSafeSvgText(await file.text());
+}
+
+// The same check on the markup itself — also run before an SVG is put
+// straight into a page (see lib/inline-svg.ts), where scripting would run.
+export function isSafeSvgText(text: string): boolean {
   return /<svg[\s>]/i.test(text) && !UNSAFE_SVG.some((pattern) => pattern.test(text));
 }
 

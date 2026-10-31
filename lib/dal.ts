@@ -60,6 +60,7 @@ import {
   toUTCDateString,
 } from "@/lib/srs";
 import { deckCoverImagePath, wordAudio, wordImagePath } from "@/lib/images";
+import { withInlineSvgs } from "@/lib/inline-svg";
 import {
   findClozeMatchesByForm,
   findTermClozeMatches,
@@ -1973,10 +1974,10 @@ export const getLearnQueueForCourse = cache(
       }));
     };
 
-    return {
+    return withInlineSvgs({
       words: newWords.map((word) => ({ ...toRevealWord(word, course), linkedWords: linkedWordsOf(word) })),
       limitReached: newWords.length === 0 && candidates.length > 0,
-    };
+    });
   },
 );
 
@@ -2042,7 +2043,7 @@ export async function getLessonWord(
     include: revealWordInclude,
   });
 
-  return word ? toRevealWord(word, course) : null;
+  return word ? withInlineSvgs(toRevealWord(word, course)) : null;
 }
 
 // Marks words from a batch handed out by `getLearnQueueForCourse` as
@@ -2224,7 +2225,7 @@ export const getTestQueueForCourse = cache(
       ]);
     }
 
-    return shuffle([...grammarQuestions, ...vocabQuestions]);
+    return withInlineSvgs(shuffle([...grammarQuestions, ...vocabQuestions]));
   },
 );
 
@@ -2442,15 +2443,17 @@ export const getReviewQueue = cache(
       ? await loadGrammarPool(course, user)
       : null;
 
-    return shuffle(
-      dueProgress.map((progress) =>
-        buildTypedQuestion(
-          {
-            ...progress.word,
-            path: progress.word.path as "vocab" | "grammar",
-          },
-          course,
-          grammarPool,
+    return withInlineSvgs(
+      shuffle(
+        dueProgress.map((progress) =>
+          buildTypedQuestion(
+            {
+              ...progress.word,
+              path: progress.word.path as "vocab" | "grammar",
+            },
+            course,
+            grammarPool,
+          ),
         ),
       ),
     );

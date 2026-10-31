@@ -355,6 +355,12 @@ export type WordAudio = { female: string | null; male: string | null };
 // the learn card: already learnt, coming up in this batch, or still to come.
 export type LinkedWordStatus = { term: string; status: "learnt" | "this-batch" | "later" };
 
+// An SVG word picture ready to put straight into a page (see
+// lib/inline-svg.ts and WordImage): its viewBox, for sizing, and its
+// markup, with its ids and styles prefixed so they can't clash with the
+// page's or another picture's.
+export type InlineSvg = { viewBox: string; markup: string };
+
 export type RevealWord = {
   // Only on the learn queue's words — see LinkedWordStatus.
   linkedWords?: LinkedWordStatus[];
@@ -373,6 +379,9 @@ export type RevealWord = {
   forms: WordFormSummary[];
   examples: WordExampleSummary[];
   image: string;
+  // The picture's markup, when it's an SVG that's put straight into the
+  // page instead of loaded from `image` (see withInlineSvgs).
+  imageSvg?: InlineSvg | null;
   targetLanguage: string;
   // The originating languageDeck's path — Learn now pools vocab and grammar
   // together (see getLearnQueueForCourse in lib/dal.ts), so each word
@@ -426,6 +435,9 @@ export type MultipleChoiceQuestion = {
   // Same convention as RevealWord.image — one picture per word, independent
   // of quiz direction.
   image: string;
+  // The picture's markup, when it's an SVG that's put straight into the
+  // page instead of loaded from `image` (see withInlineSvgs).
+  imageSvg?: InlineSvg | null;
   // The word's recordings, when the prompt is its term — null when the
   // prompt is the translation, or there are none.
   promptAudio: WordAudio | null;
@@ -467,6 +479,9 @@ type FormClozeQuestion = {
   path: "vocab" | "grammar";
   // The word's picture — shown in the quiz's "Great job!" banner.
   image: string;
+  // The picture's markup, when it's an SVG that's put straight into the
+  // page instead of loaded from `image` (see withInlineSvgs).
+  imageSvg?: InlineSvg | null;
 };
 
 // Free-text version: the learner types the missing form.
@@ -529,6 +544,9 @@ export type TypeAnswerQuestion = {
   answerRomanized: boolean;
   targetLanguage: string;
   image: string;
+  // The picture's markup, when it's an SVG that's put straight into the
+  // page instead of loaded from `image` (see withInlineSvgs).
+  imageSvg?: InlineSvg | null;
   // As MultipleChoiceQuestion.promptAudio.
   promptAudio: WordAudio | null;
 };

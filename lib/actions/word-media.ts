@@ -137,3 +137,32 @@ export async function removeWordMedia(wordId: string, kind: WordMediaKind): Prom
   await prisma.word.updateMany({ where: { id: wordId }, data: { [COLUMN[kind]]: null } });
   await revalidateWord(wordId);
 }
+
+// The words the course page's batch image window can draw pictures for
+// (see BatchWordImages): the vocab in one deck, or every deck in the
+// course, with whether each has a picture yet and whether it's an SVG.
+// Grammar points don't show pictures, so they're left out.
+export async function listWordsForBatchImages(
+  courseSlug: string,
+  languageDeckId: string | null,
+): Promise<{ error?: string; words?: { id: string; term: string; deckTitle: string; hasImage: boolean; hasSvg: boolean }[] }> {
+  if (!(await isAdmin())) return { error: "You don't have permission to do that." };
+
+  const words = await prisma.word.findMany({
+    where: {
+      path: "vocab",
+      languageDeck: { course: { slug: courseSlug }, ...(languageDeckId ? { id: languageDeckId } : {}) },
+    },
+    orderBy: [{ languageDeck: { position: "asc" } }, { position: "asc" }],
+    select: { id: true, term: true, imageKey: true, languageDeck: { select: { title: true } } },
+  });
+  return {
+    words: words.map((word) => ({
+      id: word.id,
+      term: word.term,
+      deckTitle: word.languageDeck.title,
+      hasImage: Boolean(word.imageKey),
+      hasSvg: Boolean(word.imageKey?.toLowerCase().endsWith(".svg")),
+    })),
+  };
+}

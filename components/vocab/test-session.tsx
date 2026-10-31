@@ -661,6 +661,7 @@ export const TestSession = ({
   // A vocab word's picture, for the "Great job!" banner (grammar points
   // and custom questions keep Donguri cheering).
   const wordPicture = question.path === "vocab" && "image" in question ? question.image : null;
+  const wordPictureSvg = question.path === "vocab" && "image" in question ? question.imageSvg : null;
 
   const feedbackBanner = feedback && (
     <motion.div
@@ -737,6 +738,7 @@ export const TestSession = ({
         <span className="-my-2 flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-raised shadow-sm ring-2 ring-matcha/30 sm:h-24 sm:w-24">
           <WordImage
             src={wordPicture}
+            svg={wordPictureSvg}
             alt=""
             className="h-full w-full object-contain"
             fallback={
@@ -791,6 +793,7 @@ export const TestSession = ({
               <div className="flex aspect-[4/3] max-h-[35vh] w-full items-center justify-center overflow-hidden rounded-3xl bg-washi-soft shadow-inner md:max-h-[55vh]">
                 <WordImage
                   src={question.image}
+                  svg={question.imageSvg}
                   alt={question.direction === "term-to-translation" ? question.prompt : ""}
                   className="h-full w-full object-cover"
                   fallback={

@@ -5,6 +5,7 @@ import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 import { removeWhiteBackground } from "@/lib/transparent-background";
 import {
+  STYLE_REFERENCE_SRC,
   WORD_IMAGE_CHARACTERS,
   type WordImageCharacterId,
 } from "@/lib/word-image-characters";
@@ -29,7 +30,6 @@ import {
   type TraceOptions,
 } from "@/lib/svg-trace";
 import {
-  formatCost,
   imageCost,
   imageEstimateKey,
   svgCost,
@@ -56,7 +56,7 @@ const VECTOR_STYLE = [
 ].join(" ");
 
 // The references show what the characters look like, but each is drawn in
-// one pose (the rabbit reading, Donguri waving) that the model otherwise
+// one pose (Hazel reading, Donguri waving) that the model otherwise
 // copies into every picture — so it's told to take only their look from
 // them and pose them afresh for the word.
 const POSE = [
@@ -233,17 +233,15 @@ export async function generateWordPicture(
     : [
         `A simple, friendly illustration of the English word "${word.english}" for a language-learning flashcard.`,
         scene.withoutCharacter,
+        `The reference image is only a guide to the style: draw "${word.english}" in the same style — the same outline weight and colour, flat colours, simple rounded shapes and cute, friendly look — but don't draw what's in the reference image or copy its subject.`,
       ].join(" ");
   const imageLog = logger("Image");
   const references = await Promise.all(
-    characters.map((character) =>
-      characterReference(
-        origin,
-        character.src,
-        imageModel.side,
-        imageLog,
-        signal,
-      ),
+    (characters.length
+      ? characters.map((character) => character.src)
+      : [STYLE_REFERENCE_SRC]
+    ).map((src) =>
+      characterReference(origin, src, imageModel.side, imageLog, signal),
     ),
   );
   await drawImage({
@@ -408,7 +406,7 @@ async function drawImage({
   );
   if (usage) {
     const usd = imageCost(imageModel, usage);
-    log(`Cost: ${formatCost(usd)} ($${usd.toFixed(3)})`);
+    log(`Cost: $${usd.toFixed(4)}`);
     emit({
       type: "cost",
       usd,
@@ -512,7 +510,7 @@ export async function traceWordPicture(
             onUsage: (usage) => {
               const usd = svgCost(svgModel, usage);
               logger("ChatGPT")(
-                `Cost: ${formatCost(usd)} ($${usd.toFixed(3)})`,
+                `Cost: $${usd.toFixed(4)}`,
               );
               emit({
                 type: "cost",

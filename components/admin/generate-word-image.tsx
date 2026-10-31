@@ -3,8 +3,6 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import {
   AlertTriangle,
-  Coins,
-  Lightbulb,
   Ban,
   Check,
   ChevronDown,
@@ -19,15 +17,8 @@ import {
   X,
 } from "lucide-react";
 import { chooseGeneratedWordImage } from "@/lib/actions/word-media";
-import { WORD_IMAGE_CHARACTERS, type WordImageCharacterId } from "@/lib/word-image-characters";
-import {
-  CUSTOM_SCENE_ID,
-  CUSTOM_SCENE_MAX_CHARS,
-  CUSTOM_SCENE_MAX_WORDS,
-  WORD_IMAGE_SCENES,
-  cleanCustomScene,
-  type WordImageSceneId,
-} from "@/lib/word-image-scenes";
+import { referenceImageCount, type WordImageCharacterId } from "@/lib/word-image-characters";
+import { CUSTOM_SCENE_ID, cleanCustomScene } from "@/lib/word-image-scenes";
 import {
   EDIT_INSTRUCTION_MAX_CHARS,
   GENERATED_IMAGE_MAX_BYTES,
@@ -39,24 +30,19 @@ import {
   type WordImageEvent,
 } from "@/lib/generated-word-image";
 import {
-  DEFAULT_IMAGE_MODEL,
-  DEFAULT_IMAGE_QUALITY,
-  DEFAULT_SVG_MODEL,
-  IMAGE_MODELS,
-  IMAGE_QUALITIES,
-  SVG_MODELS,
-  estimateImageCost,
-  estimateSvgCost,
-  formatCost,
-  imageEstimateKey,
-  parseImageModel,
-  parseImageQuality,
-  parseSvgModel,
-  svgEstimateKey,
-  type ImageModelId,
-  type ImageQuality,
-  type SvgModelId,
-} from "@/lib/word-image-models";
+  CHECKERBOARD,
+  CharacterPicker,
+  CostEstimate,
+  ImageModelPicker,
+  RecommendedModelsNote,
+  ScenePicker,
+  SpendBadge,
+  SvgModelPicker,
+  formatBytes,
+  readStream,
+  useWordImageSettings,
+  type SceneChoice,
+} from "@/components/admin/word-image-settings";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
@@ -80,60 +66,6 @@ type Option = {
   error?: string;
   choice: Choice | null;
 };
-
-// A light checkerboard behind pictures, so their transparent background
-// shows as transparent rather than as white — an SVG pattern, not a
-// gradient.
-const CHECKERBOARD = {
-  backgroundColor: "#ffffff",
-  backgroundImage:
-    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M0 0h8v8H0zM8 8h8v8H8z' fill='%23e8e8e8'/%3E%3C/svg%3E\")",
-};
-
-// The models chosen last time, and what each kind of call actually cost
-// last time (see WordImageEvent's "cost"), kept in this browser — a
-// convenience only, so storage being unavailable just means the defaults
-// and rough estimates.
-const MODELS_STORAGE_KEY = "word-image-models";
-const COSTS_STORAGE_KEY = "word-image-costs";
-
-type ModelChoice = { imageModel: ImageModelId; quality: ImageQuality; svgModel: SvgModelId | "off" };
-
-function readStored<T>(key: string): Partial<T> {
-  try {
-    const value = JSON.parse(localStorage.getItem(key) ?? "{}") as unknown;
-    return value && typeof value === "object" ? (value as Partial<T>) : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeStored(key: string, value: object) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {}
-}
-
-// Under a model select: what the call should cost — what it really cost
-// last time when that's known, OpenAI's rates and typical token counts
-// otherwise.
-function CostEstimate({ estimate, last }: { estimate: number; last: number | undefined }) {
-  const t = useTranslations();
-  return (
-    <span className="font-normal text-sumi-soft">
-      {last !== undefined
-        ? t("admin_category_words.cost_last", "≈ {{cost}} each (last time)", { cost: formatCost(last) })
-        : t("admin_category_words.cost_estimate", "≈ {{cost}} each (estimate)", { cost: formatCost(estimate) })}
-    </span>
-  );
-}
-
-const SELECT_CLASS =
-  "h-9 min-w-0 rounded-full border border-sumi/15 bg-washi px-3 text-sm font-normal text-sumi outline-none focus:border-ai/50 focus:ring-2 focus:ring-ai-soft disabled:opacity-60";
-
-function formatBytes(bytes: number) {
-  return bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
 
 function formatElapsed(ms: number) {
   return `${(ms / 1000).toFixed(1)}s`;
@@ -334,32 +266,6 @@ function RunLog({
   );
 }
 
-// Reads one of the word-picture streams (see app/api/admin/word-images),
-// one JSON event per line, handing each to `onEvent` as it arrives.
-async function readStream(url: string, body: object, signal: AbortSignal, onEvent: (event: WordImageEvent) => void) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    signal,
-  });
-  if (!response.ok || !response.body) {
-    const error = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(error?.error ?? `Request failed (${response.status}).`);
-  }
-
-  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-  let buffered = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffered += value;
-    const lines = buffered.split("\n");
-    buffered = lines.pop() ?? "";
-    for (const line of lines) if (line.trim()) onEvent(JSON.parse(line) as WordImageEvent);
-  }
-}
-
 // On the admin deck page: a button that opens a window for making the
 // word's picture, in two steps. First the picture itself — a small PNG
 // with whichever characters are ticked, framed by the chosen scene (see
@@ -374,10 +280,9 @@ export function GenerateWordImage({ wordId, term }: { wordId: string; term: stri
   const dialogRef = useRef<HTMLDialogElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const [characterIds, setCharacterIds] = useState<WordImageCharacterId[]>(["donguri"]);
-  const [sceneId, setSceneId] = useState<WordImageSceneId | typeof CUSTOM_SCENE_ID>("auto");
+  const [characterIds, setCharacterIds] = useState<WordImageCharacterId[]>([]);
+  const [sceneId, setSceneId] = useState<SceneChoice>("auto");
   const [customScene, setCustomScene] = useState("");
-  const customSceneWords = customScene.trim().split(/\s+/).filter(Boolean).length;
   const needsCustomScene = sceneId === CUSTOM_SCENE_ID && !cleanCustomScene(customScene);
   const [png, setPng] = useState<{ dataUrl: string; bytes: number } | null>(null);
   // The picture from before the last edit, to go back to if the edit made
@@ -393,48 +298,11 @@ export function GenerateWordImage({ wordId, term }: { wordId: string; term: stri
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
-  const [models, setModels] = useState<ModelChoice>({
-    imageModel: DEFAULT_IMAGE_MODEL,
-    quality: DEFAULT_IMAGE_QUALITY,
-    svgModel: DEFAULT_SVG_MODEL,
-  });
-  const [lastCosts, setLastCosts] = useState<Record<string, number>>({});
-  // What this window has spent on OpenAI since it was opened.
-  const [spent, setSpent] = useState(0);
-
-  const imageModel = parseImageModel(models.imageModel);
-  const svgModel = parseSvgModel(models.svgModel);
-  const drawCostKey = imageEstimateKey(imageModel, models.quality, characterIds.length);
-  const editCostKey = imageEstimateKey(imageModel, models.quality, characterIds.length + 1);
-
-  const chooseModels = (change: Partial<ModelChoice>) => {
-    const next = { ...models, ...change };
-    setModels(next);
-    writeStored(MODELS_STORAGE_KEY, next);
-  };
-
-  // GPT Image 2 on low quality and Sol for the ChatGPT SVG — or no ChatGPT
-  // SVG at all, which is cheaper still.
-  const usingRecommended =
-    models.imageModel === DEFAULT_IMAGE_MODEL &&
-    models.quality === DEFAULT_IMAGE_QUALITY &&
-    (models.svgModel === DEFAULT_SVG_MODEL || models.svgModel === "off");
-  const useRecommended = () =>
-    chooseModels({
-      imageModel: DEFAULT_IMAGE_MODEL,
-      quality: DEFAULT_IMAGE_QUALITY,
-      svgModel: DEFAULT_SVG_MODEL,
-    });
+  const settings = useWordImageSettings();
+  const { models } = settings;
 
   const open = () => {
-    const stored = readStored<ModelChoice>(MODELS_STORAGE_KEY);
-    setModels({
-      imageModel: parseImageModel(stored.imageModel).id,
-      quality: parseImageQuality(stored.quality),
-      svgModel: parseSvgModel(stored.svgModel)?.id ?? "off",
-    });
-    setLastCosts(readStored<Record<string, number>>(COSTS_STORAGE_KEY) as Record<string, number>);
-    setSpent(0);
+    settings.open();
     dialogRef.current?.showModal();
   };
 
@@ -465,12 +333,7 @@ export function GenerateWordImage({ wordId, term }: { wordId: string; term: stri
             setSvgs((current) => ({ ...current, [event.key]: event.result }));
             break;
           case "cost":
-            setSpent((current) => current + event.usd);
-            setLastCosts((current) => {
-              const next = { ...current, [event.estimateKey]: event.usd };
-              writeStored(COSTS_STORAGE_KEY, next);
-              return next;
-            });
+            settings.recordCost(event);
             break;
           case "end":
             if (!event.ok) setError(event.error ?? "Something went wrong.");
@@ -483,9 +346,6 @@ export function GenerateWordImage({ wordId, term }: { wordId: string; term: stri
       if (abortRef.current === controller) setRunning(null);
     }
   };
-
-  const toggleCharacter = (id: WordImageCharacterId) =>
-    setCharacterIds((current) => (current.includes(id) ? current.filter((other) => other !== id) : [...current, id]));
 
   const drawPicture = () => {
     setPng(null);
@@ -655,20 +515,7 @@ export function GenerateWordImage({ wordId, term }: { wordId: string; term: stri
             <h2 className="font-nunito text-lg font-extrabold">
               {t("admin_category_words.generate_title", "Image for {{term}}", { term })}
             </h2>
-            <div
-              aria-live="polite"
-              className="ml-auto flex shrink-0 items-center gap-2 rounded-full border border-kin/40 bg-kin/15 py-1.5 pr-4 pl-2"
-            >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-kin/30 text-acorn">
-                <Coins aria-hidden className="h-4 w-4" />
-              </span>
-              <span className="flex flex-col leading-tight">
-                <span className="text-[10px] font-semibold tracking-wide text-sumi-soft uppercase">
-                  {t("admin_category_words.cost_spent_label", "Spent this window")}
-                </span>
-                <span className="font-nunito text-lg font-extrabold tabular-nums text-sumi">{formatCost(spent)}</span>
-              </span>
-            </div>
+            <SpendBadge settings={settings} />
             <button
               type="button"
               onClick={close}
@@ -682,155 +529,16 @@ export function GenerateWordImage({ wordId, term }: { wordId: string; term: stri
           <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
             {/* Step 1: the picture. */}
             <div className="flex flex-col gap-3">
-              <fieldset disabled={running !== null} className="flex flex-col gap-1.5">
-                <legend className="mb-1.5 text-xs font-semibold text-sumi-soft">
-                  {t("admin_category_words.characters", "Characters")}
-                </legend>
-                <div className="flex flex-wrap gap-1.5">
-                  {WORD_IMAGE_CHARACTERS.map((character) => {
-                    const checked = characterIds.includes(character.id);
-                    return (
-                      <label
-                        key={character.id}
-                        className={cn(
-                          "flex cursor-pointer items-center gap-1.5 rounded-full border py-1 pr-3 pl-1 text-xs font-semibold transition has-disabled:cursor-not-allowed has-disabled:opacity-60 has-focus-visible:ring-2 has-focus-visible:ring-ai-soft",
-                          checked ? "border-ai bg-ai-soft text-ai-dark" : "border-sumi/15 bg-washi text-sumi hover:border-ai/40",
-                        )}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleCharacter(character.id)}
-                          className="sr-only"
-                        />
-                        {/* eslint-disable-next-line @next/next/no-img-element -- a small local thumbnail. */}
-                        <img src={character.src} alt="" className="h-6 w-6 rounded-full bg-white object-contain" />
-                        {character.name}
-                        {checked && <Check aria-hidden className="h-3 w-3" strokeWidth={3} />}
-                      </label>
-                    );
-                  })}
-                </div>
-                {characterIds.length === 0 && (
-                  <p className="text-xs text-sumi-soft">
-                    {t("admin_category_words.no_characters", "No characters — just the word itself.")}
-                  </p>
-                )}
-              </fieldset>
-
-              <label className="flex flex-col gap-1.5 text-xs font-semibold text-sumi-soft">
-                {t("admin_category_words.scene", "Scene")}
-                <select
-                  value={sceneId}
-                  onChange={(event) => setSceneId(event.target.value as WordImageSceneId | typeof CUSTOM_SCENE_ID)}
-                  disabled={running !== null}
-                  className="h-9 rounded-full border border-sumi/15 bg-washi px-3 text-sm font-normal text-sumi outline-none focus:border-ai/50 focus:ring-2 focus:ring-ai-soft disabled:opacity-60"
-                >
-                  {WORD_IMAGE_SCENES.map((scene) => (
-                    <option key={scene.id} value={scene.id}>
-                      {scene.name}
-                    </option>
-                  ))}
-                  <option value={CUSTOM_SCENE_ID}>{t("admin_category_words.scene_custom", "Custom…")}</option>
-                </select>
-              </label>
-
-              {sceneId === CUSTOM_SCENE_ID && (
-                <label className="flex flex-col gap-1 text-xs font-semibold text-sumi-soft">
-                  <span className="sr-only">{t("admin_category_words.scene_custom_label", "Describe the scene")}</span>
-                  <textarea
-                    value={customScene}
-                    // Anything past the word limit isn't taken — a paste
-                    // that runs over keeps its first words.
-                    onChange={(event) => {
-                      const next = event.target.value;
-                      const words = next.trim().split(/\s+/).filter(Boolean);
-                      setCustomScene(
-                        words.length <= CUSTOM_SCENE_MAX_WORDS ? next : words.slice(0, CUSTOM_SCENE_MAX_WORDS).join(" "),
-                      );
-                    }}
-                    maxLength={CUSTOM_SCENE_MAX_CHARS}
-                    rows={2}
-                    disabled={running !== null}
-                    autoComplete="off"
-                    placeholder={t("admin_category_words.scene_custom_placeholder", "e.g. running late for the bus")}
-                    className="resize-none rounded-xl border border-sumi/15 bg-washi px-3 py-2 text-sm font-normal text-sumi outline-none placeholder:text-sumi-soft/50 focus:border-ai/50 focus:ring-2 focus:ring-ai-soft disabled:opacity-60"
-                  />
-                  <span className="self-end font-normal tabular-nums">
-                    {t("admin_category_words.scene_custom_count", "{{count}}/{{max}} words", {
-                      count: customSceneWords,
-                      max: CUSTOM_SCENE_MAX_WORDS,
-                    })}
-                  </span>
-                </label>
-              )}
-
-              {!usingRecommended && (
-                <div className="flex items-start gap-2 rounded-xl border border-ai/30 bg-ai-soft px-3 py-2 text-xs text-sumi">
-                  <Lightbulb aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ai-dark" />
-                  <div className="flex min-w-0 flex-col gap-1.5">
-                    <p>
-                      {t(
-                        "admin_category_words.models_recommendation",
-                        "Use GPT Image 2 on Low quality and GPT-6.1 Sol for the ChatGPT SVG — good enough for tracing, for a fraction of the cost.",
-                      )}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={useRecommended}
-                      disabled={running !== null}
-                      className="w-fit rounded-full bg-ai px-3 py-1 text-[11px] font-semibold text-washi transition hover:bg-ai-dark disabled:opacity-60"
-                    >
-                      {t("admin_category_words.models_use_recommended", "Use recommended")}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-                <label className="flex min-w-0 flex-col gap-1.5 text-xs font-semibold text-sumi-soft">
-                  {t("admin_category_words.image_model", "Image model")}
-                  <select
-                    value={models.imageModel}
-                    onChange={(event) => chooseModels({ imageModel: event.target.value as ImageModelId })}
-                    disabled={running !== null}
-                    className={SELECT_CLASS}
-                  >
-                    {IMAGE_MODELS.map((model) => (
-                      <option key={model.id} value={model.id}>
-                        {model.id === DEFAULT_IMAGE_MODEL
-                          ? t("admin_category_words.model_recommended", "{{name}} (recommended)", { name: model.name })
-                          : model.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex flex-col gap-1.5 text-xs font-semibold text-sumi-soft">
-                  {t("admin_category_words.image_quality", "Quality")}
-                  <select
-                    value={models.quality}
-                    onChange={(event) => chooseModels({ quality: event.target.value as ImageQuality })}
-                    disabled={running !== null}
-                    className={SELECT_CLASS}
-                  >
-                    {IMAGE_QUALITIES.map((quality) => (
-                      <option key={quality} value={quality}>
-                        {quality === "low"
-                          ? t("admin_category_words.quality_low_recommended", "Low (recommended)")
-                          : quality === "medium"
-                            ? t("admin_category_words.quality_medium", "Medium")
-                            : t("admin_category_words.quality_high", "High")}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <span className="col-span-2 -mt-1 text-xs">
-                  <CostEstimate
-                    estimate={estimateImageCost(imageModel, models.quality, characterIds.length)}
-                    last={lastCosts[drawCostKey]}
-                  />
-                </span>
-              </div>
+              <CharacterPicker value={characterIds} onChange={setCharacterIds} disabled={running !== null} />
+              <ScenePicker
+                sceneId={sceneId}
+                onSceneChange={setSceneId}
+                customScene={customScene}
+                onCustomSceneChange={setCustomScene}
+                disabled={running !== null}
+              />
+              <RecommendedModelsNote settings={settings} disabled={running !== null} />
+              <ImageModelPicker settings={settings} disabled={running !== null} inputImages={referenceImageCount(characterIds)} />
 
               <div
                 style={png ? CHECKERBOARD : undefined}
@@ -935,33 +643,7 @@ export function GenerateWordImage({ wordId, term }: { wordId: string; term: stri
                 )}
               </div>
 
-              {png && (
-                <label className="flex flex-col gap-1.5 text-xs font-semibold text-sumi-soft">
-                  {t("admin_category_words.svg_model", "ChatGPT SVG")}
-                  <select
-                    value={models.svgModel}
-                    onChange={(event) => chooseModels({ svgModel: event.target.value as SvgModelId | "off" })}
-                    disabled={running !== null}
-                    className={SELECT_CLASS}
-                  >
-                    {SVG_MODELS.map((model) => (
-                      <option key={model.id} value={model.id}>
-                        {model.id === DEFAULT_SVG_MODEL
-                          ? t("admin_category_words.model_recommended", "{{name}} (recommended)", { name: model.name })
-                          : model.name}
-                      </option>
-                    ))}
-                    <option value="off">{t("admin_category_words.svg_model_off", "Off — free tracers only")}</option>
-                  </select>
-                  {svgModel ? (
-                    <CostEstimate estimate={estimateSvgCost(svgModel)} last={lastCosts[svgEstimateKey(svgModel)]} />
-                  ) : (
-                    <span className="font-normal text-sumi-soft">
-                      {t("admin_category_words.svg_model_off_note", "The other SVGs are made here, at no cost.")}
-                    </span>
-                  )}
-                </label>
-              )}
+              {png && <SvgModelPicker settings={settings} disabled={running !== null} />}
 
               {editing && png && !running && (
                 <form
@@ -995,10 +677,7 @@ export function GenerateWordImage({ wordId, term }: { wordId: string; term: stri
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex flex-col text-xs tabular-nums text-sumi-soft">
                       {instruction.length}/{EDIT_INSTRUCTION_MAX_CHARS}
-                      <CostEstimate
-                        estimate={estimateImageCost(imageModel, models.quality, characterIds.length + 1)}
-                        last={lastCosts[editCostKey]}
-                      />
+                      <CostEstimate settings={settings} cost={settings.imageCostFor(characterIds.length + 1)} />
                     </span>
                     <div className="flex gap-2">
                       <Button type="button" variant="outline" size="sm" onClick={() => setEditing(false)}>
