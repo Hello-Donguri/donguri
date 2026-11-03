@@ -4,6 +4,7 @@ import { useCallback, useEffect, useEffectEvent, useRef } from "react";
 import { Check, Volume2, X } from "lucide-react";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { useRecording, useSpeech } from "@/lib/speech";
+import { countListen } from "@/lib/listens";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { Jyutping, ToneHelp } from "@/components/vocab/jyutping";
 import { HintText } from "@/components/vocab/hint-text";
@@ -13,21 +14,27 @@ import type { RetryReason } from "@/lib/actions/vocab";
 // The word's uploaded recordings, one button each — female, then male —
 // in place of the read-through. "icon" is SpeakButton's round button with
 // a ♀/♂ tag; "labelled" is ListenButton's pill with the voice named.
+// `wordId`, when it's the word itself being played, counts each listen
+// (see countListen).
 function RecordingButtons({
   text,
   audio,
   variant,
+  wordId,
 }: {
   text: string;
   audio: WordAudio;
   variant: "icon" | "labelled";
+  wordId?: string;
 }) {
   const t = useTranslations();
   const { play, playing } = useRecording();
   const voices = [
-    { url: audio.female, symbol: "♀", label: t("session_ui.female_voice", "Female") },
-    { url: audio.male, symbol: "♂", label: t("session_ui.male_voice", "Male") },
-  ].filter((voice): voice is { url: string; symbol: string; label: string } => voice.url !== null);
+    { url: audio.female, symbol: "♀", label: t("session_ui.female_voice", "Female"), source: "female" as const },
+    { url: audio.male, symbol: "♂", label: t("session_ui.male_voice", "Male"), source: "male" as const },
+  ].filter(
+    (voice): voice is { url: string; symbol: string; label: string; source: "female" | "male" } => voice.url !== null,
+  );
 
   return (
     <span className="inline-flex shrink-0 items-center gap-2">
@@ -41,7 +48,10 @@ function RecordingButtons({
           <button
             key={voice.url}
             type="button"
-            onClick={() => play(voice.url)}
+            onClick={() => {
+              play(voice.url);
+              countListen(wordId, voice.source);
+            }}
             aria-label={ariaLabel}
             className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ai-soft text-ai transition hover:scale-105 hover:bg-ai/15"
           >
@@ -57,7 +67,10 @@ function RecordingButtons({
           <button
             key={voice.url}
             type="button"
-            onClick={() => play(voice.url)}
+            onClick={() => {
+              play(voice.url);
+              countListen(wordId, voice.source);
+            }}
             aria-label={ariaLabel}
             className="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-ai/25 bg-ai-soft/60 px-4 text-sm font-semibold text-ai transition hover:bg-ai/15"
           >
@@ -72,27 +85,33 @@ function RecordingButtons({
 
 // Plays the word: its recordings when it has any (see RecordingButtons),
 // otherwise the browser's read-through.
+// `wordId` (when it's the word itself, not a sentence) counts each listen.
 export const SpeakButton = ({
   text,
   language,
   audio = null,
+  wordId,
 }: {
   text: string;
   language: string;
   audio?: WordAudio | null;
+  wordId?: string;
 }) => {
-  if (audio) return <RecordingButtons text={text} audio={audio} variant="icon" />;
-  return <ReadThroughSpeakButton text={text} language={language} />;
+  if (audio) return <RecordingButtons text={text} audio={audio} variant="icon" wordId={wordId} />;
+  return <ReadThroughSpeakButton text={text} language={language} wordId={wordId} />;
 };
 
-const ReadThroughSpeakButton = ({ text, language }: { text: string; language: string }) => {
+const ReadThroughSpeakButton = ({ text, language, wordId }: { text: string; language: string; wordId?: string }) => {
   const t = useTranslations();
   const { speak, speaking } = useSpeech();
 
   return (
     <button
       type="button"
-      onClick={() => speak(text, language)}
+      onClick={() => {
+        speak(text, language);
+        countListen(wordId, "speech");
+      }}
       aria-label={t("session_ui.listen_to", "Listen to {{text}}", { text })}
       disabled={speaking}
       className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ai-soft text-ai transition hover:scale-105 hover:bg-ai/15 disabled:opacity-60"
@@ -112,23 +131,28 @@ export const ListenButton = ({
   text,
   language,
   audio = null,
+  wordId,
 }: {
   text: string;
   language: string;
   audio?: WordAudio | null;
+  wordId?: string;
 }) => {
-  if (audio) return <RecordingButtons text={text} audio={audio} variant="labelled" />;
-  return <ReadThroughListenButton text={text} language={language} />;
+  if (audio) return <RecordingButtons text={text} audio={audio} variant="labelled" wordId={wordId} />;
+  return <ReadThroughListenButton text={text} language={language} wordId={wordId} />;
 };
 
-const ReadThroughListenButton = ({ text, language }: { text: string; language: string }) => {
+const ReadThroughListenButton = ({ text, language, wordId }: { text: string; language: string; wordId?: string }) => {
   const t = useTranslations();
   const { speak, speaking } = useSpeech();
 
   return (
     <button
       type="button"
-      onClick={() => speak(text, language)}
+      onClick={() => {
+        speak(text, language);
+        countListen(wordId, "speech");
+      }}
       aria-label={t("session_ui.listen_to", "Listen to {{text}}", { text })}
       disabled={speaking}
       className="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-ai/25 bg-ai-soft/60 px-4 text-sm font-semibold text-ai transition hover:bg-ai/15 disabled:opacity-60"

@@ -10,7 +10,7 @@ import type { WordAudio } from "@/lib/definitions";
 import { cn } from "@/lib/utils";
 
 const ACCEPT: Record<WordMediaKind, string> = {
-  image: "image/webp,image/png,image/jpeg,image/svg+xml",
+  image: "image/svg+xml,.svg",
   audioFemale: "audio/mpeg,audio/mp4,audio/x-m4a,audio/aac,audio/wav,audio/x-wav,audio/ogg,audio/webm,.mp3,.m4a,.wav,.ogg,.webm",
   audioMale: "audio/mpeg,audio/mp4,audio/x-m4a,audio/aac,audio/wav,audio/x-wav,audio/ogg,audio/webm,.mp3,.m4a,.wav,.ogg,.webm",
 };

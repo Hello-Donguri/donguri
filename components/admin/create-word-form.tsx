@@ -164,7 +164,7 @@ export function CreateWordForm({ languageDeckId, categories }: CreateWordFormPro
             <FileField
               label={t("admin_word_form.picture", "Picture")}
               name="image"
-              accept="image/webp,image/png,image/jpeg,image/svg+xml"
+              accept="image/svg+xml,.svg"
               onChange={handleImageChange}
               errors={state?.errors?.image}
             />

@@ -528,6 +528,7 @@ const ReviewSessionQuestions = ({
                     text={question.prompt}
                     language={question.targetLanguage}
                     audio={question.promptAudio}
+                    wordId={question.wordId}
                   />
                 )}
               </div>

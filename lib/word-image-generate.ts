@@ -106,8 +106,13 @@ async function wordAndCharacters(
     select: {
       term: true,
       translation: true,
+      wordType: true,
+      category: { select: { name: true } },
       languageDeck: {
-        select: { course: { select: { targetLanguage: true } } },
+        select: {
+          title: true,
+          course: { select: { targetLanguage: true } },
+        },
       },
     },
   });
@@ -117,7 +122,13 @@ async function wordAndCharacters(
   const characters = WORD_IMAGE_CHARACTERS.filter((character) =>
     characterIds.includes(character.id),
   );
-  return { word: { english }, characters };
+  // Which sense of the word to draw — "March" in Time, Numbers &
+  // Measurement is the month, not marching: the word's category (or its
+  // deck's title, without one) and its part of speech.
+  const topic = word.category?.name ?? word.languageDeck.title;
+  const partOfSpeech = word.wordType?.replace(/_/g, " ") ?? null;
+  const meaning = `Here "${english}" is ${partOfSpeech ? `${/^[aeiou]/i.test(partOfSpeech) ? "an" : "a"} ${partOfSpeech} ` : "a word "}from the "${topic}" topic: draw that meaning of it, not any other meaning the word can have.`;
+  return { word: { english, topic, partOfSpeech, meaning }, characters };
 }
 
 // "Donguri", "Donguri and Charles Duck", "Donguri, Charles Duck and the Rabbit".
@@ -205,6 +216,9 @@ export async function generateWordPicture(
   const { word, characters } = await wordAndCharacters(wordId, characterIds);
   log(`Word: "${word.english}" (English only goes into the prompt)`);
   log(
+    `Meaning: ${word.partOfSpeech ?? "no part of speech set"}, from "${word.topic}"`,
+  );
+  log(
     characters.length
       ? `Characters: ${listOf(characters.map((character) => character.name))}`
       : "No characters — drawing the word on its own",
@@ -225,6 +239,7 @@ export async function generateWordPicture(
   const subject = characters.length
     ? [
         `Draw ${listOf(characters.map((character) => character.description))}${characters.length > 1 ? ", together" : ""}, illustrating the English word "${word.english}" for a language-learning flashcard.`,
+        word.meaning,
         characters.length > 1
           ? `${scene.withCharacter.replaceAll("The character is", "The characters are").replaceAll("the character", "the characters")} Every one of them is in the picture.`
           : scene.withCharacter,
@@ -236,6 +251,7 @@ export async function generateWordPicture(
       ].join(" ")
     : [
         `A simple, friendly illustration of the English word "${word.english}" for a language-learning flashcard.`,
+        word.meaning,
         scene.withoutCharacter,
         `The reference image is only a guide to the style: draw "${word.english}" in the same style — the same outline weight and colour, flat colours, simple rounded shapes and cute, friendly look — but don't draw what's in the reference image or copy its subject.`,
         face
@@ -317,7 +333,7 @@ export async function editWordPicture(
     ),
   );
   const prompt = [
-    `The first image is a flashcard illustration of the English word "${word.english}". Edit it: ${instruction}.`,
+    `The first image is a flashcard illustration of the English word "${word.english}". ${word.meaning} Edit it: ${instruction}.`,
     "Change only what that asks for. Keep everything else as it is: the composition, the characters, their poses and colours, the other objects and the background.",
     characters.length
       ? `The other images are references for the characters (in order: ${listOf(characters.map((character) => character.name))}) — use them only to keep each character's look exactly right. ${ARMS}`

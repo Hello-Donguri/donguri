@@ -41,4 +41,6 @@ export function typedAudio(file: File, mime: string): File {
   return file.type ? file : new File([file], file.name, { type: mime });
 }
 
-export const WORD_IMAGE_TYPES = ["image/webp", "image/png", "image/jpeg", "image/svg+xml"];
+// Word pictures are SVGs only — crisp at any size, and small.
+export const WORD_IMAGE_TYPES = ["image/svg+xml"];
+export const WORD_IMAGE_TYPE_ERROR = "Word pictures must be SVGs.";

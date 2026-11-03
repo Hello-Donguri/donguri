@@ -657,7 +657,11 @@ export async function submitFormAnswer(
 
   const form = await prisma.wordForm.findUniqueOrThrow({
     where: { id: formId },
-    select: { value: true, wordId: true, word: { select: courseSelect } },
+    select: {
+      value: true,
+      wordId: true,
+      word: { select: { path: true, alternateAnswers: { select: { value: true } }, ...courseSelect } },
+    },
   });
 
   if (form.wordId !== wordId) {
@@ -667,6 +671,12 @@ export async function submitFormAnswer(
   // Same forgiving comparison as every other typed answer — case, spacing
   // and contractions ("isn't" for "is not") don't matter.
   const correct = normaliseAnswer(typedAnswer) === normaliseAnswer(form.value);
+  // The word's alternate answers are a "synonym" retry here too — the
+  // blank may be a form ("chairs") rather than the term itself.
+  const synonym = correct
+    ? null
+    : synonymFor(typedAnswer, form.word.alternateAnswers, { vocab: form.word.path === "vocab" });
+  if (synonym) return retryResponse(user.id, synonym);
   // A form is one exact value, so it's checked as a single reading.
   const retry =
     correct || isRetry

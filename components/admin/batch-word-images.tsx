@@ -121,12 +121,9 @@ function autoChoose(
   );
 }
 
+// Only an SVG can be chosen — the PNG is there to compare against.
 function choiceFor(item: Item, key: string | null): Choice | null {
-  if (!key) return null;
-  if (key === "png")
-    return item.picture
-      ? { type: "image/png", base64: item.picture.dataUrl.split(",")[1] }
-      : null;
+  if (!key || key === "png") return null;
   const result = item.svgs?.[key as SvgOptionKey];
   return result?.ok ? { type: "image/svg+xml", svg: result.svg } : null;
 }
@@ -262,7 +259,11 @@ function BatchCard({
               alt={`${item.term} — ${shown.label}`}
               className="h-full w-full object-contain"
             />
-            {!working && <FullSizeHint label={t("admin_batch_images.full_size", "Full size")} />}
+            {!working && (
+              <FullSizeHint
+                label={t("admin_batch_images.full_size", "Full size")}
+              />
+            )}
           </ImageLightbox>
         ) : item.status === "failed" ? (
           <p className="flex h-full items-center justify-center p-2 text-center text-[11px] text-shu-dark">
@@ -384,10 +385,10 @@ function BatchCard({
               <button
                 key={option.key}
                 type="button"
-                // Too big to use: shown large, but not chosen.
+                // Too big to use, or the PNG: shown large, but not chosen.
                 onClick={() => {
                   setLooking(option.key);
-                  if (!tooBig) onChoose(option.key);
+                  if (!tooBig && option.key !== "png") onChoose(option.key);
                 }}
                 onMouseEnter={() => setHovered(option.key)}
                 onMouseLeave={() => setHovered(null)}
@@ -513,6 +514,18 @@ export function BatchWordImages({
 
   const open = () => {
     settings.open();
+    // A batch left from before is only kept for the same words — ticking
+    // different ones on the deck page starts a new batch.
+    if (presetWords) {
+      const ids = new Set(
+        presetWords.slice(0, BATCH_MAX).map((word) => word.id),
+      );
+      setItems((current) =>
+        current.length === ids.size && current.every((item) => ids.has(item.id))
+          ? current
+          : [],
+      );
+    }
     dialogRef.current?.showModal();
     if (!presetWords && deckId) void loadWords(deckId, filter);
   };
@@ -749,8 +762,15 @@ export function BatchWordImages({
     );
   };
 
+  // Closing with nothing approved yet clears the batch, so the next one
+  // starts clean; approved pictures (and their SVGs) are kept until then.
   const close = () => {
     if (running) stop();
+    setItems((current) =>
+      current.some((item) => item.approved === true || item.status === "traced")
+        ? current
+        : [],
+    );
     dialogRef.current?.close();
   };
 
@@ -926,7 +946,11 @@ export function BatchWordImages({
                 disabled={running !== null}
               />
               {characterIds.length === 0 && (
-                <FaceToggle value={face} onChange={setFace} disabled={running !== null} />
+                <FaceToggle
+                  value={face}
+                  onChange={setFace}
+                  disabled={running !== null}
+                />
               )}
               {/* No custom scene: one description can't suit every word. */}
               <ScenePicker

@@ -453,8 +453,9 @@ export function GenerateWordImage({ wordId, term }: { wordId: string; term: stri
       src: png.dataUrl,
       filename: `${term}.png`,
       bytes: png.bytes,
-      detail: null,
-      choice: { type: "image/png", base64: png.dataUrl.split(",")[1] },
+      // To compare against and download — word pictures are SVGs only.
+      detail: t("admin_category_words.png_view_only", "View only"),
+      choice: null,
     });
     for (const { key, label } of SVG_OPTIONS) {
       const result = svgs[key];

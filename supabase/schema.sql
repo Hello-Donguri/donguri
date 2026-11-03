@@ -2187,3 +2187,23 @@ create policy "Authenticated users can view word links"
 -- and the admin course page lists them apart from the live decks.
 
 alter table public.language_decks add column if not exists is_test boolean not null default false;
+
+-- 63. Example sentence recordings -----------------------------------------------------------
+-- Like a word's own recordings (section 59): each example sentence can have
+-- one in a female voice and one in a male voice, of the sentence in the
+-- language being learnt. Recorded from the admin deck page's recording
+-- window (see RecordDeckAudio) and uploaded to bunny.net.
+
+alter table public.word_examples add column if not exists audio_female_key text;
+alter table public.word_examples add column if not exists audio_male_key text;
+
+-- 64. Word listens --------------------------------------------------------------------------
+-- How often learners have listened to each word: its female recording, its
+-- male recording, or the browser's read-through (when it has no
+-- recordings). Counted on every press of a listen button for the word
+-- itself — the learn card, quiz and review prompts, the learn-complete
+-- tiles (see app/api/listens) — and shown on the admin deck page.
+
+alter table public.words add column if not exists listens_female integer not null default 0;
+alter table public.words add column if not exists listens_male integer not null default 0;
+alter table public.words add column if not exists listens_speech integer not null default 0;

@@ -626,7 +626,12 @@ export const TestSession = ({
               {question.prompt}
             </p>
             {question.direction === "term-to-translation" && (
-              <SpeakButton text={question.prompt} language={question.targetLanguage} audio={question.promptAudio} />
+              <SpeakButton
+                text={question.prompt}
+                language={question.targetLanguage}
+                audio={question.promptAudio}
+                wordId={question.wordId}
+              />
             )}
           </div>
           {question.promptRomanization && (

@@ -335,6 +335,10 @@ export type WordExampleSummary = {
   // WordExample.enHighlight.
   enHighlight: string | null;
   jaHighlight: string | null;
+  // The sentence's recordings (in the language being learnt), when it has
+  // any — null means the browser reads it out instead. Only on the
+  // learner's side (see toRevealWord); the admin editor leaves it out.
+  audio?: WordAudio | null;
 };
 
 // An extra accepted spelling/answer for a word's typed-answer questions —
@@ -350,6 +354,20 @@ export type WordAlternateAnswerSummary = {
 // gets a button for each; a word with neither carries null instead, and
 // the browser's read-through is used.
 export type WordAudio = { female: string | null; male: string | null };
+
+// One thing to record on the admin deck page's recording windows (see
+// getDeckRecordingItems and RecordDeckAudio): a word or one of its example
+// sentences, the text to say (in the language being learnt), what it means
+// (shown smaller, as a prompt), and the recordings it already has.
+export type RecordingTarget = "word" | "example";
+export type RecordingVoice = "female" | "male";
+export type RecordingItem = {
+  target: RecordingTarget;
+  id: string;
+  text: string;
+  context: string;
+  audio: WordAudio;
+};
 
 // One of a word's linked words (see WordLink), as debug mode shows it on
 // the learn card: already learnt, coming up in this batch, or still to come.
@@ -693,15 +711,14 @@ const IMAGE_FIELD_SCHEMA = z
   })
   .optional();
 
-// A word's picture can also be an SVG (illustrations often are). Only
-// words: they're always shown through a plain <img> (see WordImage), where
-// an SVG can't run anything — and lib/svg.ts turns away any SVG with
-// scripting in it anyway, in case its URL is opened directly.
+// A word's picture is always an SVG — crisp at any size, and small.
+// lib/svg.ts turns away any SVG with scripting in it, since they're also
+// put straight into learners' pages (see lib/inline-svg.ts).
 const WORD_IMAGE_FIELD_SCHEMA = z
   .file({ error: "Choose an image." })
   .max(MAX_IMAGE_BYTES, { error: "Image must be under 5MB." })
-  .mime(["image/webp", "image/png", "image/jpeg", "image/svg+xml"], {
-    error: "Use a WebP, PNG, JPEG or SVG image.",
+  .mime(["image/svg+xml"], {
+    error: "Word pictures must be SVGs.",
   })
   .optional();
 
@@ -1339,8 +1356,18 @@ export type AdminCategorySummary = {
   subheading: string | null;
   coverImage: string | null;
   // How many of the deck's words have each kind of media — what's left to
-  // make before the deck can go live. `svgImages` is a subset of `images`.
-  media: { total: number; images: number; svgImages: number; femaleVoice: number; maleVoice: number };
+  // make before the deck can go live. `svgImages` is how many have an SVG picture.
+  // `sentences` counts its words' example sentences, and the sentence
+  // voices how many of those have each recording.
+  media: {
+    total: number;
+    svgImages: number;
+    femaleVoice: number;
+    maleVoice: number;
+    sentences: number;
+    sentenceFemaleVoice: number;
+    sentenceMaleVoice: number;
+  };
 };
 
 // Loaded by the admin deck-edit page to prefill `EditCategoryForm` — the
@@ -1370,6 +1397,9 @@ export type AdminWordSummary = {
   imageKey: string | null;
   // The pronunciation recordings' URLs (see wordAudio in lib/images.ts).
   audio: WordAudio | null;
+  // How many times learners have listened to the word: each recording,
+  // and the browser's read-through (see app/api/listens).
+  listens: { female: number; male: number; speech: number };
   active: boolean;
   category: WordCategoryOption | null;
   wordType: WordType | null;

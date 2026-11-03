@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, Check, Volume2 } from "lucide-react";
 import type { RevealWord } from "@/lib/definitions";
 import { useRecording, useSpeech } from "@/lib/speech";
+import { countListen } from "@/lib/listens";
 import { WordImage } from "@/components/ui/word-image";
 import { Button } from "@/components/ui/button";
 import { useTranslations } from "@/components/i18n/locale-provider";
@@ -248,7 +249,11 @@ function WordTile({
   return (
     <motion.button
       type="button"
-      onClick={() => (recording ? play(recording) : speak(word.term, word.targetLanguage))}
+      onClick={() => {
+        if (recording) play(recording);
+        else speak(word.term, word.targetLanguage);
+        countListen(word.id, !recording ? "speech" : recording === word.audio?.female ? "female" : "male");
+      }}
       disabled={speaking || (recording !== null && playing === recording)}
       aria-label={t("session_ui.listen_to", "Listen to {{text}}", { text: word.term })}
       initial={animate ? { opacity: 0, y: 16, scale: 0.94 } : false}

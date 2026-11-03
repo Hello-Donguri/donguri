@@ -188,7 +188,7 @@ export function EditWordForm({ word, links, linkableWords, currentImageSrc, cate
             <FileField
               label={t("admin_word_form.replace_image", "Replace image")}
               name="image"
-              accept="image/webp,image/png,image/jpeg,image/svg+xml"
+              accept="image/svg+xml,.svg"
               errors={state?.errors?.image}
             />
           </div>

@@ -2,9 +2,10 @@
 
 import { useOptimistic, useTransition } from "react";
 import Link from "next/link";
-import { FlaskConical, Image as ImageIcon, Mars, Shapes, Venus, type LucideIcon } from "lucide-react";
+import { FlaskConical, Mars, Shapes, Venus, type LucideIcon } from "lucide-react";
 import { setCategoryActive, setCategoryTest } from "@/lib/actions/admin-content";
 import { DeleteDeckButton } from "@/components/admin/delete-deck-button";
+import { ReadinessRing, deckReadiness } from "@/components/admin/readiness-ring";
 import { VisibilityToggle } from "@/components/ui/visibility-toggle";
 import { WordImage } from "@/components/ui/word-image";
 import { Button } from "@/components/ui/button";
@@ -21,12 +22,35 @@ function statusClass(count: number, total: number) {
   return "border-kin/40 bg-kin/15 text-sumi";
 }
 
-function mediaStats(media: Media, t: TFunction): { key: string; label: string; count: number; Icon: LucideIcon }[] {
+// Each kind of media, out of how many could have it — words for the first
+// three, example sentences for the sentence voices (left out when the deck
+// has no sentences).
+function mediaStats(
+  media: Media,
+  t: TFunction,
+): { key: string; label: string; count: number; total: number; Icon: LucideIcon }[] {
   return [
-    { key: "images", label: t("admin_course_decks.media_images", "Images"), count: media.images, Icon: ImageIcon },
-    { key: "svg", label: t("admin_course_decks.media_svg", "SVG images"), count: media.svgImages, Icon: Shapes },
-    { key: "female", label: t("admin_course_decks.media_female", "Female voice"), count: media.femaleVoice, Icon: Venus },
-    { key: "male", label: t("admin_course_decks.media_male", "Male voice"), count: media.maleVoice, Icon: Mars },
+    { key: "svg", label: t("admin_course_decks.media_svg", "SVG images"), count: media.svgImages, total: media.total, Icon: Shapes },
+    { key: "female", label: t("admin_course_decks.media_female", "Female voice"), count: media.femaleVoice, total: media.total, Icon: Venus },
+    { key: "male", label: t("admin_course_decks.media_male", "Male voice"), count: media.maleVoice, total: media.total, Icon: Mars },
+    ...(media.sentences > 0
+      ? [
+          {
+            key: "sentence-female",
+            label: t("admin_course_decks.media_sentence_female", "Sentences ♀"),
+            count: media.sentenceFemaleVoice,
+            total: media.sentences,
+            Icon: Venus,
+          },
+          {
+            key: "sentence-male",
+            label: t("admin_course_decks.media_sentence_male", "Sentences ♂"),
+            count: media.sentenceMaleVoice,
+            total: media.sentences,
+            Icon: Mars,
+          },
+        ]
+      : []),
   ];
 }
 
@@ -34,55 +58,33 @@ function sumMedia(categories: AdminCategorySummary[]): Media {
   return categories.reduce<Media>(
     (sum, { media }) => ({
       total: sum.total + media.total,
-      images: sum.images + media.images,
       svgImages: sum.svgImages + media.svgImages,
       femaleVoice: sum.femaleVoice + media.femaleVoice,
       maleVoice: sum.maleVoice + media.maleVoice,
+      sentences: sum.sentences + media.sentences,
+      sentenceFemaleVoice: sum.sentenceFemaleVoice + media.sentenceFemaleVoice,
+      sentenceMaleVoice: sum.sentenceMaleVoice + media.sentenceMaleVoice,
     }),
-    { total: 0, images: 0, svgImages: 0, femaleVoice: 0, maleVoice: 0 },
+    {
+      total: 0,
+      svgImages: 0,
+      femaleVoice: 0,
+      maleVoice: 0,
+      sentences: 0,
+      sentenceFemaleVoice: 0,
+      sentenceMaleVoice: 0,
+    },
   );
 }
 
-// How ready a deck is to go live: the share of its four media slots
-// (image, SVG image, female voice, male voice per word) that are filled.
-function readiness(media: Media): number {
-  if (media.total === 0) return 0;
-  const filled = media.images + media.svgImages + media.femaleVoice + media.maleVoice;
-  return Math.round((filled / (media.total * 4)) * 100);
-}
-
-function ReadinessRing({ media }: { media: Media }) {
+function DeckReadinessRing({ media }: { media: Media }) {
   const t = useTranslations();
-  const percent = readiness(media);
-  const radius = 16;
-  const circumference = 2 * Math.PI * radius;
-  const stroke = percent === 100 ? "stroke-matcha" : percent === 0 ? "stroke-shu" : "stroke-kin";
-
+  const percent = deckReadiness(media);
   return (
-    <div
-      role="img"
-      aria-label={t("admin_course_decks.readiness_aria", "{{percent}}% ready", { percent })}
-      title={t("admin_course_decks.readiness_aria", "{{percent}}% ready", { percent })}
-      className="relative h-11 w-11 shrink-0"
-    >
-      <svg viewBox="0 0 40 40" className="h-full w-full -rotate-90" aria-hidden>
-        <circle cx="20" cy="20" r={radius} fill="none" strokeWidth="4" className="stroke-sumi/10" />
-        <circle
-          cx="20"
-          cy="20"
-          r={radius}
-          fill="none"
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={circumference * (1 - percent / 100)}
-          className={`${stroke} transition-[stroke-dashoffset]`}
-        />
-      </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold tabular-nums text-sumi">
-        {percent}%
-      </span>
-    </div>
+    <ReadinessRing
+      percent={percent}
+      label={t("admin_course_decks.readiness_aria", "{{percent}}% ready", { percent })}
+    />
   );
 }
 
@@ -91,17 +93,17 @@ function MediaSummary({ media }: { media: Media }) {
 
   return (
     <ul className="grid grid-cols-2 gap-2">
-      {mediaStats(media, t).map(({ key, label, count, Icon }) => (
+      {mediaStats(media, t).map(({ key, label, count, total, Icon }) => (
         <li
           key={key}
-          className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-xs font-medium ${statusClass(count, media.total)}`}
+          className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-xs font-medium ${statusClass(count, total)}`}
         >
           <span className="flex min-w-0 items-center gap-1.5">
             <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
             <span className="truncate">{label}</span>
           </span>
           <span className="shrink-0 font-bold tabular-nums">
-            {count}/{media.total}
+            {count}/{total}
           </span>
         </li>
       ))}
@@ -148,7 +150,7 @@ function DeckCard({
       }`}
     >
       <div className="absolute right-3 top-3">
-        <ReadinessRing media={category.media} />
+        <DeckReadinessRing media={category.media} />
       </div>
 
       <Link href={href} className="group flex items-start gap-3 pr-12">

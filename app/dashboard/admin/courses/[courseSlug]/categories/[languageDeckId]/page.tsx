@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Check, FileX2, ImageOff } from "lucide-react";
-import { requireAdminProfile, getAdminCategoryWords } from "@/lib/dal";
+import { Check, FileX2, ImageOff, Volume2 } from "lucide-react";
+import { requireAdminProfile, getAdminCategoryWords, getDeckRecordingItems } from "@/lib/dal";
 import { setWordActive } from "@/lib/actions/admin-content";
 import { DeleteWordButton } from "@/components/admin/delete-word-button";
 import { WordMediaSlots } from "@/components/admin/word-media-slots";
 import { GenerateWordImage } from "@/components/admin/generate-word-image";
+import { RecordDeckAudio } from "@/components/admin/record-deck-audio";
 import { WordBatchSelection, WordSelectCheckbox } from "@/components/admin/word-batch-selection";
 import { DeckMediaSummary } from "@/components/admin/deck-media-summary";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
@@ -44,14 +45,17 @@ export default async function AdminCategoryWordsPage({ params, searchParams }: P
   await requireAdminProfile();
   const [{ courseSlug, languageDeckId }, { missing }] = await Promise.all([params, searchParams]);
   const filter: "all" | "image" | "svg" = missing === "image" || missing === "svg" ? missing : "all";
-  const { languageDeck, course, words } =
-    await getAdminCategoryWords(languageDeckId);
+  const [{ languageDeck, course, words }, recordingItems] = await Promise.all([
+    getAdminCategoryWords(languageDeckId),
+    getDeckRecordingItems(languageDeckId),
+  ]);
   const { t } = await getTranslator();
 
   if (course.slug !== courseSlug) {
     redirect(`/dashboard/admin/courses/${courseSlug}`);
   }
 
+  const exampleRecordings = recordingItems.filter((item) => item.target === "example");
   const withoutImage = words.filter((word) => !word.imageKey);
   const notSvg = words.filter((word) => word.imageKey && !isSvgImage(word.imageKey));
   const shownWords = filter === "image" ? withoutImage : filter === "svg" ? notSvg : words;
@@ -182,7 +186,26 @@ export default async function AdminCategoryWordsPage({ params, searchParams }: P
         </div>
       </div>
 
-      {words.length > 0 && <DeckMediaSummary words={words} t={t} />}
+      {words.length > 0 && (
+        <DeckMediaSummary
+          words={words}
+          sentences={{
+            total: exampleRecordings.length,
+            female: exampleRecordings.filter((item) => item.audio.female).length,
+            male: exampleRecordings.filter((item) => item.audio.male).length,
+          }}
+          t={t}
+        />
+      )}
+
+      {/* Recording the deck's words and example sentences, one voice at a
+          time (see RecordDeckAudio). */}
+      {recordingItems.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <RecordDeckAudio items={recordingItems} voice="female" deckTitle={languageDeck.title} />
+          <RecordDeckAudio items={recordingItems} voice="male" deckTitle={languageDeck.title} />
+        </div>
+      )}
 
       {/* Narrow the list to the words still needing a picture, or an SVG
           version of theirs — and back to all of them. */}
@@ -308,6 +331,25 @@ export default async function AdminCategoryWordsPage({ params, searchParams }: P
                         {word.romanization}
                       </p>
                     )}
+                    {/* How often learners have listened to it. */}
+                    <p
+                      className="flex items-center gap-1 text-xs text-sumi-soft"
+                      title={t(
+                        "admin_category_words.listens_breakdown",
+                        "Female recording {{female}} · Male recording {{male}} · Browser voice {{speech}}",
+                        word.listens,
+                      )}
+                    >
+                      <Volume2 aria-hidden className="h-3.5 w-3.5" />
+                      {t("admin_category_words.listens", "{{count}} listens", {
+                        count: word.listens.female + word.listens.male + word.listens.speech,
+                      })}
+                      {word.listens.female + word.listens.male + word.listens.speech > 0 && (
+                        <span className="text-sumi-soft/70">
+                          · ♀ {word.listens.female} · ♂ {word.listens.male} · 🗣 {word.listens.speech}
+                        </span>
+                      )}
+                    </p>
                   </div>
                 </div>
 

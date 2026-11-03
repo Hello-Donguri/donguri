@@ -5,6 +5,7 @@ import { requireProfile } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import { buildWordAudioKey, buildWordImageKey, uploadImage } from "@/lib/bunny";
 import { isSafeSvg, UNSAFE_SVG_MESSAGE } from "@/lib/svg";
+import { deleteUnusedAudio } from "@/lib/audio-cleanup";
 import { GENERATED_IMAGE_MAX_BYTES } from "@/lib/generated-word-image";
 import {
   AUDIO_MAX_BYTES,
@@ -12,6 +13,7 @@ import {
   AUDIO_TYPE_ERROR,
   IMAGE_MAX_BYTES,
   WORD_IMAGE_TYPES,
+  WORD_IMAGE_TYPE_ERROR,
   audioMime,
   typedAudio,
 } from "@/lib/word-media";
@@ -64,7 +66,7 @@ export async function uploadWordMedia(formData: FormData): Promise<{ error?: str
   let key: string;
   let upload: File = file;
   if (kind === "image") {
-    if (!WORD_IMAGE_TYPES.includes(file.type)) return { error: "Use a WebP, PNG, JPEG or SVG image." };
+    if (!WORD_IMAGE_TYPES.includes(file.type)) return { error: WORD_IMAGE_TYPE_ERROR };
     if (file.size > IMAGE_MAX_BYTES) return { error: "Image must be under 5MB." };
     if (file.type === "image/svg+xml" && !(await isSafeSvg(file))) return { error: UNSAFE_SVG_MESSAGE };
     key = buildWordImageKey(file.type);
@@ -83,7 +85,10 @@ export async function uploadWordMedia(formData: FormData): Promise<{ error?: str
     return { error: "Upload failed. Try again." };
   }
 
-  const current = await prisma.word.findUnique({ where: { id: wordId }, select: { imageKey: true } });
+  const current = await prisma.word.findUnique({
+    where: { id: wordId },
+    select: { imageKey: true, audioFemaleKey: true, audioMaleKey: true },
+  });
   if (!current) return { error: "That word no longer exists." };
 
   const applyToShared = kind === "image" && formData.get("applyToShared") === "1" && current.imageKey;
@@ -92,6 +97,8 @@ export async function uploadWordMedia(formData: FormData): Promise<{ error?: str
     : [{ id: wordId }];
   const ids = affected.map((word) => word.id);
   const updated = await prisma.word.updateMany({ where: { id: { in: ids } }, data: { [COLUMN[kind]]: key } });
+  // A replaced recording's old file goes from bunny.net too.
+  if (kind !== "image") await deleteUnusedAudio([current[COLUMN[kind]]]);
 
   await Promise.all(ids.map(revalidateWord));
   return { updated: updated.count };
@@ -107,15 +114,15 @@ export async function chooseGeneratedWordImage(
 ): Promise<{ error?: string }> {
   if (!(await isAdmin())) return { error: "You don't have permission to do that." };
 
-  const file =
-    image.type === "image/svg+xml"
-      ? new File([image.svg], "generated.svg", { type: image.type })
-      : new File([Buffer.from(image.base64, "base64")], "generated.png", { type: image.type });
+  // Only SVGs are used as word pictures; the PNG is just to look at.
+  if (image.type !== "image/svg+xml") return { error: WORD_IMAGE_TYPE_ERROR };
+
+  const file = new File([image.svg], "generated.svg", { type: image.type });
 
   if (file.size > GENERATED_IMAGE_MAX_BYTES) {
     return { error: `Too big to use — keep it under ${GENERATED_IMAGE_MAX_BYTES / 1024}KB.` };
   }
-  if (image.type === "image/svg+xml" && !(await isSafeSvg(file))) return { error: UNSAFE_SVG_MESSAGE };
+  if (!(await isSafeSvg(file))) return { error: UNSAFE_SVG_MESSAGE };
 
   const key = buildWordImageKey(file.type);
   try {
@@ -132,9 +139,18 @@ export async function chooseGeneratedWordImage(
   return {};
 }
 
+// Clears one of a word's media slots. A recording is deleted from
+// bunny.net as well (once nothing else uses the file — see
+// deleteUnusedAudio); a picture's file is kept, since copied decks share
+// pictures.
 export async function removeWordMedia(wordId: string, kind: WordMediaKind): Promise<void> {
   if (!(await isAdmin()) || !isKind(kind)) return;
+  const current = await prisma.word.findUnique({
+    where: { id: wordId },
+    select: { audioFemaleKey: true, audioMaleKey: true },
+  });
   await prisma.word.updateMany({ where: { id: wordId }, data: { [COLUMN[kind]]: null } });
+  if (current && kind !== "image") await deleteUnusedAudio([current[COLUMN[kind]]]);
   await revalidateWord(wordId);
 }
 

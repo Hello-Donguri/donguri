@@ -9,6 +9,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { buildDeckCoverImageKey, buildWordAudioKey, buildWordImageKey, uploadImage } from "@/lib/bunny";
 import { AUDIO_MAX_BYTES, AUDIO_SIZE_ERROR, AUDIO_TYPE_ERROR, audioMime, typedAudio } from "@/lib/word-media";
 import { isSafeSvg, UNSAFE_SVG_MESSAGE } from "@/lib/svg";
+import { deleteUnusedAudio } from "@/lib/audio-cleanup";
 import { withStarMark } from "@/lib/star-mark";
 import {
   parseExamplesColumns,
@@ -86,6 +87,50 @@ function isBlankRow(row: Record<string, string>, ignoreKeys: string[]): boolean 
 // Silent best-effort validation (drop invalid/blank rows) fits this
 // admin-only, low-frequency tool the same way image-upload failures here are
 // handled with a plain message rather than field-level errors.
+// Saving a word's examples (the word form, a spreadsheet re-import)
+// replaces them all — so their recordings (see the deck page's recording
+// window) are carried over to each new example whose sentence in the
+// language being learnt is unchanged. One that's been reworded starts
+// without, since the old recording no longer says it. `previousKeys` are
+// all the recordings the examples had, for deleteUnusedAudio to clear up
+// the ones that weren't carried over once the save is done.
+async function exampleRecordingKeeper(wordIds: string[]) {
+  const recorded = wordIds.length
+    ? await prisma.wordExample.findMany({
+        where: {
+          wordId: { in: wordIds },
+          OR: [{ audioFemaleKey: { not: null } }, { audioMaleKey: { not: null } }],
+        },
+        select: {
+          wordId: true,
+          en: true,
+          ja: true,
+          audioFemaleKey: true,
+          audioMaleKey: true,
+          word: { select: { languageDeck: { select: { course: { select: { targetLanguage: true } } } } } },
+        },
+      })
+    : [];
+  const spoken = (englishIsTarget: boolean, en: string, ja: string) => (englishIsTarget ? en : ja);
+  const englishIsTarget = new Map<string, boolean>();
+  const byText = new Map<string, { audioFemaleKey: string | null; audioMaleKey: string | null }>();
+  for (const example of recorded) {
+    const english = example.word.languageDeck.course.targetLanguage === "en";
+    englishIsTarget.set(example.wordId, english);
+    byText.set(`${example.wordId}\n${spoken(english, example.en, example.ja)}`, {
+      audioFemaleKey: example.audioFemaleKey,
+      audioMaleKey: example.audioMaleKey,
+    });
+  }
+  const keep = (wordId: string, en: string, ja: string) => {
+    const english = englishIsTarget.get(wordId);
+    if (english === undefined) return {};
+    return byText.get(`${wordId}\n${spoken(english, en, ja)}`) ?? {};
+  };
+  const previousKeys = recorded.flatMap((example) => [example.audioFemaleKey, example.audioMaleKey]);
+  return { keep, previousKeys };
+}
+
 async function replaceWordFormsAndExamples(wordId: string, formData: FormData): Promise<void> {
   const formRows = collectIndexedRows(formData, "forms")
     .filter((row) => !isBlankRow(row, ["clientId"]))
@@ -113,6 +158,7 @@ async function replaceWordFormsAndExamples(wordId: string, formData: FormData): 
     };
   });
 
+  const recordings = await exampleRecordingKeeper([wordId]);
   const examplesData = exampleRows.map((example, index) => {
     // "*word*"/"**word**" in a sentence marks its highlight; the highlight
     // fields win when filled in
@@ -128,6 +174,7 @@ async function replaceWordFormsAndExamples(wordId: string, formData: FormData): 
       enHighlight: en.highlight || null,
       jaHighlight: ja.highlight || null,
       position: index + 1,
+      ...recordings.keep(wordId, en.text, ja.text),
     };
   });
 
@@ -137,6 +184,7 @@ async function replaceWordFormsAndExamples(wordId: string, formData: FormData): 
     ...(formsData.length > 0 ? [prisma.wordForm.createMany({ data: formsData })] : []),
     ...(examplesData.length > 0 ? [prisma.wordExample.createMany({ data: examplesData })] : []),
   ]);
+  await deleteUnusedAudio(recordings.previousKeys);
 }
 
 // Validates the submitted alternate-answer rows and replaces every existing
@@ -604,8 +652,9 @@ export async function createWord(
 type AudioVoice = "Female" | "Male";
 
 // A word's female and male recordings after this save: a newly picked file
-// is uploaded (replacing the old one, which is left on bunny.net as with
-// images), "Remove" clears it, and otherwise it's kept.
+// is uploaded (replacing the old one, whose file the caller deletes once
+// the word's saved — see deleteUnusedAudio), "Remove" clears it, and
+// otherwise it's kept.
 async function saveWordAudio(
   formData: FormData,
   current: { audioFemaleKey: string | null; audioMaleKey: string | null },
@@ -764,6 +813,9 @@ export async function updateWord(
     },
   });
 
+  // A recording replaced or removed on the form goes from bunny.net.
+  await deleteUnusedAudio([existing.audioFemaleKey, existing.audioMaleKey]);
+
   await replaceWordFormsAndExamples(wordId, formData);
   await replaceWordAlternateAnswers(wordId, formData);
   await prisma.$transaction([
@@ -798,6 +850,25 @@ export async function setWordActive(wordId: string, active: boolean): Promise<vo
   revalidatePath(`/dashboard/courses/${word.languageDeck.course.slug}/decks/${word.languageDeckId}`);
 }
 
+// Every recording on the words `where` picks out, and on their example
+// sentences — gathered before they're deleted, so the files can be deleted
+// from bunny.net after (see deleteUnusedAudio).
+async function recordingKeys(where: Prisma.WordWhereInput) {
+  const words = await prisma.word.findMany({
+    where,
+    select: {
+      audioFemaleKey: true,
+      audioMaleKey: true,
+      examples: { select: { audioFemaleKey: true, audioMaleKey: true } },
+    },
+  });
+  return words.flatMap((word) => [
+    word.audioFemaleKey,
+    word.audioMaleKey,
+    ...word.examples.flatMap((example) => [example.audioFemaleKey, example.audioMaleKey]),
+  ]);
+}
+
 // Unlike setWordActive (reversible — hide the word, keep everything), this
 // is permanent: WordForm/WordExample/WordAlternateAnswer/WordQuizQuestion
 // and — critically — every learner's UserWordProgress on this word all
@@ -812,10 +883,14 @@ export async function deleteWord(wordId: string): Promise<void> {
     return;
   }
 
+  // Its recordings and its sentences', to delete from bunny.net with it.
+  const audio = await recordingKeys({ id: wordId });
+
   const word = await prisma.word.delete({
     where: { id: wordId },
     select: { languageDeckId: true, languageDeck: { select: { course: { select: { slug: true } } } } },
   });
+  await deleteUnusedAudio(audio);
 
   revalidatePath(`/dashboard/admin/courses/${word.languageDeck.course.slug}/categories/${word.languageDeckId}`);
   revalidatePath(`/dashboard/courses/${word.languageDeck.course.slug}/decks/${word.languageDeckId}`);
@@ -872,10 +947,13 @@ export async function deleteCategory(languageDeckId: string): Promise<void> {
     return;
   }
 
+  const audio = await recordingKeys({ languageDeckId });
+
   const languageDeck = await prisma.languageDeck.delete({
     where: { id: languageDeckId },
     select: { course: { select: { slug: true } } },
   });
+  await deleteUnusedAudio(audio);
 
   revalidatePath(`/dashboard/admin/courses/${languageDeck.course.slug}`);
   revalidatePath(`/dashboard/courses/${languageDeck.course.slug}`);
@@ -1504,8 +1582,14 @@ export async function importWordsFromSpreadsheet(
   const formsData = [...formsByWordId.values()].flatMap((forms) =>
     forms.map((form, index) => ({ ...form, position: index + 1 })),
   );
+  const recordings = await exampleRecordingKeeper(updatedWordIds);
   const examplesData = [...examplesByWordId.values()].flatMap((examples) =>
-    examples.map((example, index) => ({ id: randomUUID(), ...example, position: index + 1 })),
+    examples.map((example, index) => ({
+      id: randomUUID(),
+      ...example,
+      position: index + 1,
+      ...recordings.keep(example.wordId, example.en, example.ja),
+    })),
   );
   const quizData = [...quizByWordId.values()].flatMap((questions) =>
     questions.map((question, index) => ({ ...question, position: index + 1 })),
@@ -1667,6 +1751,7 @@ export async function importWordsFromSpreadsheet(
   // occasionally-slow round trips (see lib/prisma.ts) — the default 5s cut
   // it close even for a handful of rows before that fix.
   const results = await prisma.$transaction(ops, { timeout: 20_000 });
+  await deleteUnusedAudio(recordings.previousKeys);
   const deactivatedCount =
     (vocabDeactivateResultIndex >= 0 ? (results[vocabDeactivateResultIndex] as { count: number }).count : 0) +
     (grammarDeactivateResultIndex >= 0 ? (results[grammarDeactivateResultIndex] as { count: number }).count : 0);

@@ -90,6 +90,23 @@ export async function uploadImage(file: File, key: string): Promise<void> {
   }
 }
 
+// Deletes a file from storage. One that's already gone counts as deleted.
+export async function deleteFile(key: string): Promise<void> {
+  const endpoint =
+    process.env.BUNNY_STORAGE_ENDPOINT || "https://storage.bunnycdn.com";
+  const zone = requireEnv("BUNNY_STORAGE_ZONE");
+  const apiKey = requireEnv("BUNNY_STORAGE_API_KEY");
+
+  const res = await fetch(`${endpoint}/${zone}/${key}`, {
+    method: "DELETE",
+    headers: { AccessKey: apiKey },
+  });
+
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`Bunny delete failed (${res.status}): ${await res.text()}`);
+  }
+}
+
 export function imageUrl(imageKey: string): string {
   return `https://${requireEnv("BUNNY_PULL_ZONE_HOST")}/${imageKey}`;
 }

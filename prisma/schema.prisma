@@ -213,6 +213,11 @@ model Word {
   // of supabase/schema.sql. Null: the browser's read-through is used.
   audioFemaleKey   String?               @map("audio_female_key")
   audioMaleKey     String?               @map("audio_male_key")
+  // How many times learners have listened to the word — each recording,
+  // and the browser's read-through. See app/api/listens.
+  listensFemale    Int                   @default(0) @map("listens_female")
+  listensMale      Int                   @default(0) @map("listens_male")
+  listensSpeech    Int                   @default(0) @map("listens_speech")
   wordType         String?               @map("word_type")
   // A second part of speech alongside `wordType` (e.g. an irregular verb
   // that's also a phrase) — see section 56 of supabase/schema.sql.
@@ -326,6 +331,10 @@ model WordExample {
   // "not marked" — fall back to the automatic match.
   enHighlight  String?   @map("en_highlight")
   jaHighlight  String?   @map("ja_highlight")
+  // The sentence (in the language being learnt) recorded in a female and a
+  // male voice — bunny.net keys, like Word.audioFemaleKey.
+  audioFemaleKey String? @map("audio_female_key")
+  audioMaleKey   String? @map("audio_male_key")
   position     Int
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   form         WordForm? @relation(fields: [formId], references: [id], onUpdate: NoAction)

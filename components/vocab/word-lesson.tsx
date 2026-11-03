@@ -181,9 +181,12 @@ export const WordLesson = ({
             </dl>
           )}
         </div>
+        {/* Its recordings when it has any, the browser's read-through
+            otherwise. */}
         <SpeakButton
           text={stripGrammarMarks(englishIsTarget ? example.en : example.ja)}
           language={word.targetLanguage}
+          audio={example.audio}
         />
       </div>
     );
@@ -208,6 +211,11 @@ export const WordLesson = ({
           ? mainExample.en
           : mainExample.ja
         : null;
+
+  // The word's own recordings — or, for a grammar point read out as its
+  // first example, that example's.
+  const listenFromExample = isGrammar && !keyPart && formValues.length === 0 && Boolean(mainExample);
+  const listenAudio = word.audio ?? (listenFromExample ? (mainExample?.audio ?? null) : null);
 
   // A vocab word's picture illustrates its first example, so it sits in
   // the example's panel, beside the sentence (above it on phones).
@@ -282,11 +290,16 @@ export const WordLesson = ({
       )}
 
       {/* Belongs to the pronunciation above, so it sits tight under it. */}
-      {(listenText || word.audio) && (
+      {(listenText || listenAudio) && (
         <div className="mt-3">
           {/* The recordings say the word itself, whatever listenText falls
               back to for a grammar pattern. */}
-          <ListenButton text={listenText ?? word.term} language={word.targetLanguage} audio={word.audio} />
+          <ListenButton
+            text={listenText ?? word.term}
+            language={word.targetLanguage}
+            audio={listenAudio}
+            wordId={word.id}
+          />
         </div>
       )}
 
@@ -432,7 +445,7 @@ function VocabLesson({
           then, set off by a short rule, the meaning. */}
       <div className="mx-auto flex w-full max-w-xl flex-col items-center gap-5 text-center">
         <div className="flex flex-col items-center gap-3">
-          <ListenButton text={word.term} language={word.targetLanguage} audio={word.audio} />
+          <ListenButton text={word.term} language={word.targetLanguage} audio={word.audio} wordId={word.id} />
           <p className="font-nunito text-7xl leading-none font-black tracking-tight text-sumi sm:text-8xl">
             {word.term}
           </p>

@@ -32,6 +32,7 @@ import type {
   QuizDirection,
   QuizOption,
   QuizQuestion,
+  RecordingItem,
   ReviewQueueDebugEntry,
   ReviewQueueSummary,
   LinkedWordStatus,
@@ -61,6 +62,7 @@ import {
 } from "@/lib/srs";
 import { deckCoverImagePath, wordAudio, wordImagePath } from "@/lib/images";
 import { withInlineSvgs } from "@/lib/inline-svg";
+import { imageUrl } from "@/lib/bunny";
 import {
   findClozeMatchesByForm,
   findTermClozeMatches,
@@ -409,7 +411,15 @@ export const getAdminCategoryOverview = cache(
       where: { courseId: course.id },
       orderBy: { position: "asc" },
       include: {
-        words: { select: { path: true, imageKey: true, audioFemaleKey: true, audioMaleKey: true } },
+        words: {
+          select: {
+            path: true,
+            imageKey: true,
+            audioFemaleKey: true,
+            audioMaleKey: true,
+            examples: { select: { audioFemaleKey: true, audioMaleKey: true } },
+          },
+        },
       },
     });
 
@@ -433,16 +443,79 @@ export const getAdminCategoryOverview = cache(
           coverImage: deckCoverImagePath(languageDeck),
           media: {
             total: words.length,
-            images: words.filter((word) => word.imageKey).length,
             svgImages: words.filter((word) => word.imageKey?.toLowerCase().endsWith(".svg")).length,
             femaleVoice: words.filter((word) => word.audioFemaleKey).length,
             maleVoice: words.filter((word) => word.audioMaleKey).length,
+            sentences: words.reduce((count, word) => count + word.examples.length, 0),
+            sentenceFemaleVoice: words.reduce(
+              (count, word) => count + word.examples.filter((example) => example.audioFemaleKey).length,
+              0,
+            ),
+            sentenceMaleVoice: words.reduce(
+              (count, word) => count + word.examples.filter((example) => example.audioMaleKey).length,
+              0,
+            ),
           },
         };
       }),
     };
   },
 );
+
+// What the admin deck page's recording windows (see RecordDeckAudio) take
+// the recorder through, in deck order: each vocab word, then its example
+// sentences — always in the language being learnt (`term` is; an example's
+// `en` side is when that's English, its `ja` side otherwise) — with the
+// recordings each already has. Grammar points' own patterns aren't said
+// aloud, but their example sentences are.
+export const getDeckRecordingItems = cache(async (languageDeckId: string): Promise<RecordingItem[]> => {
+  await requireAdminProfile();
+  const deck = await prisma.languageDeck.findUnique({
+    where: { id: languageDeckId },
+    select: {
+      course: { select: { targetLanguage: true } },
+      words: {
+        orderBy: { position: "asc" },
+        select: {
+          id: true,
+          path: true,
+          term: true,
+          translation: true,
+          audioFemaleKey: true,
+          audioMaleKey: true,
+          examples: {
+            orderBy: { position: "asc" },
+            select: { id: true, en: true, ja: true, audioFemaleKey: true, audioMaleKey: true },
+          },
+        },
+      },
+    },
+  });
+  if (!deck) return [];
+  const englishIsTarget = deck.course.targetLanguage === "en";
+  const url = (key: string | null) => (key ? imageUrl(key) : null);
+
+  return deck.words.flatMap((word): RecordingItem[] => [
+    ...(word.path === "vocab"
+      ? [
+          {
+            target: "word" as const,
+            id: word.id,
+            text: word.term,
+            context: word.translation,
+            audio: { female: url(word.audioFemaleKey), male: url(word.audioMaleKey) },
+          },
+        ]
+      : []),
+    ...word.examples.map((example) => ({
+      target: "example" as const,
+      id: example.id,
+      text: englishIsTarget ? example.en : example.ja,
+      context: `${word.term} — ${englishIsTarget ? example.ja : example.en}`,
+      audio: { female: url(example.audioFemaleKey), male: url(example.audioMaleKey) },
+    })),
+  ]).filter((item) => item.text.trim());
+});
 
 // Full word list for one category (LanguageDeck), unfiltered by `active` — used by
 // the admin category-detail page and by the import flow's word-selection
@@ -588,6 +661,9 @@ function toAdminWordSummary(word: {
   imageKey: string | null;
   audioFemaleKey: string | null;
   audioMaleKey: string | null;
+  listensFemale?: number;
+  listensMale?: number;
+  listensSpeech?: number;
   active: boolean;
   wordType: string | null;
   secondaryWordType: string | null;
@@ -606,6 +682,11 @@ function toAdminWordSummary(word: {
   alternateAnswers: { id: string; value: string }[];
 }): AdminWordSummary {
   return {
+    listens: {
+      female: word.listensFemale ?? 0,
+      male: word.listensMale ?? 0,
+      speech: word.listensSpeech ?? 0,
+    },
     id: word.id,
     term: word.term,
     translation: word.translation,
@@ -2021,6 +2102,7 @@ function toRevealWord(
       romanization: example.romanization,
       enHighlight: example.enHighlight,
       jaHighlight: example.jaHighlight,
+      audio: wordAudio(example),
     })),
     image: wordImagePath(word),
     targetLanguage: course.targetLanguage,
