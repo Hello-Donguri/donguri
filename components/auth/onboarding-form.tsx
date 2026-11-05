@@ -6,8 +6,9 @@ import { TextField } from "@/components/ui/text-field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { UsernameField } from "@/components/auth/username-field";
 import { NativeLanguageField } from "@/components/settings/native-language-field";
+import { SpellingPreferenceField } from "@/components/settings/spelling-preference-field";
 import { LearningReasonField } from "@/components/settings/learning-reason-field";
-import type { LearningReason, NativeLanguage } from "@/lib/definitions";
+import type { LearningReason, NativeLanguage, SpellingPreference } from "@/lib/definitions";
 import { useTranslations } from "@/components/i18n/locale-provider";
 
 type OnboardingFormProps = {
@@ -16,6 +17,7 @@ type OnboardingFormProps = {
   // Already chosen — shown for reference only, since it can't change.
   username: string | null;
   nativeLanguage: NativeLanguage | null;
+  spellingPreference: SpellingPreference | null;
   learningReason: LearningReason | null;
 };
 
@@ -24,6 +26,7 @@ export function OnboardingForm({
   lastName,
   username,
   nativeLanguage,
+  spellingPreference,
   learningReason,
 }: OnboardingFormProps) {
   const t = useTranslations();
@@ -56,6 +59,10 @@ export function OnboardingForm({
         <UsernameField errors={state?.errors?.username} />
       )}
       <NativeLanguageField defaultValue={nativeLanguage} errors={state?.errors?.nativeLanguage} />
+      <SpellingPreferenceField
+        defaultValue={spellingPreference}
+        errors={state?.errors?.spellingPreference}
+      />
       <LearningReasonField defaultValue={learningReason} errors={state?.errors?.learningReason} />
       {state?.message && <p className="text-sm text-shu">{state.message}</p>}
       <SubmitButton pending={pending} pendingText={t("onboarding.saving", "Saving…")}>

@@ -55,6 +55,14 @@ export function EditWordForm({ word, links, linkableWords, currentImageSrc, cate
             errors={state?.errors?.term}
           />
           <TextField
+            label={t("admin_word_form.us_spelling", "US spelling")}
+            name="usSpelling"
+            required={false}
+            placeholder={t("admin_word_form.us_spelling_placeholder", "Only if different, e.g. color for colour")}
+            defaultValue={word.usSpelling ?? ""}
+            errors={state?.errors?.usSpelling}
+          />
+          <TextField
             label={t("admin_word_form.translation", "Translation")}
             name="translation"
             defaultValue={word.translation}

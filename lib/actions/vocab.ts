@@ -21,6 +21,7 @@ import { scheduleWeeklyCrownCheck } from "@/lib/weekly-crown";
 import type { OptionMeaning, QuizDirection } from "@/lib/definitions";
 import { isLatinTypeable } from "@/lib/language";
 import { inputAnswers } from "@/lib/grammar-marks";
+import { spellingVariants, usesUsSpelling, withPreferredSpelling } from "@/lib/spelling";
 
 // How loosely a typed answer is read. Vocab answers are lenient: slashes
 // separate alternatives ("they / them") and a bracketed note is optional
@@ -448,26 +449,34 @@ export async function submitAnswer(
     where: { id: wordId },
     select: {
       term: true,
+      usSpelling: true,
       translation: true,
       romanization: true,
-      languageDeck: { select: { courseId: true } },
+      languageDeck: { select: { courseId: true, course: { select: { targetLanguage: true } } } },
     },
   });
 
+  // The options were shown in the learner's spelling (see
+  // withPreferredSpelling); either spelling of the word is still it.
+  const useUs = usesUsSpelling(user.spelling_preference, word.languageDeck.course.targetLanguage);
   const optionsAreTerms = direction === "translation-to-term";
-  const correctAnswer = optionsAreTerms ? word.term : word.translation;
-  const correct = selectedAnswer === correctAnswer;
+  const termVariants = spellingVariants(word.term, word, useUs);
+  const correctAnswer = optionsAreTerms ? termVariants[0] : word.translation;
+  const correct = optionsAreTerms
+    ? termVariants.includes(selectedAnswer)
+    : selectedAnswer === correctAnswer;
 
   const { xp } = await recordAnswer(user.id, wordId, correct, advancesStage);
 
   const meaningOf = (option: {
     term: string;
+    usSpelling: string | null;
     translation: string;
     romanization: string | null;
   }): OptionMeaning =>
     optionsAreTerms
       ? { text: option.translation, romanization: null }
-      : { text: option.term, romanization: option.romanization };
+      : { text: withPreferredSpelling(option, useUs).term, romanization: option.romanization };
 
   const optionWords =
     optionTexts.length > 0
@@ -476,16 +485,16 @@ export async function submitAnswer(
             active: true,
             languageDeck: { courseId: word.languageDeck.courseId },
             ...(optionsAreTerms
-              ? { term: { in: optionTexts } }
+              ? { OR: [{ term: { in: optionTexts } }, { usSpelling: { in: optionTexts } }] }
               : { translation: { in: optionTexts } }),
           },
-          select: { term: true, translation: true, romanization: true },
+          select: { term: true, usSpelling: true, translation: true, romanization: true },
         })
       : [];
 
   const meanings: Record<string, OptionMeaning> = {};
   for (const option of optionWords) {
-    const text = optionsAreTerms ? option.term : option.translation;
+    const text = optionsAreTerms ? withPreferredSpelling(option, useUs).term : option.translation;
     meanings[text] ??= meaningOf(option);
   }
   // Two words can share a translation — the right answer always shows its
@@ -530,6 +539,7 @@ export async function submitTypedAnswer(
     where: { id: wordId },
     select: {
       term: true,
+      usSpelling: true,
       translation: true,
       romanization: true,
       path: true,
@@ -547,16 +557,24 @@ export async function submitTypedAnswer(
     word.path === "vocab" &&
     Boolean(word.romanization);
 
+  // A typed term may be in either spelling, UK or US (see
+  // spellingVariants); the learner's own comes first, as the one shown.
+  const useUs = usesUsSpelling(user.spelling_preference, word.languageDeck.course.targetLanguage);
+  const termVariants = spellingVariants(word.term, word, useUs);
   const storedAnswer =
     direction === "term-to-translation"
       ? word.translation
       : useRomanizedAnswer
         ? word.romanization!
-        : word.term;
+        : termVariants[0];
   // Where the Jyutping is asked for, the characters themselves count too —
   // a learner who can write 今日 shouldn't be marked wrong for not typing
   // gam1 jat6. (Characters can't be a near miss, so no retry for them.)
-  const acceptedAnswers = [storedAnswer, ...(useRomanizedAnswer ? [word.term] : [])].join(",");
+  const acceptedAnswers = [
+    storedAnswer,
+    ...(useRomanizedAnswer ? [word.term] : []),
+    ...(direction === "translation-to-term" && !useRomanizedAnswer ? termVariants.slice(1) : []),
+  ].join(",");
   const leniency = { vocab: word.path === "vocab" };
   // Jyutping may come in with no spaces between syllables — the tone
   // numbers already mark where each one ends.
@@ -628,28 +646,40 @@ export async function submitFormAnswer(
       where: { id: wordId },
       select: {
         term: true,
+        usSpelling: true,
         path: true,
         alternateAnswers: { select: { value: true } },
         ...courseSelect,
       },
     });
     const leniency = { vocab: word.path === "vocab" };
-    const { correct, fullAnswer } = matchTypedAnswer(typedAnswer, word.term, leniency);
+    // Either spelling, UK or US — the learner's own first, as the one shown.
+    const targetLanguage = word.languageDeck.course.targetLanguage;
+    const [shownTerm, ...otherSpellings] = spellingVariants(
+      word.term,
+      word,
+      usesUsSpelling(user.spelling_preference, targetLanguage),
+    );
+    const { correct, fullAnswer } = matchTypedAnswer(
+      typedAnswer,
+      [shownTerm, ...otherSpellings].join(","),
+      leniency,
+    );
     const synonym = correct ? null : synonymFor(typedAnswer, word.alternateAnswers, leniency);
     if (synonym) return retryResponse(user.id, synonym);
     const retry =
       correct || isRetry
         ? null
-        : retryFor(typedAnswer, word.term, leniency, word.languageDeck.course.targetLanguage, false);
+        : retryFor(typedAnswer, shownTerm, leniency, targetLanguage, false);
     if (retry) return retryResponse(user.id, retry);
 
     const { xp } = await recordAnswer(user.id, wordId, correct, advancesStage, isRetry ? RETRY_XP : 1);
     return {
       correct,
       retry: null,
-      correctAnswer: word.term,
+      correctAnswer: shownTerm,
       xp,
-      alternatives: alternativeReadings(word.term, leniency),
+      alternatives: alternativeReadings(shownTerm, leniency),
       fullAnswer,
       meanings: await formOptionMeanings(word.languageDeck.course.id, optionTexts),
     };
@@ -660,7 +690,15 @@ export async function submitFormAnswer(
     select: {
       value: true,
       wordId: true,
-      word: { select: { path: true, alternateAnswers: { select: { value: true } }, ...courseSelect } },
+      word: {
+        select: {
+          term: true,
+          usSpelling: true,
+          path: true,
+          alternateAnswers: { select: { value: true } },
+          ...courseSelect,
+        },
+      },
     },
   });
 
@@ -669,8 +707,18 @@ export async function submitFormAnswer(
   }
 
   // Same forgiving comparison as every other typed answer — case, spacing
-  // and contractions ("isn't" for "is not") don't matter.
-  const correct = normaliseAnswer(typedAnswer) === normaliseAnswer(form.value);
+  // and contractions ("isn't" for "is not") don't matter — with the form in
+  // either spelling ("colours" or "colors"), the learner's own first.
+  const targetLanguage = form.word.languageDeck.course.targetLanguage;
+  const formVariants = spellingVariants(
+    form.value,
+    form.word,
+    usesUsSpelling(user.spelling_preference, targetLanguage),
+  );
+  const shownForm = formVariants[0];
+  const correct = formVariants.some(
+    (variant) => normaliseAnswer(typedAnswer) === normaliseAnswer(variant),
+  );
   // The word's alternate answers are a "synonym" retry here too — the
   // blank may be a form ("chairs") rather than the term itself.
   const synonym = correct
@@ -681,7 +729,7 @@ export async function submitFormAnswer(
   const retry =
     correct || isRetry
       ? null
-      : retryFor(typedAnswer, form.value, { vocab: false }, form.word.languageDeck.course.targetLanguage, false);
+      : retryFor(typedAnswer, shownForm, { vocab: false }, targetLanguage, false);
   if (retry) return retryResponse(user.id, retry);
 
   const { xp } = await recordAnswer(user.id, wordId, correct, advancesStage, isRetry ? RETRY_XP : 1);
@@ -689,7 +737,7 @@ export async function submitFormAnswer(
   return {
     correct,
     retry: null,
-    correctAnswer: form.value,
+    correctAnswer: shownForm,
     xp,
     meanings: await formOptionMeanings(form.word.languageDeck.course.id, optionTexts),
   };

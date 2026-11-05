@@ -556,6 +556,7 @@ export async function createWord(
     term: formData.get("term"),
     translation: formData.get("translation"),
     romanization: formData.get("romanization") || undefined,
+    usSpelling: formData.get("usSpelling") || undefined,
     exampleSentence: formData.get("exampleSentence") || undefined,
     explanation: formData.get("explanation") || undefined,
     explanationJa: formData.get("explanationJa") || undefined,
@@ -575,6 +576,7 @@ export async function createWord(
     term,
     translation,
     romanization,
+    usSpelling,
     exampleSentence,
     explanation,
     explanationJa,
@@ -626,6 +628,7 @@ export async function createWord(
       term,
       translation,
       romanization: romanization || null,
+      usSpelling: usSpelling || null,
       exampleSentence: exampleSentence || null,
       explanation: explanation || null,
       explanationJa: explanationJa || null,
@@ -712,6 +715,7 @@ export async function updateWord(
     term: formData.get("term"),
     translation: formData.get("translation"),
     romanization: formData.get("romanization") || undefined,
+    usSpelling: formData.get("usSpelling") || undefined,
     exampleSentence: formData.get("exampleSentence") || undefined,
     explanation: formData.get("explanation") || undefined,
     explanationJa: formData.get("explanationJa") || undefined,
@@ -731,6 +735,7 @@ export async function updateWord(
     term,
     translation,
     romanization,
+    usSpelling,
     exampleSentence,
     explanation,
     explanationJa,
@@ -802,6 +807,7 @@ export async function updateWord(
       term,
       translation,
       romanization: romanization || null,
+      usSpelling: usSpelling || null,
       exampleSentence: exampleSentence || null,
       explanation: explanation || null,
       explanationJa: explanationJa || null,
@@ -1101,6 +1107,9 @@ type ImportedWordRow = {
   path: "vocab" | "grammar";
   wordNumber: string | null;
   term: string;
+  // Undefined when the sheet has no "US spelling" column, so an updated
+  // word keeps the one it has.
+  usSpelling: string | null | undefined;
   translation: string;
   romanization: string | null;
   exampleSentence: string | null;
@@ -1162,6 +1171,7 @@ function processWordSheet(
   categoryIdByName: Map<string, string>,
   newCategories: Map<string, NewWordCategory>,
   wordTypes: readonly string[],
+  hasUsSpellingColumn: boolean,
 ): ProcessedWordSheet {
   const existingWordIds = new Set(existingWordsForPath.map((word) => word.id));
   // Fallback match for a row with no (or no *matching*) Word ID — e.g. every
@@ -1280,6 +1290,7 @@ function processWordSheet(
       path,
       wordNumber: data.wordNumber || null,
       term: data.term,
+      usSpelling: hasUsSpellingColumn ? data.usSpelling || null : undefined,
       translation: data.translation,
       romanization: data.romanization || null,
       exampleSentence: data.exampleSentence || null,
@@ -1537,6 +1548,7 @@ export async function importWordsFromSpreadsheet(
     categoryIdByName,
     newCategories,
     wordTypes,
+    parsed.usSpellingColumn.vocab,
   );
   const grammar = processWordSheet(
     parsed.grammarRows,
@@ -1548,6 +1560,7 @@ export async function importWordsFromSpreadsheet(
     categoryIdByName,
     newCategories,
     wordTypes,
+    parsed.usSpellingColumn.grammar,
   );
 
   const rowErrors = [...vocab.rowErrors, ...grammar.rowErrors];
@@ -1626,6 +1639,7 @@ export async function importWordsFromSpreadsheet(
           languageDeckId,
           path: row.path,
           term: row.term,
+          usSpelling: row.usSpelling ?? null,
           translation: row.translation,
           romanization: row.romanization,
           exampleSentence: row.exampleSentence,
@@ -1650,7 +1664,7 @@ export async function importWordsFromSpreadsheet(
   if (updatedRows.length > 0) {
     const updateValueRows = updatedRows.map(
       (row) =>
-        Prisma.sql`(${row.id}::uuid, ${row.term}::text, ${row.translation}::text, ${row.romanization}::text, ${row.exampleSentence}::text, ${row.explanation}::text, ${row.explanationJa}::text, ${row.categoryId}::uuid, ${row.wordType}::text, ${row.secondaryWordType}::text)`,
+        Prisma.sql`(${row.id}::uuid, ${row.term}::text, ${row.usSpelling !== undefined}::boolean, ${row.usSpelling ?? null}::text, ${row.translation}::text, ${row.romanization}::text, ${row.exampleSentence}::text, ${row.explanation}::text, ${row.explanationJa}::text, ${row.categoryId}::uuid, ${row.wordType}::text, ${row.secondaryWordType}::text)`,
     );
 
     ops.push(
@@ -1658,6 +1672,7 @@ export async function importWordsFromSpreadsheet(
         UPDATE words AS w
         SET
           term = v.term,
+          us_spelling = CASE WHEN v.set_us_spelling THEN v.us_spelling ELSE w.us_spelling END,
           translation = v.translation,
           romanization = v.romanization,
           example_sentence = v.example_sentence,
@@ -1667,7 +1682,7 @@ export async function importWordsFromSpreadsheet(
           word_type = v.word_type,
           secondary_word_type = v.secondary_word_type
         FROM (VALUES ${Prisma.join(updateValueRows)})
-          AS v(id, term, translation, romanization, example_sentence, explanation, explanation_ja, category_id, word_type, secondary_word_type)
+          AS v(id, term, set_us_spelling, us_spelling, translation, romanization, example_sentence, explanation, explanation_ja, category_id, word_type, secondary_word_type)
         WHERE w.id = v.id
       `,
     );

@@ -39,6 +39,7 @@ import { normaliseXlsx } from "@/lib/xlsx-normalise";
 const WORD_COLUMNS = [
   { header: "Word #", key: "wordNumber", width: 8 },
   { header: "Term", key: "term", width: 22 },
+  { header: "US spelling", key: "usSpelling", width: 18 },
   { header: "Translation", key: "translation", width: 22 },
   { header: "Romanization", key: "romanization", width: 20 },
   { header: "Example sentence", key: "exampleSentence", width: 36 },
@@ -252,6 +253,10 @@ function addInstructionsSheet(workbook: ExcelJS.Workbook, cleanCategoryNames: st
       `Optional. A second word type shown beside the first on the lesson — e.g. "irregular verb" with "phrase". Same choices as Word type.`,
     ],
     [
+      "US spelling",
+      'Optional. The Term\'s US spelling, only where it differs from the UK one in the Term column — e.g. "color" on the row for "colour". Learners who choose US spelling see this instead, and either spelling is accepted when typed. Leave it blank when the two are the same.',
+    ],
+    [
       "Alternative spellings",
       'Optional. Other answers that should also count as correct when a learner types this word — e.g. "3; three" for a word whose Term is "三". Separate multiple alternatives with a semicolon ( ; ) or a pipe ( | ). Checked regardless of which side (Term or Translation) the learner is typing.',
     ],
@@ -426,6 +431,7 @@ export type WordExportRow = {
   // 'vocab', Grammar/Grammar quiz questions for 'grammar'.
   path: "vocab" | "grammar";
   term: string;
+  usSpelling: string | null;
   translation: string;
   romanization: string | null;
   exampleSentence: string | null;
@@ -502,6 +508,7 @@ function writeWordsAndQuizSheets(
     wordsSheet.addRow({
       wordNumber,
       term: word.term,
+      usSpelling: word.usSpelling ?? "",
       translation: word.translation,
       romanization: word.romanization ?? "",
       exampleSentence: word.exampleSentence ?? "",
@@ -603,6 +610,8 @@ export type ParsedWorkbook =
       // Whether each sheet has a "Linked words" column — a file from before
       // it existed leaves links alone rather than clearing them.
       linkedWordsColumn: { vocab: boolean; grammar: boolean };
+      // Same for "US spelling" — an older file leaves them as they are.
+      usSpellingColumn: { vocab: boolean; grammar: boolean };
     }
   | { ok: false; message: string };
 
@@ -839,6 +848,10 @@ export async function parseWordImportWorkbook(buffer: Buffer): Promise<ParsedWor
     linkedWordsColumn: {
       vocab: hasHeader(wordsSheet, "Linked words"),
       grammar: grammarSheet ? hasHeader(grammarSheet, "Linked words") : false,
+    },
+    usSpellingColumn: {
+      vocab: hasHeader(wordsSheet, "US spelling"),
+      grammar: grammarSheet ? hasHeader(grammarSheet, "US spelling") : false,
     },
   };
 }

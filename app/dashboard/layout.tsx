@@ -6,6 +6,7 @@ import { DevModeProvider } from "@/components/dashboard/dev-mode-context";
 import { ReviewDueNotifier } from "@/components/vocab/review-due-notifier";
 import { Toaster } from "@/components/ui/toast";
 import { GuestBanner } from "@/components/access/guest-banner";
+import { SpellingPreferencePrompt } from "@/components/settings/spelling-preference-field";
 import { getCourseStreaks, getLearningAllowance, getProfile, requireProfile } from "@/lib/dal";
 import { connection } from "next/server";
 import { parseDonguriConfig, type AccessoryId } from "@/lib/levels";
@@ -33,6 +34,9 @@ export default function DashboardLayout({
           <DashboardGuestBanner />
         </Suspense>
         <main className="mx-auto max-w-360 px-4 py-6 sm:px-6 sm:py-10">{children}</main>
+        <Suspense fallback={null}>
+          <DashboardSpellingPrompt />
+        </Suspense>
         <ReviewDueNotifier />
         <Toaster />
       </div>
@@ -77,6 +81,17 @@ async function DashboardHeaderActions() {
       xp={xp}
     />
   );
+}
+
+// Everyone who signed up before they were asked UK or US spelling is
+// asked once, on whichever dashboard page they open next (see
+// SpellingPreferencePrompt). Read fresh, like the guest banner, so it's
+// gone as soon as they've answered.
+async function DashboardSpellingPrompt() {
+  await connection();
+  const profile = await getProfile();
+  if (!profile || profile.spelling_preference) return null;
+  return <SpellingPreferencePrompt />;
 }
 
 // Guests (see lib/access.ts) are reminded on every page that their progress

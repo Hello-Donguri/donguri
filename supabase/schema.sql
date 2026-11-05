@@ -2207,3 +2207,26 @@ alter table public.word_examples add column if not exists audio_male_key text;
 alter table public.words add column if not exists listens_female integer not null default 0;
 alter table public.words add column if not exists listens_male integer not null default 0;
 alter table public.words add column if not exists listens_speech integer not null default 0;
+
+-- 65. UK and US spellings -------------------------------------------------------------------
+-- The course content is written in UK spelling. `words.us_spelling` is a
+-- word's US spelling where it differs ("color" for "colour"), set on the
+-- admin word form or the spreadsheet's "US spelling" column; null where
+-- the two are the same.
+-- `profiles.spelling_preference`: which one the learner sees ('uk' or
+-- 'us'), asked on sign-up/onboarding, by a one-off prompt for accounts
+-- from before it was asked (null until they answer), and editable in
+-- account settings. Either spelling is accepted when typed (see
+-- lib/spelling.ts).
+
+alter table public.words add column if not exists us_spelling text;
+alter table public.profiles add column if not exists spelling_preference text;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'profiles_spelling_preference_check') then
+    alter table public.profiles
+      add constraint profiles_spelling_preference_check check (spelling_preference in ('uk', 'us'));
+  end if;
+end;
+$$;

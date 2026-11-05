@@ -50,6 +50,15 @@ export type NativeLanguage = (typeof NATIVE_LANGUAGES)[number];
 
 const NativeLanguageSchema = z.enum(NATIVE_LANGUAGES, { error: "Choose your native language." });
 
+// Which spelling of a word a learner sees — the content is written in UK
+// spelling, with a US one on the words where it differs (Word.usSpelling).
+// Kept in step with profiles_spelling_preference_check (section 65 of
+// supabase/schema.sql).
+export const SPELLING_PREFERENCES = ["uk", "us"] as const;
+export type SpellingPreference = (typeof SPELLING_PREFERENCES)[number];
+
+const SpellingPreferenceSchema = z.enum(SPELLING_PREFERENCES, { error: "Choose UK or US spelling." });
+
 // Why a learner is learning, picked from a dropdown on sign-up/onboarding
 // and changeable on the profile page. Kept in step with
 // profiles_learning_reason_check (section 54 of supabase/schema.sql).
@@ -73,6 +82,7 @@ export const SignupFormSchema = z.object({
   lastName: LastNameSchema,
   username: UsernameSchema,
   nativeLanguage: NativeLanguageSchema,
+  spellingPreference: SpellingPreferenceSchema,
   learningReason: LearningReasonSchema,
   email: z.email({ error: "Please enter a valid email." }).trim(),
   password: z
@@ -113,6 +123,7 @@ export type SignupFormState =
         lastName?: string[];
         username?: string[];
         nativeLanguage?: string[];
+        spellingPreference?: string[];
         learningReason?: string[];
         email?: string[];
         password?: string[];
@@ -128,6 +139,7 @@ export const OnboardingFormSchema = z.object({
   lastName: LastNameSchema,
   username: UsernameSchema,
   nativeLanguage: NativeLanguageSchema,
+  spellingPreference: SpellingPreferenceSchema,
   learningReason: LearningReasonSchema,
 });
 
@@ -138,6 +150,7 @@ export type OnboardingFormState =
         lastName?: string[];
         username?: string[];
         nativeLanguage?: string[];
+        spellingPreference?: string[];
         learningReason?: string[];
       };
       message?: string;
@@ -222,6 +235,8 @@ export type Profile = {
   // app/user/[username]).
   profile_hidden: boolean;
   native_language: NativeLanguage | null;
+  // Null until they've been asked — see SpellingPreferencePrompt.
+  spelling_preference: SpellingPreference | null;
   learning_reason: LearningReason | null;
   // Whether they've finished or dismissed the welcome tour (see
   // components/tour/app-tour.tsx).
@@ -1029,6 +1044,11 @@ const WordFieldsSchema = {
     .trim()
     .max(200, { error: "Keep it under 200 characters." })
     .optional(),
+  usSpelling: z
+    .string()
+    .trim()
+    .max(200, { error: "Keep it under 200 characters." })
+    .optional(),
   exampleSentence: z
     .string()
     .trim()
@@ -1058,6 +1078,7 @@ type WordFieldErrors = {
   term?: string[];
   translation?: string[];
   romanization?: string[];
+  usSpelling?: string[];
   exampleSentence?: string[];
   explanation?: string[];
   explanationJa?: string[];
@@ -1281,6 +1302,7 @@ export const WordImportRowSchema = z.object({
     .min(1, { error: "Translation is required." })
     .max(200, { error: "Keep it under 200 characters." }),
   romanization: z.string().trim().max(200, { error: "Keep it under 200 characters." }).optional(),
+  usSpelling: z.string().trim().max(200, { error: "Keep it under 200 characters." }).optional(),
   exampleSentence: z.string().trim().max(500, { error: "Keep it under 500 characters." }).optional(),
   explanation: z.string().trim().max(500, { error: "Keep it under 500 characters." }).optional(),
   explanationJa: z.string().trim().max(500, { error: "Keep it under 500 characters." }).optional(),
@@ -1388,6 +1410,8 @@ export type AdminCategoryDetail = {
 export type AdminWordSummary = {
   id: string;
   term: string;
+  // See Word.usSpelling.
+  usSpelling: string | null;
   translation: string;
   romanization: string | null;
   exampleSentence: string | null;

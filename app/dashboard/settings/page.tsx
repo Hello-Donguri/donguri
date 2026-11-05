@@ -8,6 +8,7 @@ import { NameForm } from "@/components/settings/name-form";
 import { VisibilityToggle } from "@/components/ui/visibility-toggle";
 import { setFollowedEmails, setOvertakenEmails, setProfileVisible } from "@/lib/actions/profile";
 import { NativeLanguageSetting } from "@/components/settings/native-language-field";
+import { SpellingPreferenceSetting } from "@/components/settings/spelling-preference-field";
 import { getTranslator } from "@/lib/i18n/server";
 
 export const metadata: Metadata = {
@@ -103,6 +104,19 @@ export default async function SettingsPage() {
           {t("settings_page.native_language_description", "The language you grew up speaking.")}
         </p>
         <NativeLanguageSetting initial={profile.native_language} />
+      </div>
+
+      <div className="max-w-lg rounded-2xl border border-card-border bg-washi-soft p-6">
+        <h2 className="font-semibold text-sumi">
+          {t("settings_page.spelling_title", "English spelling")}
+        </h2>
+        <p className="mt-1 mb-4 text-sm text-sumi-soft">
+          {t(
+            "settings_page.spelling_description",
+            "Some words are spelt differently in the UK and the US. Choose which one you see. Either is accepted when you type an answer.",
+          )}
+        </p>
+        <SpellingPreferenceSetting initial={profile.spelling_preference} />
       </div>
 
       {/* The "Manage notifications" link in every email lands here. */}

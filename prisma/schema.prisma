@@ -33,6 +33,9 @@ model Profile {
   // for accounts from before it was asked. See section 54 of
   // supabase/schema.sql.
   learningReason         String?                 @map("learning_reason")
+  // 'uk' or 'us' — which spelling of a word they see (see Word.usSpelling);
+  // null until asked. See section 65 of supabase/schema.sql.
+  spellingPreference     String?                 @map("spelling_preference")
   // When they finished or dismissed the course page's welcome tour; null
   // until then. See section 55 of supabase/schema.sql.
   tourSeenAt             DateTime?               @map("tour_seen_at") @db.Timestamptz(6)
@@ -199,6 +202,9 @@ model Word {
   // did. See the check constraint in supabase/schema.sql.
   path             String                @default("vocab")
   term             String
+  // The term's US spelling where it differs from the (UK) term — see
+  // section 65 of supabase/schema.sql.
+  usSpelling       String?               @map("us_spelling")
   translation      String
   exampleSentence  String?               @map("example_sentence")
   position         Int

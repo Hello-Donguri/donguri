@@ -44,10 +44,12 @@ import type {
 import {
   LEARNING_REASONS,
   NATIVE_LANGUAGES,
+  SPELLING_PREFERENCES,
   WORD_TYPES,
   parseCourseLevel,
   type LearningReason,
   type NativeLanguage,
+  type SpellingPreference,
 } from "@/lib/definitions";
 import {
   addDays,
@@ -76,6 +78,7 @@ import { orderLearnCandidates } from "@/lib/learn-order";
 import { isLatinTypeable } from "@/lib/language";
 import { testDeckFilter } from "@/lib/deck-visibility";
 import { levelForXp, parseDonguriConfig, type AccessoryId } from "@/lib/levels";
+import { usesUsSpelling, withPreferredSpelling } from "@/lib/spelling";
 import {
   pickChallengeTarget,
   type ChallengeTarget,
@@ -158,6 +161,7 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
       username: true,
       profileHidden: true,
       nativeLanguage: true,
+      spellingPreference: true,
       learningReason: true,
       tourSeenAt: true,
       emailOvertaken: true,
@@ -193,6 +197,9 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
     username: profile.username,
     profile_hidden: profile.profileHidden,
     native_language: isNativeLanguage(profile.nativeLanguage) ? profile.nativeLanguage : null,
+    spelling_preference: isSpellingPreference(profile.spellingPreference)
+      ? profile.spellingPreference
+      : null,
     learning_reason: isLearningReason(profile.learningReason) ? profile.learningReason : null,
     tour_seen: profile.tourSeenAt !== null,
     email_overtaken: profile.emailOvertaken,
@@ -235,6 +242,10 @@ function isLearningReason(value: string | null): value is LearningReason {
 
 function isNativeLanguage(value: string | null): value is NativeLanguage {
   return (NATIVE_LANGUAGES as readonly (string | null)[]).includes(value);
+}
+
+function isSpellingPreference(value: string | null): value is SpellingPreference {
+  return value !== null && (SPELLING_PREFERENCES as readonly string[]).includes(value);
 }
 
 export function isProfileComplete(
@@ -652,6 +663,7 @@ export const getWordCategories = cache(
 function toAdminWordSummary(word: {
   id: string;
   term: string;
+  usSpelling: string | null;
   translation: string;
   romanization: string | null;
   exampleSentence: string | null;
@@ -689,6 +701,7 @@ function toAdminWordSummary(word: {
     },
     id: word.id,
     term: word.term,
+    usSpelling: word.usSpelling,
     translation: word.translation,
     romanization: word.romanization,
     exampleSentence: word.exampleSentence,
@@ -827,7 +840,11 @@ const requireEnrolledCourse = cache(async (courseSlug: string) => {
     redirect("/dashboard/courses");
   }
 
-  return { user, course: enrollment.course, enrollment };
+  // Whether this learner sees words in their US spelling here — see
+  // withPreferredSpelling in lib/spelling.ts.
+  const useUs = usesUsSpelling(user.spelling_preference, enrollment.course.targetLanguage);
+
+  return { user, course: enrollment.course, enrollment, useUs };
 });
 
 function toCourseSummary(course: {
@@ -881,7 +898,7 @@ export const getCourseHome = cache(async (courseSlug: string) => {
 // section 53 of supabase/schema.sql). Inactive words and decks are left
 // out, like everywhere else they'd be learnt or reviewed.
 export const getFlaggedWords = cache(async (courseSlug: string): Promise<FlaggedWord[]> => {
-  const { user, course } = await requireEnrolledCourse(courseSlug);
+  const { user, course, useUs } = await requireEnrolledCourse(courseSlug);
 
   const rows = await prisma.userWordProgress.findMany({
     where: {
@@ -892,18 +909,20 @@ export const getFlaggedWords = cache(async (courseSlug: string): Promise<Flagged
     orderBy: { flaggedAt: "desc" },
     select: {
       stage: true,
-      word: { select: { id: true, term: true, translation: true, romanization: true, path: true } },
+      word: {
+        select: { id: true, term: true, usSpelling: true, translation: true, romanization: true, path: true },
+      },
     },
   });
 
-  return rows.map((row) => ({ ...row.word, stage: row.stage }));
+  return rows.map((row) => ({ ...withPreferredSpelling(row.word, useUs), stage: row.stage }));
 });
 
 // Every word and grammar point the learner has learnt in this course,
 // newest first — skipped words ("I already know this") left out, like
 // inactive words and decks.
 export const getLearntWords = cache(async (courseSlug: string): Promise<LearntWord[]> => {
-  const { user, course } = await requireEnrolledCourse(courseSlug);
+  const { user, course, useUs } = await requireEnrolledCourse(courseSlug);
 
   const rows = await prisma.userWordProgress.findMany({
     where: {
@@ -915,11 +934,17 @@ export const getLearntWords = cache(async (courseSlug: string): Promise<LearntWo
     select: {
       stage: true,
       flaggedAt: true,
-      word: { select: { id: true, term: true, translation: true, romanization: true, path: true } },
+      word: {
+        select: { id: true, term: true, usSpelling: true, translation: true, romanization: true, path: true },
+      },
     },
   });
 
-  return rows.map((row) => ({ ...row.word, stage: row.stage, flagged: row.flaggedAt !== null }));
+  return rows.map((row) => ({
+    ...withPreferredSpelling(row.word, useUs),
+    stage: row.stage,
+    flagged: row.flaggedAt !== null,
+  }));
 });
 
 // How many words are flagged and learnt in this course — the counts on the
@@ -1010,6 +1035,7 @@ function toLanguageDeckSummary(languageDeck: {
 const LANGUAGE_DECK_WORDS_SELECT = {
   id: true,
   term: true,
+  usSpelling: true,
   translation: true,
   romanization: true,
   path: true,
@@ -1130,7 +1156,7 @@ export async function ensureDeckActivations(courseSlug: string) {
 // languageDeck in this course.
 export const getDeckDetail = cache(
   async (courseSlug: string, deckId: string) => {
-    const { user, course } = await requireEnrolledCourse(courseSlug);
+    const { user, course, useUs } = await requireEnrolledCourse(courseSlug);
 
     const languageDeck = await prisma.languageDeck.findFirst({
       where: { id: deckId, courseId: course.id, active: true, ...testDeckFilter(user) },
@@ -1152,7 +1178,10 @@ export const getDeckDetail = cache(
 
     return {
       course: toCourseSummary(course),
-      deck: toLanguageDeckSummary(languageDeck),
+      deck: toLanguageDeckSummary({
+        ...languageDeck,
+        words: languageDeck.words.map((word) => withPreferredSpelling(word, useUs)),
+      }),
     };
   },
 );
@@ -1989,7 +2018,7 @@ async function getLastActiveAt(userId: string): Promise<Date | null> {
 // them to sign up or become a member instead of saying they're done.
 export const getLearnQueueForCourse = cache(
   async (courseSlug: string): Promise<{ words: RevealWord[]; limitReached: boolean }> => {
-    const { user, course } = await requireEnrolledCourse(courseSlug);
+    const { user, course, useUs } = await requireEnrolledCourse(courseSlug);
     const [languageDeckIds, allowance] = await Promise.all([
       getActiveDeckIds(course.id, user.id),
       getLearningAllowance(),
@@ -2056,7 +2085,10 @@ export const getLearnQueueForCourse = cache(
     };
 
     return withInlineSvgs({
-      words: newWords.map((word) => ({ ...toRevealWord(word, course), linkedWords: linkedWordsOf(word) })),
+      words: newWords.map((word) => ({
+        ...toRevealWord(withPreferredSpelling(word, useUs), course),
+        linkedWords: linkedWordsOf(word),
+      })),
       limitReached: newWords.length === 0 && candidates.length > 0,
     });
   },
@@ -2118,14 +2150,14 @@ export async function getLessonWord(
   courseSlug: string,
   wordId: string,
 ): Promise<RevealWord | null> {
-  const { course } = await requireEnrolledCourse(courseSlug);
+  const { course, useUs } = await requireEnrolledCourse(courseSlug);
 
   const word = await prisma.word.findFirst({
     where: { id: wordId, languageDeck: { courseId: course.id } },
     include: revealWordInclude,
   });
 
-  return word ? withInlineSvgs(toRevealWord(word, course)) : null;
+  return word ? withInlineSvgs(toRevealWord(withPreferredSpelling(word, useUs), course)) : null;
 }
 
 // Marks words from a batch handed out by `getLearnQueueForCourse` as
@@ -2216,7 +2248,7 @@ const LEARN_BATCH_WINDOW_MS = 30 * 60 * 1000;
 
 export const getTestQueueForCourse = cache(
   async (courseSlug: string, wordIds?: string[]): Promise<QuizQuestion[]> => {
-    const { user, course } = await requireEnrolledCourse(courseSlug);
+    const { user, course, useUs } = await requireEnrolledCourse(courseSlug);
 
     const freshWhere = {
       userId: user.id,
@@ -2266,10 +2298,10 @@ export const getTestQueueForCourse = cache(
 
     const grammarWords = freshProgress
       .filter((progress) => progress.word.path === "grammar")
-      .map((progress) => ({ ...progress.word, path: "grammar" as const }));
+      .map((progress) => ({ ...withPreferredSpelling(progress.word, useUs), path: "grammar" as const }));
     const vocabWords = freshProgress
       .filter((progress) => progress.word.path === "vocab")
-      .map((progress) => ({ ...progress.word, path: "vocab" as const }));
+      .map((progress) => ({ ...withPreferredSpelling(progress.word, useUs), path: "vocab" as const }));
 
     const grammarPool =
       grammarWords.length > 0 ? await loadGrammarPool(course, user) : null;
@@ -2288,6 +2320,7 @@ export const getTestQueueForCourse = cache(
         select: {
           id: true,
           term: true,
+          usSpelling: true,
           translation: true,
           romanization: true,
           languageDeckId: true,
@@ -2297,7 +2330,7 @@ export const getTestQueueForCourse = cache(
         },
       });
       const distractorWords = distractorPool.map((word) => ({
-        ...word,
+        ...withPreferredSpelling(word, useUs),
         path: "vocab" as const,
       }));
 
@@ -2499,7 +2532,7 @@ export const getReviewQueueDebug = cache(
 // above).
 export const getReviewQueue = cache(
   async (courseSlug: string): Promise<QuizQuestion[]> => {
-    const { user, course } = await requireEnrolledCourse(courseSlug);
+    const { user, course, useUs } = await requireEnrolledCourse(courseSlug);
 
     const reviewable = reviewableWhere(user, course.id);
     const dueProgress = await prisma.userWordProgress.findMany({
@@ -2530,7 +2563,7 @@ export const getReviewQueue = cache(
         dueProgress.map((progress) =>
           buildTypedQuestion(
             {
-              ...progress.word,
+              ...withPreferredSpelling(progress.word, useUs),
               path: progress.word.path as "vocab" | "grammar",
             },
             course,

@@ -7,7 +7,9 @@ import {
   LEARNING_REASONS,
   type LearningReason,
   NATIVE_LANGUAGES,
+  SPELLING_PREFERENCES,
   type NativeLanguage,
+  type SpellingPreference,
   UpdateNameFormSchema,
   UpdateProfileFormSchema,
   type UpdateNameFormState,
@@ -101,6 +103,23 @@ export async function setNativeLanguage(language: NativeLanguage): Promise<void>
     data: { nativeLanguage: language },
   });
   revalidatePath("/dashboard/settings");
+}
+
+// UK or US spelling — from account settings, or the one-off prompt for
+// accounts from before it was asked (see SpellingPreferencePrompt). Saved
+// as soon as it's picked; the whole dashboard reads it, so all of it is
+// revalidated.
+export async function setSpellingPreference(preference: SpellingPreference): Promise<void> {
+  const user = await requireUser();
+  if (!(SPELLING_PREFERENCES as readonly string[]).includes(preference)) {
+    throw new Error("Unknown spelling.");
+  }
+
+  await prisma.profile.update({
+    where: { id: user.id },
+    data: { spellingPreference: preference },
+  });
+  revalidatePath("/dashboard", "layout");
 }
 
 // The profile page's "why are you learning?" picker — saved as soon as it

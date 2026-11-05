@@ -72,6 +72,13 @@ export function CreateWordForm({ languageDeckId, categories }: CreateWordFormPro
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <TextField label={t("admin_word_form.term", "Term")} name="term" errors={state?.errors?.term} />
           <TextField
+            label={t("admin_word_form.us_spelling", "US spelling")}
+            name="usSpelling"
+            required={false}
+            placeholder={t("admin_word_form.us_spelling_placeholder", "Only if different, e.g. color for colour")}
+            errors={state?.errors?.usSpelling}
+          />
+          <TextField
             label={t("admin_word_form.translation", "Translation")}
             name="translation"
             errors={state?.errors?.translation}
