@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Check, FileX2, ImageOff, Volume2 } from "lucide-react";
+import { Check, Eye, FileX2, ImageOff, Volume2 } from "lucide-react";
 import { requireAdminProfile, getAdminCategoryWords, getDeckRecordingItems } from "@/lib/dal";
-import { setWordActive } from "@/lib/actions/admin-content";
+import { previewWordLesson, setWordActive } from "@/lib/actions/admin-content";
+import { LessonButton } from "@/components/vocab/word-lesson";
 import { DeleteWordButton } from "@/components/admin/delete-word-button";
 import { WordMediaSlots } from "@/components/admin/word-media-slots";
 import { GenerateWordImage } from "@/components/admin/generate-word-image";
@@ -16,7 +17,7 @@ import { prisma } from "@/lib/prisma";
 import { WordImage } from "@/components/ui/word-image";
 import { VisibilityToggle } from "@/components/ui/visibility-toggle";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { PageTitle, PageSubtitle } from "@/components/ui/page-heading";
 import { getTranslator } from "@/lib/i18n/server";
 import { cn, getContrastTextClass } from "@/lib/utils";
@@ -399,6 +400,18 @@ export default async function AdminCategoryWordsPage({ params, searchParams }: P
                 )}
 
                 <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
+                  {/* How it looks in Learn, in the same dialog the quizzes
+                      use for "See the lesson". */}
+                  <LessonButton
+                    courseSlug={courseSlug}
+                    wordId={word.id}
+                    load={previewWordLesson.bind(null, word.id)}
+                    showDeck
+                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                  >
+                    <Eye aria-hidden className="h-4 w-4" />
+                    {t("admin_category_words.preview", "Preview")}
+                  </LessonButton>
                   <Button
                     href={`/dashboard/admin/courses/${courseSlug}/categories/${languageDeckId}/words/${word.id}/quiz`}
                     variant="outline"

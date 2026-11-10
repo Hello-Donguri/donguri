@@ -218,6 +218,7 @@
   "admin_category_words.import_spreadsheet": "Import from spreadsheet",
   "admin_category_words.no_image": "No image",
   "admin_category_words.no_words": "No words yet.",
+  "admin_category_words.preview": "Preview",
   "admin_category_words.quiz": "Quiz",
   "admin_category_words.show_all": "Show all words",
   "admin_category_words.showing_missing": "Showing {{count}} of {{total}} words — the ones without an image",

@@ -684,6 +684,18 @@ const Highlighted = ({
     ),
   );
 
+// Where the word's from, top left of the learn card (its category goes top
+// right — see WordLesson).
+export const DeckPill = ({ word }: { word: Pick<RevealWord, "path" | "deckTitle"> }) => (
+  <span
+    className={`rounded-full px-3.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${
+      word.path === "grammar" ? "bg-matcha-soft text-matcha-dark" : "bg-ai-soft text-ai-dark"
+    }`}
+  >
+    {word.deckTitle}
+  </span>
+);
+
 // Lessons fetched this visit, by course and word — one request per word,
 // however many places ask (the review's preload, its inline lesson, the
 // modal). Through the /api/lesson route handler rather than a server
@@ -744,16 +756,23 @@ export const InlineLesson = ({ courseSlug, wordId }: { courseSlug: string; wordI
 // the same word). The native <dialog> handles focus trapping and Escape.
 // `children` and `className` replace the trigger's own label and look —
 // e.g. a word's card on the flagged and learnt lists (see WordList).
+// `load` replaces the learner's lesson request — the admin deck page's
+// preview loads any word, enrolled or not — and `showDeck` adds the deck
+// name the learn card has.
 export const LessonButton = ({
   courseSlug,
   wordId,
   children,
   className,
+  load,
+  showDeck,
 }: {
   courseSlug: string;
   wordId: string;
   children?: ReactNode;
   className?: string;
+  load?: () => Promise<RevealWord | null>;
+  showDeck?: boolean;
 }) => {
   const t = useTranslations();
   const [dialogRef, animate] = useAnimate<HTMLDialogElement>();
@@ -771,7 +790,7 @@ export const LessonButton = ({
       setLesson(null);
       setFailed(false);
       startLoading(async () => {
-        const result = await loadLesson(courseSlug, wordId);
+        const result = await (load ? load().catch(() => null) : loadLesson(courseSlug, wordId));
         if (loadedFor.current !== wordId) return;
         setLesson(result);
         setFailed(result === null);
@@ -834,7 +853,7 @@ export const LessonButton = ({
           </button>
 
           {lesson ? (
-            <WordLesson word={lesson} />
+            <WordLesson word={lesson} header={showDeck ? <DeckPill word={lesson} /> : undefined} />
           ) : (
             <p className="py-16 text-center text-sm text-sumi-soft">
               {failed && !loading

@@ -2160,6 +2160,23 @@ export async function getLessonWord(
   return word ? withInlineSvgs(toRevealWord(withPreferredSpelling(word, useUs), course)) : null;
 }
 
+// One word's learn card for an admin previewing it from the deck page —
+// any word, active or not, without needing to be enrolled in its course.
+// Shows the word's base (UK) spelling.
+export async function getAdminLessonPreview(wordId: string): Promise<RevealWord | null> {
+  await requireAdminProfile();
+
+  const word = await prisma.word.findFirst({
+    where: { id: wordId },
+    include: {
+      ...revealWordInclude,
+      languageDeck: { select: { title: true, course: { select: { targetLanguage: true } } } },
+    },
+  });
+
+  return word ? withInlineSvgs(toRevealWord(word, word.languageDeck.course)) : null;
+}
+
 // Marks words from a batch handed out by `getLearnQueueForCourse` as
 // learnt: creates their `UserWordProgress` rows (stage 1, first review due
 // 15 minutes out) and bumps the streak. Called one word at a time, as the

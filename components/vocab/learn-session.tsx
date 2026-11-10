@@ -14,7 +14,7 @@ import {
   sessionCardVariants,
   useEnterToContinue,
 } from "@/components/vocab/session-ui";
-import { WordLesson, lessonAccent } from "@/components/vocab/word-lesson";
+import { DeckPill, WordLesson, lessonAccent } from "@/components/vocab/word-lesson";
 import { LinkedWordsDebug } from "@/components/vocab/linked-words-debug";
 import { Button } from "@/components/ui/button";
 import { LearnComplete } from "@/components/vocab/learn-complete";
@@ -141,18 +141,6 @@ export const LearnSession = ({ words, courseSlug }: LearnSessionProps) => {
         : t("learn_session.got_it_next_word", "Got it — next word")
       : t("learn_session.got_it_done", "Got it — done for now");
 
-  // Where the word's from, top left of the card (its category goes top
-  // right — see WordLesson).
-  const deckPill = (
-    <span
-      className={`rounded-full px-3.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${
-        isGrammar ? "bg-matcha-soft text-matcha-dark" : "bg-ai-soft text-ai-dark"
-      }`}
-    >
-      {word.deckTitle}
-    </span>
-  );
-
   return (
     <section
       // Room at the bottom for the action bar.
@@ -177,7 +165,7 @@ export const LearnSession = ({ words, courseSlug }: LearnSessionProps) => {
               <ProgressSegments current={index + 1} total={words.length} />
             </div>
           </div>
-          <WordLesson word={word} header={deckPill} />
+          <WordLesson word={word} header={<DeckPill word={word} />} />
         </motion.div>
       </AnimatePresence>
 

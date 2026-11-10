@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireProfile } from "@/lib/dal";
+import { getAdminLessonPreview, requireProfile } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { buildDeckCoverImageKey, buildWordAudioKey, buildWordImageKey, uploadImage } from "@/lib/bunny";
@@ -1903,4 +1903,9 @@ export async function deleteWordCategory(categoryId: string): Promise<void> {
   await prisma.wordCategory.delete({ where: { id: categoryId } });
 
   revalidatePath("/dashboard/admin/word-categories");
+}
+
+// A word's learn card, for the deck page's Preview button (see LessonButton).
+export async function previewWordLesson(wordId: string) {
+  return getAdminLessonPreview(wordId);
 }
