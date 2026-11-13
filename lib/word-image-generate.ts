@@ -70,6 +70,17 @@ const POSE = [
 const ARMS =
   "No character has fingers, thumbs or hands: every arm is a short, stubby, rounded nub, just as in the reference images. Anything a character holds is pressed between its stubby arms or balanced on the end of one — never gripped with fingers.";
 
+// Donguri, Dad Donguri, Child Donguri and Hazel have no mouth at all (see
+// `mouth` in lib/word-image-characters.ts), but the model gives them a
+// smile to match an expression unless told not to. Empty when none of
+// `characters` is one of them.
+function noMouths(characters: readonly { name: string; mouth: boolean }[]): string {
+  const mouthless = characters.filter((character) => !character.mouth);
+  if (mouthless.length === 0) return "";
+  const names = listOf(mouthless.map((character) => character.name));
+  return `${names} ${mouthless.length > 1 ? "have" : "has"} no mouth, just as in the reference image${mouthless.length > 1 ? "s" : ""}: never draw a mouth, smile, lips or teeth on ${mouthless.length > 1 ? "them" : "it"}, and show expression with the eyes, ears, arms and pose instead.`;
+}
+
 // The size the tracers work at: their settings (speckle sizes, curve
 // lengths) were tuned on 1024px pictures, so a smaller one is scaled up
 // to this first.
@@ -248,7 +259,10 @@ export async function generateWordPicture(
           : "Keep the character's look exactly as in the reference image: the same shape, proportions, colours, face and outline style.",
         POSE,
         ARMS,
-      ].join(" ")
+        noMouths(characters),
+      ]
+        .filter(Boolean)
+        .join(" ")
     : [
         `A simple, friendly illustration of the English word "${word.english}" for a language-learning flashcard.`,
         word.meaning,
@@ -336,7 +350,7 @@ export async function editWordPicture(
     `The first image is a flashcard illustration of the English word "${word.english}". ${word.meaning} Edit it: ${instruction}.`,
     "Change only what that asks for. Keep everything else as it is: the composition, the characters, their poses and colours, the other objects and the background.",
     characters.length
-      ? `The other images are references for the characters (in order: ${listOf(characters.map((character) => character.name))}) — use them only to keep each character's look exactly right. ${ARMS}`
+      ? `The other images are references for the characters (in order: ${listOf(characters.map((character) => character.name))}) — use them only to keep each character's look exactly right. ${ARMS} ${noMouths(characters)}`
       : "",
     VECTOR_STYLE,
   ]

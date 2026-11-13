@@ -4,12 +4,15 @@
 export const WORD_IMAGE_CHARACTERS = [
   {
     id: "donguri",
+    // Whether it has a mouth — see noMouths in lib/word-image-generate.ts.
+    mouth: false,
     name: "Donguri",
     src: "/images/mascot.png",
     description: "Donguri, a round cream-coloured creature wearing an acorn-cap hat, with a dark blue button nose",
   },
   {
     id: "dad-donguri",
+    mouth: false,
     name: "Dad Donguri",
     src: "/images/dad-donguri.png",
     description:
@@ -17,6 +20,7 @@ export const WORD_IMAGE_CHARACTERS = [
   },
   {
     id: "child-donguri",
+    mouth: false,
     name: "Child Donguri",
     src: "/images/child-donguri.png",
     description:
@@ -24,6 +28,7 @@ export const WORD_IMAGE_CHARACTERS = [
   },
   {
     id: "charles",
+    mouth: true,
     name: "Charles Duck",
     src: "/images/charles.png",
     description:
@@ -31,6 +36,7 @@ export const WORD_IMAGE_CHARACTERS = [
   },
   {
     id: "bonkus",
+    mouth: true,
     name: "Bonkus",
     src: "/images/bonkus.png",
     description:
@@ -38,6 +44,7 @@ export const WORD_IMAGE_CHARACTERS = [
   },
   {
     id: "rabbit",
+    mouth: false,
     name: "Hazel",
     src: "/images/rabbit-reading.webp",
     description: "Hazel the rabbit, a round cream-coloured rabbit with long ears and a red button nose",
