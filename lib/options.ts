@@ -48,3 +48,9 @@ export const WORD_TYPES = [
 ] as const;
 
 export type WordType = (typeof WORD_TYPES)[number];
+
+// A deck's cover image — always an SVG, like a word's picture — is on
+// every deck card learners see, so it's kept small: checked on the server
+// and, as soon as one's picked, in the browser (see FileField's
+// `maxBytes`).
+export const MAX_DECK_COVER_BYTES = 70 * 1024;

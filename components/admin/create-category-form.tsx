@@ -5,6 +5,7 @@ import { createCategory } from "@/lib/actions/admin-content";
 import { TextField } from "@/components/ui/text-field";
 import { TextareaField } from "@/components/ui/textarea";
 import { FileField } from "@/components/ui/file-field";
+import { MAX_DECK_COVER_BYTES } from "@/lib/options";
 import { ColorField } from "@/components/ui/color-field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { useTranslations } from "@/components/i18n/locale-provider";
@@ -60,9 +61,12 @@ export function CreateCategoryForm({ courseId }: CreateCategoryFormProps) {
       <FileField
         label={t("admin_create_category.cover_image_label", "Cover photo")}
         name="coverImage"
-        accept="image/webp,image/png,image/jpeg"
+        accept="image/svg+xml"
         onChange={handleCoverImageChange}
         errors={state?.errors?.coverImage}
+        maxBytes={MAX_DECK_COVER_BYTES}
+        maxBytesError={t("admin_create_category.cover_image_too_big", "Cover images must be 70KB or smaller.")}
+        hint={t("admin_create_category.cover_image_hint", "SVG only, up to 70KB.")}
       />
       {previewUrl && (
         // eslint-disable-next-line @next/next/no-img-element -- local blob preview, not a hosted asset.

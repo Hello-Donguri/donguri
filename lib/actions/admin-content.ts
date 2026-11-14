@@ -415,6 +415,10 @@ export async function createCategory(
   let coverImageKey: string | null = null;
 
   if (validCoverImage) {
+    if (!(await isSafeSvg(validCoverImage))) {
+      return { errors: { coverImage: [UNSAFE_SVG_MESSAGE] } };
+    }
+
     coverImageKey = buildDeckCoverImageKey(validCoverImage.type);
 
     try {
@@ -504,6 +508,10 @@ export async function updateCategory(
   let coverImageKey = existing.coverImageKey;
 
   if (validCoverImage) {
+    if (!(await isSafeSvg(validCoverImage))) {
+      return { errors: { coverImage: [UNSAFE_SVG_MESSAGE] } };
+    }
+
     coverImageKey = buildDeckCoverImageKey(validCoverImage.type);
 
     try {

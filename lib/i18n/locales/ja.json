@@ -51,6 +51,8 @@
   "admin_course_decks.mark_starter": "スターターにする",
   "admin_course_decks.starter_badge": "スターター・最初の3語",
   "admin_course_decks.unmark_starter": "スターターを解除",
+  "admin_create_category.cover_image_hint": "SVGのみ、70KBまで",
+  "admin_create_category.cover_image_too_big": "カバー画像は70KB以下にしてください。",
   "admin_deck_media.ready": "",
   "admin_deck_media.percent_complete": "",
   "admin_category_words.png_view_only": "",

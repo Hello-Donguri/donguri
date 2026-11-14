@@ -5,6 +5,7 @@ import { updateCategory } from "@/lib/actions/admin-content";
 import { TextField } from "@/components/ui/text-field";
 import { TextareaField } from "@/components/ui/textarea";
 import { FileField } from "@/components/ui/file-field";
+import { MAX_DECK_COVER_BYTES } from "@/lib/options";
 import { ColorField } from "@/components/ui/color-field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { WordImage } from "@/components/ui/word-image";
@@ -71,8 +72,11 @@ export function EditCategoryForm({ category, currentCoverImageSrc }: EditCategor
       <FileField
         label={t("admin_edit_category.replace_cover_image", "Replace cover photo")}
         name="coverImage"
-        accept="image/webp,image/png,image/jpeg"
+        accept="image/svg+xml"
         errors={state?.errors?.coverImage}
+        maxBytes={MAX_DECK_COVER_BYTES}
+        maxBytesError={t("admin_create_category.cover_image_too_big", "Cover images must be 70KB or smaller.")}
+        hint={t("admin_create_category.cover_image_hint", "SVG only, up to 70KB.")}
       />
       <ColorField
         label={t("admin_create_category.bg_color_label", "Background color")}

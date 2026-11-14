@@ -9,6 +9,7 @@ import {
   NATIVE_LANGUAGES,
   SPELLING_PREFERENCES,
   WORD_TYPES,
+  MAX_DECK_COVER_BYTES,
   type LearningReason,
   type NativeLanguage,
   type SpellingPreference,
@@ -694,6 +695,14 @@ const IMAGE_FIELD_SCHEMA = z
   })
   .optional();
 
+const DECK_COVER_IMAGE_FIELD_SCHEMA = z
+  .file({ error: "Choose an image." })
+  .max(MAX_DECK_COVER_BYTES, { error: "Cover images must be 70KB or smaller." })
+  .mime(["image/svg+xml"], {
+    error: "Cover images must be SVGs.",
+  })
+  .optional();
+
 // A word's picture is always an SVG — crisp at any size, and small.
 // lib/svg.ts turns away any SVG with scripting in it, since they're also
 // put straight into learners' pages (see lib/inline-svg.ts).
@@ -757,7 +766,7 @@ const CategoryFieldsSchema = {
     .trim()
     .max(500, { error: "Keep it under 500 characters." })
     .optional(),
-  coverImage: IMAGE_FIELD_SCHEMA,
+  coverImage: DECK_COVER_IMAGE_FIELD_SCHEMA,
   bgColor: OPTIONAL_HEX_COLOR_SCHEMA,
   primaryColor: OPTIONAL_HEX_COLOR_SCHEMA,
   tags: TAGS_FIELD_SCHEMA,

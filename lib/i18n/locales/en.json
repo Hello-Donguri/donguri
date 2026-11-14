@@ -64,6 +64,8 @@
   "admin_course_decks.mark_starter": "Make starter",
   "admin_course_decks.starter_badge": "Starter · first 3 words",
   "admin_course_decks.unmark_starter": "Remove starter",
+  "admin_create_category.cover_image_hint": "SVG only, up to 70KB.",
+  "admin_create_category.cover_image_too_big": "Cover images must be 70KB or smaller.",
   "admin_deck_media.ready": "Ready to go live",
   "admin_deck_media.percent_complete": "{{percent}}% complete",
   "admin_category_words.png_view_only": "View only",
