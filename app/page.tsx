@@ -3,7 +3,7 @@
 // restored by deleting the /* ... */ wrapper and the new code beneath it.
 
 import { redirect, unstable_rethrow } from "next/navigation";
-import { getProfile, getSession } from "@/lib/dal";
+import { getSession } from "@/lib/dal";
 import { SiteHeader } from "@/components/landing/site-header";
 import { SiteFooter } from "@/components/landing/site-footer";
 import { getTranslator } from "@/lib/i18n/server";
@@ -18,11 +18,10 @@ import { FinalCta } from "@/components/landing/final-cta";
 export default async function Home() {
   const user = await getSession();
 
-  // A guest's session can outlive the guest (merged into a real account, or
-  // cleaned up) while its cookies are still being cleared — only send on to
-  // the dashboard a session whose account still exists, or this bounces
-  // between here and the dashboard's sign-in check.
-  if (user && (!user.is_anonymous || (await getProfile()))) {
+  // Guests (see lib/access.ts) can come back here — "Get started" then
+  // carries on where they were (see startAsGuest). Only real accounts go
+  // straight on to the dashboard.
+  if (user && !user.is_anonymous) {
     redirect("/dashboard");
   }
 

@@ -1,4 +1,4 @@
-import { accessTier, allowanceFor, withinAllowance, type Allowance } from "@/lib/access";
+import { GUEST_ITEM_LIMIT, accessTier, allowanceFor, withinAllowance, type Allowance } from "@/lib/access";
 import "server-only";
 
 import { cache } from "react";
@@ -337,7 +337,7 @@ export const getEnrolledCourses = cache(
         course: {
           include: {
             languageDecks: {
-              where: testDeckFilter(user),
+              where: { isStarter: false, ...testDeckFilter(user) },
               select: {
                 words: {
                   select: {
@@ -450,6 +450,7 @@ export const getAdminCategoryOverview = cache(
           active: languageDeck.active,
           tags: languageDeck.tags,
           isTest: languageDeck.isTest,
+          isStarter: languageDeck.isStarter,
           subheading: languageDeck.subheading,
           coverImage: deckCoverImagePath(languageDeck),
           media: {
@@ -1055,7 +1056,7 @@ export const getCourseDecks = cache(async (courseSlug: string) => {
 
   const [languageDecks, activeDeckIds] = await Promise.all([
     prisma.languageDeck.findMany({
-      where: { courseId: course.id, active: true, ...testDeckFilter(user) },
+      where: { courseId: course.id, active: true, isStarter: false, ...testDeckFilter(user) },
       orderBy: { position: "asc" },
       include: {
         words: {
@@ -1115,11 +1116,48 @@ const getActiveDeckIds = cache(
 
 function getDefaultDeck(courseId: string) {
   return prisma.languageDeck.findFirst({
-    where: { courseId, active: true, isTest: false },
+    where: { courseId, active: true, isTest: false, isStarter: false },
     orderBy: { position: "asc" },
-    select: { id: true },
+    select: { id: true, title: true },
   });
 }
+
+// The words "Get started" teaches a guest (see lib/access.ts): the first
+// GUEST_ITEM_LIMIT active words of the course's starter deck, in order —
+// none if the course doesn't have one.
+const getStarterWordIds = cache(async (courseId: string): Promise<string[]> => {
+  const words = await prisma.word.findMany({
+    where: { active: true, languageDeck: { courseId, active: true, isStarter: true } },
+    orderBy: { position: "asc" },
+    take: GUEST_ITEM_LIMIT,
+    select: { id: true },
+  });
+  return words.map((word) => word.id);
+});
+
+// Where this learner is with the course's starter words, for the course
+// page: a guest still to learn them goes straight to Learn, and someone
+// who learnt them as a guest and has since signed up is asked how to carry
+// on (see StartChoiceModal) until they've picked any decks of their own.
+export const getStarterStatus = cache(async (courseSlug: string) => {
+  const { user, course } = await requireEnrolledCourse(courseSlug);
+  const starterWordIds = await getStarterWordIds(course.id);
+
+  const [learnt, deckChoices, firstDeck] = await Promise.all([
+    prisma.userWordProgress.count({ where: { userId: user.id, wordId: { in: starterWordIds } } }),
+    prisma.userDeckActivation.count({ where: { userId: user.id, languageDeck: { courseId: course.id } } }),
+    getDefaultDeck(course.id),
+  ]);
+
+  return {
+    words: starterWordIds.length,
+    learnt,
+    done: starterWordIds.length > 0 && learnt >= starterWordIds.length,
+    decksChosen: deckChoices > 0,
+    // What "Quick start" starts on (see quickStart).
+    firstDeckTitle: firstDeck?.title ?? null,
+  };
+});
 
 // Writes down `getActiveDeckIds`'s implicit first-deck default before an
 // action changes the selection — otherwise activating a second deck would
@@ -1159,7 +1197,7 @@ export const getDeckDetail = cache(
     const { user, course, useUs } = await requireEnrolledCourse(courseSlug);
 
     const languageDeck = await prisma.languageDeck.findFirst({
-      where: { id: deckId, courseId: course.id, active: true, ...testDeckFilter(user) },
+      where: { id: deckId, courseId: course.id, active: true, isStarter: false, ...testDeckFilter(user) },
       include: {
         words: {
           where: { active: true },
@@ -1193,7 +1231,7 @@ export const getDeckDetail = cache(
 export const getPublicDeckDetail = cache(
   async (courseSlug: string, deckId: string) => {
     const languageDeck = await prisma.languageDeck.findFirst({
-      where: { id: deckId, active: true, isTest: false, course: { slug: courseSlug, active: true } },
+      where: { id: deckId, active: true, isTest: false, isStarter: false, course: { slug: courseSlug, active: true } },
       include: {
         course: true,
         words: {
@@ -2019,18 +2057,20 @@ async function getLastActiveAt(userId: string): Promise<Date | null> {
 export const getLearnQueueForCourse = cache(
   async (courseSlug: string): Promise<{ words: RevealWord[]; limitReached: boolean }> => {
     const { user, course, useUs } = await requireEnrolledCourse(courseSlug);
-    const [languageDeckIds, allowance] = await Promise.all([
+    // Guests learn the starter words and nothing else (see lib/access.ts).
+    const [languageDeckIds, allowance, starterWordIds] = await Promise.all([
       getActiveDeckIds(course.id, user.id),
       getLearningAllowance(),
+      user.is_guest ? getStarterWordIds(course.id) : null,
     ]);
 
-    if (languageDeckIds.length === 0) {
+    if ((starterWordIds ?? languageDeckIds).length === 0) {
       return { words: [], limitReached: false };
     }
 
     const candidates = await prisma.word.findMany({
       where: {
-        languageDeckId: { in: languageDeckIds },
+        ...(starterWordIds ? { id: { in: starterWordIds } } : { languageDeckId: { in: languageDeckIds } }),
         active: true,
         progress: { none: { userId: user.id } },
       },
@@ -2060,12 +2100,10 @@ export const getLearnQueueForCourse = cache(
             select: { wordId: true },
           })
         : [];
-    const ordered = orderLearnCandidates(
-      withLinks,
-      new Set(learnt.map((row) => row.wordId)),
-      SET_SIZE,
-      shuffle,
-    );
+    // The starter words always in the order they were written.
+    const ordered = starterWordIds
+      ? withLinks.toSorted((a, b) => starterWordIds.indexOf(a.id) - starterWordIds.indexOf(b.id))
+      : orderLearnCandidates(withLinks, new Set(learnt.map((row) => row.wordId)), SET_SIZE, shuffle);
 
     const newWords = withinAllowance(ordered, allowance).slice(0, SET_SIZE);
 
@@ -2089,7 +2127,8 @@ export const getLearnQueueForCourse = cache(
         ...toRevealWord(withPreferredSpelling(word, useUs), course),
         linkedWords: linkedWordsOf(word),
       })),
-      limitReached: newWords.length === 0 && candidates.length > 0,
+      // A guest who's learnt the starter words has to sign up for more.
+      limitReached: newWords.length === 0 && (candidates.length > 0 || starterWordIds !== null),
     });
   },
 );
@@ -2187,12 +2226,13 @@ export async function getAdminLessonPreview(wordId: string): Promise<RevealWord 
 // active decks that they haven't met yet — and anything else is ignored.
 export async function introduceLearnWords(courseSlug: string, wordIds: string[]) {
   const { user, course } = await requireEnrolledCourse(courseSlug);
-  const [languageDeckIds, allowance] = await Promise.all([
+  const [languageDeckIds, allowance, starterWordIds] = await Promise.all([
     getActiveDeckIds(course.id, user.id),
     getLearningAllowance(),
+    user.is_guest ? getStarterWordIds(course.id) : null,
   ]);
 
-  if (wordIds.length === 0 || languageDeckIds.length === 0) {
+  if (wordIds.length === 0 || (starterWordIds ?? languageDeckIds).length === 0) {
     return;
   }
 
@@ -2201,8 +2241,8 @@ export async function introduceLearnWords(courseSlug: string, wordIds: string[])
   const words = withinAllowance(
     await prisma.word.findMany({
       where: {
-        id: { in: wordIds.slice(0, SET_SIZE) },
-        languageDeckId: { in: languageDeckIds },
+        id: { in: wordIds.slice(0, SET_SIZE).filter((id) => !starterWordIds || starterWordIds.includes(id)) },
+        ...(starterWordIds ? {} : { languageDeckId: { in: languageDeckIds } }),
         active: true,
         progress: { none: { userId: user.id } },
       },

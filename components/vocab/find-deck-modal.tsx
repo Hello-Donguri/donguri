@@ -14,6 +14,10 @@ import { sectionHeadingClass } from "@/components/ui/page-heading";
 // run dry) open the Find a deck dialog without lifting its state up.
 const OPEN_EVENT = "find-deck:open";
 
+export function openFindDeck() {
+  window.dispatchEvent(new Event(OPEN_EVENT));
+}
+
 export function BrowseDecksTrigger({
   className,
   style,
@@ -26,7 +30,7 @@ export function BrowseDecksTrigger({
   return (
     <button
       type="button"
-      onClick={() => window.dispatchEvent(new Event(OPEN_EVENT))}
+      onClick={openFindDeck}
       className={className}
       style={style}
     >

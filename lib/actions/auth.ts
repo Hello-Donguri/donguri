@@ -17,6 +17,7 @@ import {
   type ResetPasswordFormState,
 } from "@/lib/definitions";
 import { getSession, requireUser } from "@/lib/dal";
+import { enrolInDefaultCourse } from "@/lib/default-course";
 import { mergeGuestInto, rememberGuestForOAuth } from "@/lib/guest-merge";
 import { clearSessionCookies } from "@/lib/supabase/session-cookies";
 import { prisma } from "@/lib/prisma";
@@ -208,6 +209,7 @@ export async function signup(
   // Moved now, while both ids are known — the confirmation link may well
   // be opened on another device, where the guest session doesn't exist.
   if (guestId) await mergeGuestInto(guestId, data.user.id);
+  await enrolInDefaultCourse(data.user.id);
 
   if (data.session) {
     redirect("/dashboard");
@@ -346,6 +348,9 @@ export async function completeOnboarding(
     console.error("Failed to complete onboarding:", error);
     return { message: "Something went wrong saving your details." };
   }
+
+  // A new Google / LINE account finishes signing up here.
+  await enrolInDefaultCourse(user.id);
 
   revalidatePath("/dashboard", "layout");
   redirect("/dashboard");

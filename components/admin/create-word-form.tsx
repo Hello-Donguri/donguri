@@ -11,7 +11,8 @@ import { WordFormsFields } from "@/components/admin/word-forms-fields";
 import { WordAlternateAnswersFields } from "@/components/admin/word-alternate-answers-fields";
 import { WordAudioFields } from "@/components/admin/word-audio-fields";
 import { useTranslations } from "@/components/i18n/locale-provider";
-import { WORD_TYPES, type WordCategoryOption } from "@/lib/definitions";
+import { WORD_TYPES } from "@/lib/options";
+import type { WordCategoryOption } from "@/lib/definitions";
 
 type CreateWordFormProps = {
   languageDeckId: string;

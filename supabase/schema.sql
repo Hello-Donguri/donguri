@@ -2230,3 +2230,14 @@ begin
   end if;
 end;
 $$;
+
+-- 66. Starter decks -------------------------------------------------------------------------
+-- The three words a visitor learns from "Get started" on the home page,
+-- before they're asked to sign up (see lib/access.ts). One per course at
+-- most, kept out of every deck list — it's only ever served to guests, by
+-- the learn queue (see getLearnQueueForCourse) — and only its first three
+-- words (by position) are ever taught.
+
+alter table public.language_decks add column if not exists is_starter boolean not null default false;
+create unique index if not exists language_decks_one_starter_per_course
+  on public.language_decks (course_id) where is_starter;

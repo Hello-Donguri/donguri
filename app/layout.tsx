@@ -6,7 +6,7 @@ import { WebVitals } from "@/components/WebVitals";
 import { ThemeProvider } from "@/components/theme-provider";
 import { LocaleProvider } from "@/components/i18n/locale-provider";
 import { getLocale } from "@/lib/i18n/get-locale";
-import { getDictionary } from "@/lib/i18n/dictionaries";
+import { getClientDictionary } from "@/lib/i18n/dictionaries";
 import PeeringDonguriAcorn from "@/components/auth/peering-donguri";
 
 // Self-hosted (app/fonts/) rather than next/font/google: Google started
@@ -66,7 +66,7 @@ export const instant = false;
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const locale = await getLocale();
-  const dictionary = getDictionary(locale);
+  const dictionary = getClientDictionary(locale);
 
   return (
     <html

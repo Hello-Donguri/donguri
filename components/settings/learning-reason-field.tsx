@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { SelectField } from "@/components/ui/select";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { setLearningReason } from "@/lib/actions/profile";
-import { LEARNING_REASONS, type LearningReason } from "@/lib/definitions";
+import { LEARNING_REASONS, type LearningReason } from "@/lib/options";
 
 function useReasonOptions() {
   const t = useTranslations();

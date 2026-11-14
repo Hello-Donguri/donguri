@@ -2,8 +2,8 @@
 
 import { useOptimistic, useTransition } from "react";
 import Link from "next/link";
-import { FlaskConical, Mars, Shapes, Venus, type LucideIcon } from "lucide-react";
-import { setCategoryActive, setCategoryTest } from "@/lib/actions/admin-content";
+import { FlaskConical, Mars, Rocket, Shapes, Venus, type LucideIcon } from "lucide-react";
+import { setCategoryActive, setCategoryStarter, setCategoryTest } from "@/lib/actions/admin-content";
 import { DeleteDeckButton } from "@/components/admin/delete-deck-button";
 import { ReadinessRing, deckReadiness } from "@/components/admin/readiness-ring";
 import { VisibilityToggle } from "@/components/ui/visibility-toggle";
@@ -121,6 +121,7 @@ function DeckCard({
   onSetTest: (isTest: boolean) => void;
 }) {
   const t = useTranslations();
+  const [settingStarter, startStarterTransition] = useTransition();
   const { vocabCount, grammarCount } = category;
   const hasVocab = vocabCount > 0;
   const hasGrammar = grammarCount > 0;
@@ -170,6 +171,12 @@ function DeckCard({
                 {t("admin_course_decks.test_badge", "Test")}
               </span>
             )}
+            {category.isStarter && (
+              <span className="flex items-center gap-1 rounded-full bg-kin/25 px-2 py-0.5 text-xs font-medium text-acorn">
+                <Rocket className="h-3 w-3" aria-hidden />
+                {t("admin_course_decks.starter_badge", "Starter · first 3 words")}
+              </span>
+            )}
             {category.tags.map((tag) => (
               <span
                 key={tag}
@@ -200,7 +207,18 @@ function DeckCard({
           toggleAction={setCategoryActive.bind(null, category.id)}
           label={category.title}
         />
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={settingStarter}
+            onClick={() => startStarterTransition(() => setCategoryStarter(category.id, !category.isStarter))}
+          >
+            {category.isStarter
+              ? t("admin_course_decks.unmark_starter", "Remove starter")
+              : t("admin_course_decks.mark_starter", "Make starter")}
+          </Button>
           <Button type="button" size="sm" variant="outline" onClick={() => onSetTest(!category.isTest)}>
             {category.isTest
               ? t("admin_course_decks.mark_live", "Move to live")

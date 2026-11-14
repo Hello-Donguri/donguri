@@ -2,17 +2,20 @@ import Link from "next/link";
 
 // `wordmarkClassName` lets a caller hide the "Hello Donguri" text at some
 // breakpoints (e.g. `sr-only md:not-sr-only`) while keeping the link's
-// accessible name.
+// accessible name. `href` is the home page unless the header sends someone
+// signed up to their course instead.
 export function Logo({
+  href = "/",
   className = "",
   wordmarkClassName = "",
 }: {
+  href?: string;
   className?: string;
   wordmarkClassName?: string;
 }) {
   return (
     <Link
-      href="/"
+      href={href}
       className={`inline-flex items-center gap-2.5 font-nunito font-black tracking-tight ${className}`}
     >
       {/* The icon fills its square edge to edge, so it's clipped to a circle

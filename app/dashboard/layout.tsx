@@ -10,6 +10,7 @@ import { SpellingPreferencePrompt } from "@/components/settings/spelling-prefere
 import { getCourseStreaks, getLearningAllowance, getProfile, requireProfile } from "@/lib/dal";
 import { connection } from "next/server";
 import { parseDonguriConfig, type AccessoryId } from "@/lib/levels";
+import { DEFAULT_COURSE_HREF } from "@/lib/default-course";
 
 export default function DashboardLayout({
   children,
@@ -21,7 +22,9 @@ export default function DashboardLayout({
       <div className="min-h-screen bg-washi">
         <header className="relative z-50 border-b border-header-border bg-header">
           <div className="mx-auto flex max-w-360 items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
-            <Logo wordmarkClassName="sr-only md:not-sr-only" />
+            <Suspense fallback={<Logo wordmarkClassName="sr-only md:not-sr-only" />}>
+              <DashboardLogo />
+            </Suspense>
             {/* The session reads live behind their own boundary so they don't
                 hold up the page below — on a full page load the page's data
                 streams in parallel with the header's instead of after it. */}
@@ -70,6 +73,18 @@ async function loadHeader() {
   };
 }
 
+// Signed up: back to English for Japanese speakers. Guests: the home page.
+async function DashboardLogo() {
+  const { profile } = await loadHeader();
+
+  return (
+    <Logo
+      href={profile.isGuest ? "/" : DEFAULT_COURSE_HREF}
+      wordmarkClassName="sr-only md:not-sr-only"
+    />
+  );
+}
+
 async function DashboardHeaderActions() {
   const { profile, equippedAccessory, streaks, xp } = await loadHeader();
 
@@ -85,12 +100,13 @@ async function DashboardHeaderActions() {
 
 // Everyone who signed up before they were asked UK or US spelling is
 // asked once, on whichever dashboard page they open next (see
-// SpellingPreferencePrompt). Read fresh, like the guest banner, so it's
+// SpellingPreferencePrompt). Guests aren't: they're asked on the sign-up
+// form, with their username. Read fresh, like the guest banner, so it's
 // gone as soon as they've answered.
 async function DashboardSpellingPrompt() {
   await connection();
   const profile = await getProfile();
-  if (!profile || profile.spelling_preference) return null;
+  if (!profile || profile.is_guest || profile.spelling_preference) return null;
   return <SpellingPreferencePrompt />;
 }
 

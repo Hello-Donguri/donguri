@@ -27,6 +27,8 @@ import { cn } from "@/lib/utils";
 
 // Dispatched on window by TourButton to take the tour again.
 export const TOUR_EVENT = "donguri:start-tour";
+// Dispatched on window by the tour when it's finished or closed.
+export const TOUR_CLOSED_EVENT = "donguri:tour-closed";
 
 // Space around the spotlit element, and between it and the card.
 const PAD = 8;
@@ -221,14 +223,17 @@ function cardPosition(box: Box | null, cardHeight: number): { top: number; left:
 // decks and the rest — each explained by Donguri in a card beside it,
 // ending on the learner's stats. Starts by itself until it's been finished
 // or dismissed once (saved on the profile — see markTourSeen); TourButton
-// starts it again any time.
+// starts it again any time. With `askFirst`, starting by itself opens on
+// a question instead — would they like the tour? — with a "No thanks".
 export function AppTour({
   autoStart,
+  askFirst = false,
   name,
   equippedAccessory,
   stats,
 }: {
   autoStart: boolean;
+  askFirst?: boolean;
   name: string;
   equippedAccessory: AccessoryId | null;
   stats: TourStat[];
@@ -237,6 +242,8 @@ export function AppTour({
   const reduceMotion = useReducedMotion();
   const [steps, setSteps] = useState<Step[] | null>(null);
   const [index, setIndex] = useState(0);
+  // Opened on the "would you like a tour?" question (see `askFirst`).
+  const [asking, setAsking] = useState(false);
   // The spotlit area, tagged with the step it was measured for, so a step
   // with nothing to spotlight never inherits the last one's.
   const [measured, setMeasured] = useState<{ stepId: string; box: Box } | null>(null);
@@ -254,17 +261,21 @@ export function AppTour({
   const step = steps?.[index];
   const box = step && measured?.stepId === step.id ? measured.box : null;
   const isLast = steps !== null && index === steps.length - 1;
+  // The opening question, while it's still being asked.
+  const isQuestion = asking && index === 0;
 
-  const start = useCallback(() => {
+  const start = useCallback((ask = false) => {
     // Only the sections on the page right now.
     setSteps(STEPS.filter((candidate) => !candidate.target || findTarget(candidate.target)));
     setIndex(0);
+    setAsking(ask);
   }, []);
 
   const close = useCallback(() => {
     setSteps(null);
     setMeasured(null);
     void markTourSeen();
+    window.dispatchEvent(new Event(TOUR_CLOSED_EVENT));
   }, []);
 
   // First visit: start once the page has settled — after any celebration
@@ -276,17 +287,18 @@ export function AppTour({
       if (document.querySelector("dialog[open]")) {
         timer = setTimeout(tryStart, 1500);
       } else {
-        start();
+        start(askFirst);
       }
     };
     timer = setTimeout(tryStart, 700);
     return () => clearTimeout(timer);
-  }, [autoStart, start]);
+  }, [autoStart, askFirst, start]);
 
   // Taking it again, from TourButton.
   useEffect(() => {
-    window.addEventListener(TOUR_EVENT, start);
-    return () => window.removeEventListener(TOUR_EVENT, start);
+    const onStart = () => start();
+    window.addEventListener(TOUR_EVENT, onStart);
+    return () => window.removeEventListener(TOUR_EVENT, onStart);
   }, [start]);
 
   // Each step: bring its section into view, then keep the spotlight on it
@@ -426,9 +438,13 @@ export function AppTour({
                   {t("tour.step_of", "{{current}} of {{total}}", { current: index + 1, total: steps.length })}
                 </span>
                 <h2 id="tour-title" className="mt-2 font-nunito text-xl leading-tight font-black text-sumi">
-                  {t(step.titleKey, step.title, { name })}
+                  {isQuestion ? t("tour.ask_title", "Would you like a quick tour?") : t(step.titleKey, step.title, { name })}
                 </h2>
-                <p className="mt-1.5 text-sm leading-relaxed text-sumi-soft">{t(step.bodyKey, step.body)}</p>
+                <p className="mt-1.5 text-sm leading-relaxed text-sumi-soft">
+                  {isQuestion
+                    ? t("tour.ask_body", "I can show you everything else Donguri can do. It only takes a minute.")
+                    : t(step.bodyKey, step.body)}
+                </p>
 
                 {step.id === "finish" && <TourStats stats={stats} reduceMotion={!!reduceMotion} />}
               </motion.div>
@@ -448,6 +464,15 @@ export function AppTour({
               </div>
 
               <div className="flex items-center gap-2">
+                {isQuestion && (
+                  <button
+                    type="button"
+                    onClick={close}
+                    className="cursor-pointer rounded-full px-3 py-2 font-nunito text-sm font-extrabold text-sumi-soft transition hover:text-sumi"
+                  >
+                    {t("tour.no_thanks", "No thanks")}
+                  </button>
+                )}
                 {index > 0 && !isLast && (
                   <button
                     type="button"
@@ -466,7 +491,9 @@ export function AppTour({
                 >
                   {isLast
                     ? t("tour.done", "Let's go!")
-                    : index === 0
+                    : isQuestion
+                      ? t("tour.ask_yes", "Yes please")
+                      : index === 0
                       ? t("tour.start", "Show me around")
                       : t("tour.next", "Next")}
                   {!isLast && (

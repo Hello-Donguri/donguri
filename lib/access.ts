@@ -1,9 +1,8 @@
 // Who can learn how much. Three tiers:
 //   - guest:  learning from the home page without an account (a Supabase
 //             anonymous user — see section 50 of supabase/schema.sql).
-//             Up to GUEST_ITEM_LIMIT items, words and grammar points
-//             together — three learn batches of three — then they're
-//             asked to sign up.
+//             Just the course's starter deck (section 66) — one learn
+//             batch of GUEST_ITEM_LIMIT words — then they have to sign up.
 //   - free:   a signed-up account without a membership. Up to
 //             FREE_VOCAB_LIMIT words and FREE_GRAMMAR_LIMIT grammar points
 //             in total — a guest's items count towards these, since they
@@ -19,7 +18,9 @@ import { hasActiveAccess } from "@/lib/billing-status";
 
 export type AccessTier = "guest" | "free" | "member";
 
-export const GUEST_ITEM_LIMIT = 9;
+// A starter deck's words — all a guest learns. Only this many of a starter
+// deck's words are ever taught, however many it holds.
+export const GUEST_ITEM_LIMIT = 3;
 export const FREE_VOCAB_LIMIT = 40;
 export const FREE_GRAMMAR_LIMIT = 20;
 

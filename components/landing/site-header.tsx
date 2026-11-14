@@ -4,6 +4,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LanguageSelector } from "@/components/i18n/language-selector";
 import { SiteMobileMenu, SiteNavLinks } from "@/components/landing/site-nav";
 import { getSession } from "@/lib/dal";
+import { DEFAULT_COURSE_HREF } from "@/lib/default-course";
 import { getTranslator } from "@/lib/i18n/server";
 
 // The public site's header — the home page and the info pages (FAQ, about,
@@ -19,7 +20,7 @@ export async function SiteHeader() {
     // padding), so the logo and buttons line up with the hero's edges.
     <header className="relative z-30 border-b border-header-border bg-header px-4 sm:px-6">
       <div className="mx-auto flex max-w-6xl items-center gap-3 py-4">
-        <Logo wordmarkClassName="sr-only sm:not-sr-only" />
+        <Logo href={signedIn ? DEFAULT_COURSE_HREF : "/"} wordmarkClassName="sr-only sm:not-sr-only" />
 
         <SiteNavLinks className="ml-4 hidden lg:flex" />
 

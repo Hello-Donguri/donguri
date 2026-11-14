@@ -938,6 +938,32 @@ export async function setCategoryTest(languageDeckId: string, isTest: boolean): 
   revalidatePath(`/dashboard/courses/${languageDeck.course.slug}`);
 }
 
+// Makes a deck its course's starter deck — the three words "Get started"
+// teaches a guest (see section 66 of supabase/schema.sql) — taking over
+// from any other, or stops it being one.
+export async function setCategoryStarter(languageDeckId: string, isStarter: boolean): Promise<void> {
+  const profile = await requireProfile();
+
+  if (profile.role !== "admin") {
+    return;
+  }
+
+  const { courseId, course } = await prisma.languageDeck.findUniqueOrThrow({
+    where: { id: languageDeckId },
+    select: { courseId: true, course: { select: { slug: true } } },
+  });
+
+  await prisma.$transaction([
+    ...(isStarter
+      ? [prisma.languageDeck.updateMany({ where: { courseId, isStarter: true }, data: { isStarter: false } })]
+      : []),
+    prisma.languageDeck.update({ where: { id: languageDeckId }, data: { isStarter } }),
+  ]);
+
+  revalidatePath(`/dashboard/admin/courses/${course.slug}`);
+  revalidatePath(`/dashboard/courses/${course.slug}`);
+}
+
 // Unlike setCategoryActive (reversible — hide the deck, keep everything),
 // this is permanent: every Word in it cascade-deletes, which cascades
 // further to each word's WordForm/WordExample/WordQuizQuestion/

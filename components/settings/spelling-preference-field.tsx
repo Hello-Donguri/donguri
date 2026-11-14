@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { SelectField } from "@/components/ui/select";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { setSpellingPreference } from "@/lib/actions/profile";
-import { SPELLING_PREFERENCES, type SpellingPreference } from "@/lib/definitions";
+import { SPELLING_PREFERENCES, type SpellingPreference } from "@/lib/options";
 import { cn } from "@/lib/utils";
 
 // A few of the everyday words that differ — shown beside each choice so
@@ -14,17 +13,31 @@ const EXAMPLES: Record<SpellingPreference, string[]> = {
   us: ["color", "center", "organize", "traveling"],
 };
 
-function useSpellingOptions() {
+// What the difference is, and that it's only spelling — shown with the
+// choice on the sign-up and onboarding forms and in the one-off prompt.
+function SpellingExplanation() {
   const t = useTranslations();
-  const labels: Record<SpellingPreference, string> = {
-    uk: t("spelling_preference.uk", "UK spelling (colour, centre)"),
-    us: t("spelling_preference.us", "US spelling (color, center)"),
-  };
-  return SPELLING_PREFERENCES.map((value) => ({ value, label: labels[value] }));
+  return (
+    <>
+      <p className="text-sm text-sumi-soft">
+        {t(
+          "spelling_prompt.body",
+          "Some English words are spelt differently in the UK and the US. They mean the same thing and sound the same, only the spelling changes: “colour” and “color”, “centre” and “center”, “organise” and “organize”.",
+        )}
+      </p>
+      <p className="text-sm text-sumi-soft">
+        {t(
+          "spelling_prompt.body_choice",
+          "Pick the one you'd like to learn. We'll show words that way, and you can type either.",
+        )}
+      </p>
+    </>
+  );
 }
 
-// The spelling question on the sign-up and onboarding forms — submitted
-// with the rest of the form as `spellingPreference`.
+// The spelling question on the sign-up and onboarding forms, alongside the
+// username — the two choices as cards, explained, submitted with the rest
+// of the form as `spellingPreference`.
 export function SpellingPreferenceField({
   defaultValue,
   errors,
@@ -33,15 +46,27 @@ export function SpellingPreferenceField({
   errors?: string[];
 }) {
   const t = useTranslations();
+  const [value, setValue] = useState(defaultValue ?? null);
+
   return (
-    <SelectField
-      label={t("spelling_preference.label", "English spelling")}
-      name="spellingPreference"
-      options={useSpellingOptions()}
-      defaultValue={defaultValue ?? ""}
-      placeholder={t("spelling_preference.placeholder", "Choose…")}
-      errors={errors}
-    />
+    <fieldset className="flex flex-col gap-2" aria-invalid={errors && errors.length > 0}>
+      <legend className="mb-1.5 text-sm font-medium text-sumi-soft">
+        {t("spelling_prompt.title", "UK or US spelling?")}
+      </legend>
+      <SpellingExplanation />
+      <input type="hidden" name="spellingPreference" value={value ?? ""} />
+      <div className="mt-1">
+        <SpellingChoice value={value} onPick={setValue} />
+      </div>
+      <p className="text-xs text-sumi-soft">
+        {t("spelling_prompt.change_later", "You can change this any time in Account settings.")}
+      </p>
+      {errors?.map((error) => (
+        <p key={error} className="text-sm text-shu">
+          {error}
+        </p>
+      ))}
+    </fieldset>
   );
 }
 
@@ -115,8 +140,9 @@ export function SpellingPreferenceSetting({ initial }: { initial: SpellingPrefer
   );
 }
 
-// Asked once of everyone who signed up before the question existed (their
-// preference is still null — see DashboardSpellingPrompt), over whatever
+// Asked once of everyone who signed up before the question was on the
+// sign-up form (their preference is still null — see
+// DashboardSpellingPrompt), over whatever
 // dashboard page they land on. There's no wrong answer, so it can't be
 // dismissed without one: picking either saves it and closes the prompt.
 export function SpellingPreferencePrompt() {
@@ -138,18 +164,9 @@ export function SpellingPreferencePrompt() {
         <h2 id="spelling-prompt-title" className="font-nunito text-2xl font-black text-sumi text-balance">
           {t("spelling_prompt.title", "UK or US spelling?")}
         </h2>
-        <p className="mt-3 text-sm text-sumi-soft">
-          {t(
-            "spelling_prompt.body",
-            "Some English words are spelt differently in the UK and the US. They mean the same thing and sound the same, only the spelling changes: “colour” and “color”, “centre” and “center”, “organise” and “organize”.",
-          )}
-        </p>
-        <p className="mt-2 text-sm text-sumi-soft">
-          {t(
-            "spelling_prompt.body_choice",
-            "Pick the one you'd like to learn. We'll show words that way, and you can type either.",
-          )}
-        </p>
+        <div className="mt-3 flex flex-col gap-2">
+          <SpellingExplanation />
+        </div>
         <div className="mt-5">
           <SpellingChoice
             value={value}

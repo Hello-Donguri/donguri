@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requireLearner } from "@/lib/dal";
+import { ensureDeckActivations, requireLearner } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 import { parseCourseLevel } from "@/lib/definitions";
 
@@ -44,4 +44,14 @@ export async function unenrollFromCourse(courseId: string): Promise<void> {
 
   // The course list, the dashboard, and the header's per-course streaks.
   revalidatePath("/dashboard", "layout");
+}
+
+// "Quick start" for someone who's just signed up after the starter words
+// (see StartChoiceModal): the course's first deck (Stage 1 Vocabulary)
+// made their own active deck, and straight into learning from it.
+export async function quickStart(courseSlug: string): Promise<void> {
+  await ensureDeckActivations(courseSlug);
+
+  revalidatePath(`/dashboard/courses/${courseSlug}`);
+  redirect(`/dashboard/courses/${courseSlug}/learn`);
 }

@@ -14,7 +14,8 @@ import { WordAudioFields } from "@/components/admin/word-audio-fields";
 import { LinkedWordsPicker } from "@/components/admin/linked-words-picker";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import type { LinkableWord } from "@/lib/dal";
-import { WORD_TYPES, type AdminWordSummary, type WordCategoryOption } from "@/lib/definitions";
+import { WORD_TYPES } from "@/lib/options";
+import type { AdminWordSummary, WordCategoryOption } from "@/lib/definitions";
 
 type EditWordFormProps = {
   word: AdminWordSummary;

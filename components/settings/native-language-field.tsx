@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { SelectField } from "@/components/ui/select";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { setNativeLanguage } from "@/lib/actions/profile";
-import { NATIVE_LANGUAGES, type NativeLanguage } from "@/lib/definitions";
+import { NATIVE_LANGUAGES, type NativeLanguage } from "@/lib/options";
 
 function useLanguageOptions() {
   const t = useTranslations();

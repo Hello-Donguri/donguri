@@ -15,12 +15,14 @@ import {
   getLeaderboards,
   getReviewQueueDebug,
   getReviewQueueSummary,
+  getStarterStatus,
   requireProfile,
 } from "@/lib/dal";
 import { getTranslator } from "@/lib/i18n/server";
 import { ArrowLeft, ArrowRight, Lock, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GuestLimitModal } from "@/components/access/guest-limit-modal";
+import { StartChoiceModal } from "@/components/access/start-choice-modal";
 
 import { ActivityOverviewCard } from "@/components/vocab/activity-overview-card";
 import { Greeting } from "@/components/dashboard/greeting";
@@ -91,6 +93,7 @@ async function loadCourseHome(slug: string) {
     enrolledCourseCount,
     allowance,
     wordCounts,
+    starter,
   ] = await Promise.all([
     getCourseDecks(slug),
     getCourseStreak(slug),
@@ -103,6 +106,7 @@ async function loadCourseHome(slug: string) {
     getEnrolledCourseCount(),
     getLearningAllowance(),
     getWordListCounts(slug),
+    getStarterStatus(slug),
   ]);
 
   const isAdmin = profile.role === "admin";
@@ -131,6 +135,7 @@ async function loadCourseHome(slug: string) {
     enrolledCourseCount,
     allowance,
     wordCounts,
+    starter,
     roomItemCount,
     isAdmin,
     reviewQueueDebug,
@@ -160,6 +165,7 @@ export default async function CourseHomePage({ params }: PageProps) {
       enrolledCourseCount,
       allowance,
       wordCounts,
+      starter,
       roomItemCount,
       isAdmin,
       reviewQueueDebug,
@@ -170,13 +176,25 @@ export default async function CourseHomePage({ params }: PageProps) {
     courseGreeting,
   ] = await Promise.all([loadCourseHome(slug), getTranslator(), getCourseGreeting(slug)]);
 
-  // Mirrors the learn queue: an active deck with any word not yet started.
-  // No active decks at all counts as nothing to learn too.
+  // Mirrors the learn queue: an active deck with any word not yet started —
+  // or, for a guest, the starter words. No active decks at all counts as
+  // nothing to learn too.
   const activeDeckSet = new Set(activeDeckIds);
-  const hasNewWords = decks.some(
-    (deck) => activeDeckSet.has(deck.id) && deck.learntWords < deck.totalWords,
-  );
-  const noActiveDecks = !decks.some((deck) => activeDeckSet.has(deck.id));
+  const hasNewWords = profile.is_guest
+    ? starter.learnt < starter.words
+    : decks.some((deck) => activeDeckSet.has(deck.id) && deck.learntWords < deck.totalWords);
+  const noActiveDecks = !profile.is_guest && !decks.some((deck) => activeDeckSet.has(deck.id));
+
+  // Just signed up after the starter words: asked how they'd like to carry
+  // on until they've picked a deck (see StartChoiceModal). The welcome
+  // tour waits meanwhile — then, if they didn't take it from there, it
+  // asks whether they'd like it once they've learnt another round of
+  // words. Everyone else (bar guests) gets it by itself, as before.
+  const showStartChoice = !profile.is_guest && starter.done && !starter.decksChosen;
+  const tourAutoStart =
+    !profile.tour_seen &&
+    !profile.is_guest &&
+    (!starter.done || (starter.decksChosen && wordCounts.learnt > starter.learnt));
   const challengesLeft = Math.max(
     challengeStatus.maxAttemptsPerDay - challengeStatus.attemptsToday,
     0,
@@ -373,18 +391,21 @@ export default async function CourseHomePage({ params }: PageProps) {
   return (
     <div className="flex flex-col gap-6">
       <DeckCompleteCelebration slug={slug} decks={decks} />
-      {/* A guest who's used their free words is asked — not sent — to sign
-          up; the banner and locked cards still lead there once it's closed. */}
+      {/* A guest who's learnt the starter words has to sign up (or log in)
+          to carry on. */}
       {profile.tier === "guest" && learnLocked && <GuestLimitModal />}
+      {showStartChoice && <StartChoiceModal courseSlug={slug} firstDeckTitle={starter.firstDeckTitle} />}
       {/* After the deck card in the DOM, so a badge earned alongside a
           finished deck is celebrated first, on top. */}
       <BadgeCelebration />
       {/* After badges in the DOM, so a level-up shows on top, first. */}
       <LevelUpCelebration />
-      {/* The welcome tour: by itself until it's been seen once, then from
-          the "Take the tour" link under the greeting. */}
+      {/* The welcome tour: by itself until it's been seen once (see
+          tourAutoStart), then from the "Take the tour" link under the
+          greeting. */}
       <AppTour
-        autoStart={!profile.tour_seen}
+        autoStart={tourAutoStart}
+        askFirst={starter.done}
         name={profile.first_name ?? ""}
         equippedAccessory={equippedAccessory}
         stats={[

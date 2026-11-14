@@ -1,6 +1,19 @@
 import * as z from "zod";
+// Kept in lib/options.ts, which client components import from directly —
+// importing anything that isn't a type from here bundles zod into the page.
+export * from "@/lib/options";
 import type { AccessTier } from "@/lib/access";
 import type { AccessoryId } from "@/lib/levels";
+import {
+  LEARNING_REASONS,
+  NATIVE_LANGUAGES,
+  SPELLING_PREFERENCES,
+  WORD_TYPES,
+  type LearningReason,
+  type NativeLanguage,
+  type SpellingPreference,
+  type WordType,
+} from "@/lib/options";
 import {
   BADGE_METRICS,
   BADGE_TIMESCALES,
@@ -42,38 +55,9 @@ export const UsernameSchema = z
       }),
   );
 
-// What a learner can say they speak natively — the two courses' audiences,
-// and everyone else. Kept in step with profiles_native_language_check
-// (section 48 of supabase/schema.sql).
-export const NATIVE_LANGUAGES = ["en", "ja", "other"] as const;
-export type NativeLanguage = (typeof NATIVE_LANGUAGES)[number];
-
 const NativeLanguageSchema = z.enum(NATIVE_LANGUAGES, { error: "Choose your native language." });
 
-// Which spelling of a word a learner sees — the content is written in UK
-// spelling, with a US one on the words where it differs (Word.usSpelling).
-// Kept in step with profiles_spelling_preference_check (section 65 of
-// supabase/schema.sql).
-export const SPELLING_PREFERENCES = ["uk", "us"] as const;
-export type SpellingPreference = (typeof SPELLING_PREFERENCES)[number];
-
 const SpellingPreferenceSchema = z.enum(SPELLING_PREFERENCES, { error: "Choose UK or US spelling." });
-
-// Why a learner is learning, picked from a dropdown on sign-up/onboarding
-// and changeable on the profile page. Kept in step with
-// profiles_learning_reason_check (section 54 of supabase/schema.sql).
-export const LEARNING_REASONS = [
-  "friends",
-  "travel",
-  "work",
-  "study",
-  "living_abroad",
-  "culture",
-  "family",
-  "fun",
-  "other",
-] as const;
-export type LearningReason = (typeof LEARNING_REASONS)[number];
 
 const LearningReasonSchema = z.enum(LEARNING_REASONS, { error: "Choose your reason for learning." });
 
@@ -308,22 +292,6 @@ export type QuizDirection = "term-to-translation" | "translation-to-term";
 // A cross-deck topical tag with its own admin-managed color — see the note
 // on the `WordCategory` Prisma model. Distinct from a "category" elsewhere
 // in this file/app, which means a deck (`LanguageDeck`).
-export const WORD_TYPES = [
-  "noun",
-  "verb",
-  "irregular_verb",
-  "adjective",
-  "adverb",
-  "pronoun",
-  "preposition",
-  "conjunction",
-  "interjection",
-  "phrase",
-  "numeral",
-  "particle",
-] as const;
-
-export type WordType = (typeof WORD_TYPES)[number];
 
 export type WordCategoryOption = {
   id: string;
@@ -1375,6 +1343,8 @@ export type AdminCategorySummary = {
   active: boolean;
   tags: string[];
   isTest: boolean;
+  // The course's starter deck (see section 66 of supabase/schema.sql).
+  isStarter: boolean;
   subheading: string | null;
   coverImage: string | null;
   // How many of the deck's words have each kind of media — what's left to
