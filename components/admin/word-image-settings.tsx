@@ -272,7 +272,7 @@ export function CharacterPicker({
             >
               <input type="checkbox" checked={checked} onChange={() => toggle(character.id)} className="sr-only" />
               {/* eslint-disable-next-line @next/next/no-img-element -- a small local thumbnail. */}
-              <img src={character.src} alt="" className="h-6 w-6 rounded-full bg-white object-contain" />
+              <img src={character.src} alt="" loading="lazy" className="h-6 w-6 rounded-full bg-white object-contain" />
               {character.name}
               {checked && <Check aria-hidden className="h-3 w-3" strokeWidth={3} />}
             </label>

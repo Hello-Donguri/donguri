@@ -317,9 +317,15 @@ export function GenerateWordImage({ wordId, term }: { wordId: string; term: stri
   const [saving, startSaving] = useTransition();
   const settings = useWordImageSettings();
   const { models } = settings;
+  // The window's contents only once it's first opened — there's one of
+  // these on every word card, and the character picker's pictures would
+  // otherwise all load with the page. Kept after that, so closing and
+  // reopening doesn't lose what's been made.
+  const [opened, setOpened] = useState(false);
 
   const open = () => {
     settings.open();
+    setOpened(true);
     dialogRef.current?.showModal();
   };
 
@@ -529,242 +535,244 @@ export function GenerateWordImage({ wordId, term }: { wordId: string; term: stri
         }}
         className="m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-5xl overflow-y-auto rounded-3xl border border-card-border bg-washi p-0 text-left text-sm text-sumi shadow-2xl backdrop:bg-sumi/50"
       >
-        <div className="flex flex-col gap-4 p-5">
-          <div className="flex items-start justify-between gap-3">
-            <h2 className="font-nunito text-lg font-extrabold">
-              {t("admin_category_words.generate_title", "Image for {{term}}", { term })}
-            </h2>
-            <SpendBadge settings={settings} />
-            <button
-              type="button"
-              onClick={close}
-              aria-label={t("common.close", "Close")}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sumi-soft transition hover:bg-ghost-hover hover:text-sumi"
-            >
-              <X aria-hidden className="h-4 w-4" />
-            </button>
-          </div>
-
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
-            {/* Step 1: the picture. */}
-            <div className="flex flex-col gap-3">
-              <CharacterPicker value={characterIds} onChange={setCharacterIds} disabled={running !== null} />
-              {characterIds.length === 0 && <FaceToggle value={face} onChange={setFace} disabled={running !== null} />}
-              <ScenePicker
-                sceneId={sceneId}
-                onSceneChange={setSceneId}
-                customScene={customScene}
-                onCustomSceneChange={setCustomScene}
-                disabled={running !== null}
-              />
-              <RecommendedModelsNote settings={settings} disabled={running !== null} />
-              <ImageModelPicker settings={settings} disabled={running !== null} inputImages={referenceImageCount(characterIds)} />
-
-              <div
-                style={png ? CHECKERBOARD : undefined}
-                className="relative aspect-square w-full overflow-hidden rounded-2xl border border-card-border bg-white"
+        {opened && (
+          <div className="flex flex-col gap-4 p-5">
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="font-nunito text-lg font-extrabold">
+                {t("admin_category_words.generate_title", "Image for {{term}}", { term })}
+              </h2>
+              <SpendBadge settings={settings} />
+              <button
+                type="button"
+                onClick={close}
+                aria-label={t("common.close", "Close")}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sumi-soft transition hover:bg-ghost-hover hover:text-sumi"
               >
-                {png ? (
-                  <>
-                    <ImageLightbox
-                      src={png.dataUrl}
-                      alt={term}
-                      className="relative block h-full w-full"
-                      inspect
-                      backgroundStyle={CHECKERBOARD}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element -- a data URL, not a hosted file. */}
-                      <img src={png.dataUrl} alt={term} className="h-full w-full object-contain" />
-                      {running !== "picture" && (
-                        <FullSizeHint label={t("admin_batch_images.full_size", "Full size")} />
-                      )}
-                    </ImageLightbox>
-                    {running === "picture" && (
-                      <LoadingPicture
-                        label={t("admin_category_words.editing_picture", "Editing the picture…")}
-                        activity={log[log.length - 1]?.message}
-                        startedAt={startedAt}
-                        overlay
-                      />
-                    )}
-                  </>
-                ) : running === "picture" ? (
-                  <LoadingPicture
-                    label={t("admin_category_words.log_drawing", "Drawing the picture…")}
-                    activity={log[log.length - 1]?.message}
-                    startedAt={startedAt}
-                  />
-                ) : (
-                  <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-4 text-center text-xs text-sumi-soft">
-                    <Sparkles aria-hidden className="h-6 w-6" />
-                    {t("admin_category_words.picture_empty", "The picture shows here — check it before making SVGs.")}
-                  </div>
-                )}
-              </div>
-              {png && (
-                <p className="flex items-center justify-between text-xs text-sumi-soft">
-                  {formatBytes(png.bytes)} PNG
-                  <a
-                    href={png.dataUrl}
-                    download={`${term}.png`}
-                    className="inline-flex items-center gap-1 font-semibold text-ai hover:text-ai-dark"
-                  >
-                    <Download aria-hidden className="h-3.5 w-3.5" />
-                    {t("admin_category_words.download", "Download")}
-                  </a>
-                </p>
-              )}
-
-              <div className="flex flex-wrap gap-2">
-                {running ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={stop}
-                    className="border-shu/40 text-shu-dark hover:bg-shu/10"
-                  >
-                    <Square aria-hidden className="h-3.5 w-3.5 fill-current" />
-                    {t("admin_category_words.stop_generating", "Stop")}
-                  </Button>
-                ) : (
-                  <>
-                    <Button
-                      type="button"
-                      variant={png ? "outline" : "primary"}
-                      size="sm"
-                      onClick={drawPicture}
-                      disabled={needsCustomScene}
-                    >
-                      {png ? <RefreshCw aria-hidden className="h-4 w-4" /> : <Sparkles aria-hidden className="h-4 w-4" />}
-                      {png
-                        ? t("admin_category_words.regenerate_picture", "Regenerate")
-                        : t("admin_category_words.draw_picture", "Draw picture")}
-                    </Button>
-                    {png && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setEditing(!editing)}
-                        aria-expanded={editing}
-                      >
-                        <Pencil aria-hidden className="h-4 w-4" />
-                        {t("admin_category_words.edit_picture", "Edit")}
-                      </Button>
-                    )}
-                    {beforeEdit && (
-                      <Button type="button" variant="outline" size="sm" onClick={undoEdit}>
-                        <Undo2 aria-hidden className="h-4 w-4" />
-                        {t("admin_category_words.undo_edit", "Undo edit")}
-                      </Button>
-                    )}
-                    {png && (
-                      <Button type="button" size="sm" onClick={makeSvgs}>
-                        <Shapes aria-hidden className="h-4 w-4" />
-                        {svgs
-                          ? t("admin_category_words.make_svgs_again", "Make SVGs again")
-                          : t("admin_category_words.make_svgs", "Make SVGs")}
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
-
-              {png && <SvgModelPicker settings={settings} disabled={running !== null} />}
-
-              {editing && png && !running && (
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    editPicture();
-                  }}
-                  className="flex flex-col gap-2 rounded-2xl border border-card-border bg-washi-soft p-3"
-                >
-                  <label className="flex flex-col gap-1.5 text-xs font-semibold text-sumi-soft">
-                    {t("admin_category_words.edit_label", "What should change?")}
-                    <textarea
-                      value={instruction}
-                      onChange={(event) => setInstruction(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" && !event.shiftKey) {
-                          event.preventDefault();
-                          editPicture();
-                        }
-                      }}
-                      maxLength={EDIT_INSTRUCTION_MAX_CHARS}
-                      rows={2}
-                      autoFocus
-                      placeholder={t(
-                        "admin_category_words.edit_placeholder",
-                        "e.g. make the hospital bigger, add a red cross",
-                      )}
-                      className="resize-none rounded-xl border border-sumi/15 bg-washi px-3 py-2 text-sm font-normal text-sumi outline-none placeholder:text-sumi-soft/50 focus:border-ai/50 focus:ring-2 focus:ring-ai-soft"
-                    />
-                  </label>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="flex flex-col text-xs tabular-nums text-sumi-soft">
-                      {instruction.length}/{EDIT_INSTRUCTION_MAX_CHARS}
-                      <CostEstimate settings={settings} cost={settings.imageCostFor(characterIds.length + 1)} />
-                    </span>
-                    <div className="flex gap-2">
-                      <Button type="button" variant="outline" size="sm" onClick={() => setEditing(false)}>
-                        {t("admin_category_words.edit_cancel", "Cancel")}
-                      </Button>
-                      <Button type="submit" size="sm" disabled={!cleanEditInstruction(instruction)}>
-                        <Pencil aria-hidden className="h-4 w-4" />
-                        {t("admin_category_words.edit_apply", "Apply edit")}
-                      </Button>
-                    </div>
-                  </div>
-                </form>
-              )}
+                <X aria-hidden className="h-4 w-4" />
+              </button>
             </div>
 
-            {/* Step 2: the log and the SVGs. */}
-            <div className="flex min-w-0 flex-col gap-3">
-              <RunLog log={log} running={running !== null} startedAt={startedAt} status={status} />
-              {error && <p className="text-xs text-shu-dark">{error}</p>}
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+              {/* Step 1: the picture. */}
+              <div className="flex flex-col gap-3">
+                <CharacterPicker value={characterIds} onChange={setCharacterIds} disabled={running !== null} />
+                {characterIds.length === 0 && <FaceToggle value={face} onChange={setFace} disabled={running !== null} />}
+                <ScenePicker
+                  sceneId={sceneId}
+                  onSceneChange={setSceneId}
+                  customScene={customScene}
+                  onCustomSceneChange={setCustomScene}
+                  disabled={running !== null}
+                />
+                <RecommendedModelsNote settings={settings} disabled={running !== null} />
+                <ImageModelPicker settings={settings} disabled={running !== null} inputImages={referenceImageCount(characterIds)} />
 
-              {options.length > 0 && (
-                <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 xl:grid-cols-4">
-                  {options.map((option) => (
-                    <OptionTile
-                      key={option.key}
-                      option={option}
-                      selected={option.key === selectedKey}
-                      onSelect={() => setSelectedKey(option.key === selectedKey ? null : option.key)}
+                <div
+                  style={png ? CHECKERBOARD : undefined}
+                  className="relative aspect-square w-full overflow-hidden rounded-2xl border border-card-border bg-white"
+                >
+                  {png ? (
+                    <>
+                      <ImageLightbox
+                        src={png.dataUrl}
+                        alt={term}
+                        className="relative block h-full w-full"
+                        inspect
+                        backgroundStyle={CHECKERBOARD}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element -- a data URL, not a hosted file. */}
+                        <img src={png.dataUrl} alt={term} className="h-full w-full object-contain" />
+                        {running !== "picture" && (
+                          <FullSizeHint label={t("admin_batch_images.full_size", "Full size")} />
+                        )}
+                      </ImageLightbox>
+                      {running === "picture" && (
+                        <LoadingPicture
+                          label={t("admin_category_words.editing_picture", "Editing the picture…")}
+                          activity={log[log.length - 1]?.message}
+                          startedAt={startedAt}
+                          overlay
+                        />
+                      )}
+                    </>
+                  ) : running === "picture" ? (
+                    <LoadingPicture
+                      label={t("admin_category_words.log_drawing", "Drawing the picture…")}
+                      activity={log[log.length - 1]?.message}
                       startedAt={startedAt}
                     />
-                  ))}
-                </div>
-              )}
-
-              {selected && (
-                <div className="flex flex-col gap-2 border-t border-card-border pt-3">
-                  {selectedIsLarge && (
-                    <p className="flex items-start gap-1.5 rounded-lg border border-kin/40 bg-kin/15 px-2.5 py-1.5 text-xs text-sumi">
-                      <AlertTriangle aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-acorn" />
-                      {t(
-                        "admin_category_words.option_large_warning",
-                        "This is over {{warn}}KB — it'll load slower for learners. A smaller option is better if it looks as good.",
-                        { warn: GENERATED_IMAGE_WARN_BYTES / 1024 },
-                      )}
-                    </p>
+                  ) : (
+                    <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-4 text-center text-xs text-sumi-soft">
+                      <Sparkles aria-hidden className="h-6 w-6" />
+                      {t("admin_category_words.picture_empty", "The picture shows here — check it before making SVGs.")}
+                    </div>
                   )}
-                  <Button type="button" size="sm" onClick={useSelected} disabled={saving} className="w-fit">
-                    {saving ? (
-                      <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Check aria-hidden className="h-4 w-4" />
-                    )}
-                    {t("admin_category_words.use_as_image", "Use {{label}} as the image", { label: selected.label })}
-                  </Button>
                 </div>
-              )}
+                {png && (
+                  <p className="flex items-center justify-between text-xs text-sumi-soft">
+                    {formatBytes(png.bytes)} PNG
+                    <a
+                      href={png.dataUrl}
+                      download={`${term}.png`}
+                      className="inline-flex items-center gap-1 font-semibold text-ai hover:text-ai-dark"
+                    >
+                      <Download aria-hidden className="h-3.5 w-3.5" />
+                      {t("admin_category_words.download", "Download")}
+                    </a>
+                  </p>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  {running ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={stop}
+                      className="border-shu/40 text-shu-dark hover:bg-shu/10"
+                    >
+                      <Square aria-hidden className="h-3.5 w-3.5 fill-current" />
+                      {t("admin_category_words.stop_generating", "Stop")}
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        type="button"
+                        variant={png ? "outline" : "primary"}
+                        size="sm"
+                        onClick={drawPicture}
+                        disabled={needsCustomScene}
+                      >
+                        {png ? <RefreshCw aria-hidden className="h-4 w-4" /> : <Sparkles aria-hidden className="h-4 w-4" />}
+                        {png
+                          ? t("admin_category_words.regenerate_picture", "Regenerate")
+                          : t("admin_category_words.draw_picture", "Draw picture")}
+                      </Button>
+                      {png && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditing(!editing)}
+                          aria-expanded={editing}
+                        >
+                          <Pencil aria-hidden className="h-4 w-4" />
+                          {t("admin_category_words.edit_picture", "Edit")}
+                        </Button>
+                      )}
+                      {beforeEdit && (
+                        <Button type="button" variant="outline" size="sm" onClick={undoEdit}>
+                          <Undo2 aria-hidden className="h-4 w-4" />
+                          {t("admin_category_words.undo_edit", "Undo edit")}
+                        </Button>
+                      )}
+                      {png && (
+                        <Button type="button" size="sm" onClick={makeSvgs}>
+                          <Shapes aria-hidden className="h-4 w-4" />
+                          {svgs
+                            ? t("admin_category_words.make_svgs_again", "Make SVGs again")
+                            : t("admin_category_words.make_svgs", "Make SVGs")}
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {png && <SvgModelPicker settings={settings} disabled={running !== null} />}
+
+                {editing && png && !running && (
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      editPicture();
+                    }}
+                    className="flex flex-col gap-2 rounded-2xl border border-card-border bg-washi-soft p-3"
+                  >
+                    <label className="flex flex-col gap-1.5 text-xs font-semibold text-sumi-soft">
+                      {t("admin_category_words.edit_label", "What should change?")}
+                      <textarea
+                        value={instruction}
+                        onChange={(event) => setInstruction(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" && !event.shiftKey) {
+                            event.preventDefault();
+                            editPicture();
+                          }
+                        }}
+                        maxLength={EDIT_INSTRUCTION_MAX_CHARS}
+                        rows={2}
+                        autoFocus
+                        placeholder={t(
+                          "admin_category_words.edit_placeholder",
+                          "e.g. make the hospital bigger, add a red cross",
+                        )}
+                        className="resize-none rounded-xl border border-sumi/15 bg-washi px-3 py-2 text-sm font-normal text-sumi outline-none placeholder:text-sumi-soft/50 focus:border-ai/50 focus:ring-2 focus:ring-ai-soft"
+                      />
+                    </label>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="flex flex-col text-xs tabular-nums text-sumi-soft">
+                        {instruction.length}/{EDIT_INSTRUCTION_MAX_CHARS}
+                        <CostEstimate settings={settings} cost={settings.imageCostFor(characterIds.length + 1)} />
+                      </span>
+                      <div className="flex gap-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => setEditing(false)}>
+                          {t("admin_category_words.edit_cancel", "Cancel")}
+                        </Button>
+                        <Button type="submit" size="sm" disabled={!cleanEditInstruction(instruction)}>
+                          <Pencil aria-hidden className="h-4 w-4" />
+                          {t("admin_category_words.edit_apply", "Apply edit")}
+                        </Button>
+                      </div>
+                    </div>
+                  </form>
+                )}
+              </div>
+
+              {/* Step 2: the log and the SVGs. */}
+              <div className="flex min-w-0 flex-col gap-3">
+                <RunLog log={log} running={running !== null} startedAt={startedAt} status={status} />
+                {error && <p className="text-xs text-shu-dark">{error}</p>}
+
+                {options.length > 0 && (
+                  <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 xl:grid-cols-4">
+                    {options.map((option) => (
+                      <OptionTile
+                        key={option.key}
+                        option={option}
+                        selected={option.key === selectedKey}
+                        onSelect={() => setSelectedKey(option.key === selectedKey ? null : option.key)}
+                        startedAt={startedAt}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {selected && (
+                  <div className="flex flex-col gap-2 border-t border-card-border pt-3">
+                    {selectedIsLarge && (
+                      <p className="flex items-start gap-1.5 rounded-lg border border-kin/40 bg-kin/15 px-2.5 py-1.5 text-xs text-sumi">
+                        <AlertTriangle aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-acorn" />
+                        {t(
+                          "admin_category_words.option_large_warning",
+                          "This is over {{warn}}KB — it'll load slower for learners. A smaller option is better if it looks as good.",
+                          { warn: GENERATED_IMAGE_WARN_BYTES / 1024 },
+                        )}
+                      </p>
+                    )}
+                    <Button type="button" size="sm" onClick={useSelected} disabled={saving} className="w-fit">
+                      {saving ? (
+                        <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Check aria-hidden className="h-4 w-4" />
+                      )}
+                      {t("admin_category_words.use_as_image", "Use {{label}} as the image", { label: selected.label })}
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </dialog>
     </>
   );
