@@ -357,7 +357,7 @@ async function awardXp(userId: string, amount: number): Promise<number> {
 // true, i.e. only for an answer given in the *scheduled review queue*. The
 // post-learn quiz deliberately does NOT advance stage: a word's first
 // real review has to wait for its stage-1 `nextReviewAt` (set 15 minutes out
-// the moment it's learned, in `getLearnQueue`) to actually pass — answering
+// by its first answer in that quiz) to actually pass — answering
 // it twice correctly thirty seconds after learning it isn't evidence of
 // retention over time, so it must not fast-forward the schedule. Without
 // this split, a perfect post-learn quiz (2 correct answers) would silently
@@ -386,12 +386,18 @@ async function recordAnswer(
       stage: true,
       correctCount: true,
       incorrectCount: true,
+      nextReviewAt: true,
+      status: true,
       word: { select: { languageDeck: { select: { courseId: true } } } },
     },
   });
 
   const stage = advancesStage ? nextStageAfterAnswer(progress.stage, correct) : progress.stage;
   const mastered = advancesStage && stage >= MAX_STAGE && correct;
+  // A word's first answer in its post-learn test puts it on the review
+  // schedule (see `introduceLearnWords` in lib/dal.ts).
+  const firstTested =
+    !advancesStage && progress.nextReviewAt === null && progress.status !== "known" && progress.stage < MAX_STAGE;
 
   await prisma.userWordProgress.update({
     where: { userId_wordId: { userId, wordId } },
@@ -402,7 +408,9 @@ async function recordAnswer(
             nextReviewAt: mastered ? null : nextReviewAtForStage(stage),
             status: mastered ? "known" : "learning",
           }
-        : {}),
+        : firstTested
+          ? { nextReviewAt: nextReviewAtForStage(progress.stage) }
+          : {}),
       correctCount: correct ? progress.correctCount + 1 : progress.correctCount,
       incorrectCount: correct ? progress.incorrectCount : progress.incorrectCount + 1,
       lastSeenAt: new Date(),

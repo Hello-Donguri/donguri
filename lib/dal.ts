@@ -2255,19 +2255,37 @@ export async function introduceLearnWords(courseSlug: string, wordIds: string[])
     return;
   }
 
-  await prisma.userWordProgress.createMany({
-    data: words.map((word) => ({
-      userId: user.id,
-      wordId: word.id,
-      stage: 1,
-      // Set immediately, not deferred to the first quiz answer — a word's
-      // stage-1 review is due 15 minutes after it's *learned*, regardless of
-      // when (or how well) its post-learn quiz goes; the quiz never advances
-      // stage (see `recordAnswer` in lib/actions/vocab.ts).
-      nextReviewAt: nextReviewAtForStage(1),
-    })),
-    skipDuplicates: true,
-  });
+  const now = new Date();
+
+  await prisma.$transaction([
+    // Words from an earlier batch whose test was never taken: the test
+    // page's own batch (see getTestQueueForCourse) has moved on, so they
+    // join the review schedule now rather than dropping out of it for good.
+    prisma.userWordProgress.updateMany({
+      where: {
+        userId: user.id,
+        lastSeenAt: null,
+        nextReviewAt: null,
+        skipped: false,
+        stage: { lt: MAX_STAGE },
+        introducedAt: { lt: new Date(now.getTime() - LEARN_BATCH_WINDOW_MS) },
+      },
+      data: { nextReviewAt: nextReviewAtForStage(1, now) },
+    }),
+    prisma.userWordProgress.createMany({
+      data: words.map((word) => ({
+        userId: user.id,
+        wordId: word.id,
+        stage: 1,
+        // Not on the review schedule until it's been answered in its
+        // post-learn test, which sets its first review 15 minutes out (see
+        // `recordAnswer` in lib/actions/vocab.ts) — or until the next batch
+        // is learnt without its test being taken (above).
+        nextReviewAt: null,
+      })),
+      skipDuplicates: true,
+    }),
+  ]);
 
   await bumpStreak(user.id, course.id, new Date());
 }
@@ -2287,9 +2305,9 @@ export async function introduceLearnWords(courseSlug: string, wordIds: string[])
 // quiz; each question carries its own `path` (see the QuizQuestion variants
 // in lib/definitions.ts) so the UI can label which is which. Either way,
 // answering these never advances the word's stage (see `recordAnswer`'s
-// `advancesStage` in lib/actions/vocab.ts) — its stage-1 review stays due 4
-// hours after it was *learned* (see `getLearnQueueForCourse`), not from
-// whenever it happens to get quizzed. A word drops out of this pool the
+// `advancesStage` in lib/actions/vocab.ts) — the first answer only puts the
+// word on the review schedule, its first review 15 minutes later (see
+// `introduceLearnWords`). A word drops out of this pool the
 // moment its first question is answered and from then on is governed
 // entirely by its stage/`nextReviewAt` — i.e. by `getReviewQueue` below.
 // The quiz only ever covers *one* learn batch — otherwise any earlier batch
@@ -2404,9 +2422,10 @@ export const getTestQueueForCourse = cache(
 // A user's words that are in a course's review queue at all — shared by
 // the review session, the course-home summary and the "words ready to
 // review" notifier, so they always agree. Every learnt, not-yet-mastered
-// word: its first review is due 15 minutes after it's learnt whether or not
-// its post-learn quiz was ever taken (see `introduceLearnWords`) — a word
-// whose quiz was skipped mustn't drop out of the schedule for good.
+// word that's on the schedule: a word joins it once it's been answered in
+// its post-learn test — its first review 15 minutes after that — or, if
+// the test was never taken, when the next batch is learnt (see
+// `introduceLearnWords`), so it can't drop out of the schedule for good.
 // Answering it in review marks it seen, which also takes it out of the
 // pending quiz (see `getTestQueueForCourse`).
 function reviewableWhere(profile: { id: string; role: string }, courseId: string) {
