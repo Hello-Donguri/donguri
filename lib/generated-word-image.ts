@@ -9,15 +9,8 @@
 export const GENERATED_IMAGE_WARN_BYTES = 30 * 1024;
 export const GENERATED_IMAGE_MAX_BYTES = 100 * 1024;
 
-// Every way the picture is turned into an SVG, in the order they're shown.
-export const SVG_OPTIONS = [
-  { key: "vtracer", label: "vTracer" },
-  { key: "vtracerClean", label: "vTracer (clean)" },
-  { key: "potrace", label: "Potrace (smooth)" },
-  { key: "inkscape", label: "Inkscape" },
-  { key: "imagetracer", label: "ImageTracer" },
-  { key: "chatgpt", label: "ChatGPT" },
-] as const;
+// How the picture is turned into an SVG: ChatGPT redrawing it by hand.
+export const SVG_OPTIONS = [{ key: "chatgpt", label: "ChatGPT" }] as const;
 
 export type SvgOptionKey = (typeof SVG_OPTIONS)[number]["key"];
 

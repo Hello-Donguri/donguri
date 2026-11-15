@@ -5,15 +5,15 @@ import { streamWordImageEvents } from "@/lib/word-image-stream";
 import { parseCharacterIds } from "@/lib/word-image-characters";
 import { parseSvgModel } from "@/lib/word-image-models";
 
-// ChatGPT redrawing the picture as an SVG is the slow one.
+// ChatGPT redrawing the picture as an SVG can take a few minutes.
 export const maxDuration = 240;
 
 // The picture's largest accepted size, as base64 — far more than a
 // generated one needs.
 const MAX_PNG_BASE64 = 8 * 1024 * 1024;
 
-// Turns the picture the admin approved on the deck page into SVGs every
-// way (see traceWordPicture), each streamed back as soon as it's ready.
+// Has ChatGPT turn the picture the admin approved on the deck page into an
+// SVG (see traceWordPicture), streamed back with its progress.
 export async function POST(request: NextRequest) {
   await connection();
   const profile = await getProfile();

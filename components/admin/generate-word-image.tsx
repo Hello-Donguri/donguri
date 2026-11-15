@@ -498,9 +498,9 @@ export function GenerateWordImage({ wordId, term }: { wordId: string; term: stri
         : running === "svgs"
           ? t("admin_category_words.log_starting", "Starting…")
           : svgs
-            ? t("admin_category_words.log_svgs_done", "SVGs finished")
+            ? t("admin_category_words.log_svgs_done", "SVG finished")
             : png
-              ? t("admin_category_words.log_picture_done", "Picture ready — redraw it, or make SVGs from it")
+              ? t("admin_category_words.log_picture_done", "Picture ready — redraw it, or make an SVG from it")
               : t("admin_category_words.log_idle", "Choose the characters and a scene, then draw the picture");
 
   const useSelected = () => {
@@ -604,7 +604,7 @@ export function GenerateWordImage({ wordId, term }: { wordId: string; term: stri
                   ) : (
                     <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-4 text-center text-xs text-sumi-soft">
                       <Sparkles aria-hidden className="h-6 w-6" />
-                      {t("admin_category_words.picture_empty", "The picture shows here — check it before making SVGs.")}
+                      {t("admin_category_words.picture_empty", "The picture shows here — check it before making the SVG.")}
                     </div>
                   )}
                 </div>
@@ -670,8 +670,8 @@ export function GenerateWordImage({ wordId, term }: { wordId: string; term: stri
                         <Button type="button" size="sm" onClick={makeSvgs}>
                           <Shapes aria-hidden className="h-4 w-4" />
                           {svgs
-                            ? t("admin_category_words.make_svgs_again", "Make SVGs again")
-                            : t("admin_category_words.make_svgs", "Make SVGs")}
+                            ? t("admin_category_words.make_svgs_again", "Make SVG again")
+                            : t("admin_category_words.make_svgs", "Make SVG")}
                         </Button>
                       )}
                     </>

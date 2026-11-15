@@ -15,20 +15,10 @@ import {
 } from "@/lib/word-image-scenes";
 import type {
   LogLevel,
-  SvgOptionKey,
   SvgResult,
   WordImageEvent,
 } from "@/lib/generated-word-image";
-import {
-  traceWithChatGpt,
-  traceWithImageTracer,
-  traceWithInkscape,
-  traceWithPotrace,
-  traceWithVtracer,
-  traceWithVtracerClean,
-  type TraceLog,
-  type TraceOptions,
-} from "@/lib/svg-trace";
+import { traceWithChatGpt, type TraceLog } from "@/lib/svg-trace";
 import {
   imageCost,
   imageEstimateKey,
@@ -39,12 +29,12 @@ import {
   type SvgModel,
 } from "@/lib/word-image-models";
 
-// What makes a picture trace cleanly into an SVG with vTracer: few flat
-// colours with hard edges, bold closed outlines, big simple shapes and a
-// plain background — anything soft (gradients, shading, texture, blur)
-// turns into hundreds of tiny paths.
+// What makes a picture redraw cleanly as an SVG: few flat colours with
+// hard edges, bold closed outlines, big simple shapes and a plain
+// background — anything soft (gradients, shading, texture, blur) can't be
+// drawn with flat SVG shapes.
 const VECTOR_STYLE = [
-  "Style: flat vector illustration, made to be auto-traced into an SVG with vTracer.",
+  "Style: flat vector illustration, made to be redrawn as an SVG.",
   "Solid flat colour fills only: no gradients, shading, highlights, soft shadows, textures, grain, noise or blur.",
   "A small palette of no more than 8 distinct colours; every area is one solid colour.",
   "Thick dark-brown outlines around every shape, and every shape is closed.",
@@ -80,11 +70,6 @@ function noMouths(characters: readonly { name: string; mouth: boolean }[]): stri
   const names = listOf(mouthless.map((character) => character.name));
   return `${names} ${mouthless.length > 1 ? "have" : "has"} no mouth, just as in the reference image${mouthless.length > 1 ? "s" : ""}: never draw a mouth, smile, lips or teeth on ${mouthless.length > 1 ? "them" : "it"}, and show expression with the eyes, ears, arms and pose instead.`;
 }
-
-// The size the tracers work at: their settings (speckle sizes, curve
-// lengths) were tuned on 1024px pictures, so a smaller one is scaled up
-// to this first.
-const TRACE_SIZE = 1024;
 
 const kb = (bytes: number) =>
   bytes < 1024 * 1024
@@ -412,7 +397,7 @@ async function drawImage({
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   // PNG out, not WebP: lossless, so there are no compression artefacts
-  // for the tracers to trace as extra shapes.
+  // to be mistaken for detail.
   const options = {
     model,
     prompt,
@@ -463,106 +448,56 @@ async function drawImage({
   });
 }
 
-// Step two: turns the picture the admin approved into an SVG every way in
-// SVG_OPTIONS, all at once, each reported through `emit` the moment it's
-// ready. Nothing is saved here; the deck page chooses one (see
-// chooseGeneratedWordImage). `signal` is Stop: everything still running is
-// cancelled — ChatGPT, Inkscape, and the tracers at their next chance —
-// and nothing new starts.
+// Step two: ChatGPT redraws the picture the admin approved as an SVG (see
+// traceWithChatGpt), reported through `emit` once it's ready. Nothing is
+// saved here; the deck page chooses it (see chooseGeneratedWordImage).
+// `signal` is Stop.
 export async function traceWordPicture(
   {
     wordId,
     characterIds,
-    png: picture,
+    png,
     svgModel,
     signal,
   }: {
     wordId: string;
     characterIds: WordImageCharacterId[];
     png: Buffer;
-    svgModel: SvgModel | null;
+    svgModel: SvgModel;
     signal: AbortSignal;
   },
   emit: Emit,
 ) {
   const start = Date.now();
   const logger = streamLogger(emit, start);
-  const log = logger("Setup");
 
   const { word, characters } = await wordAndCharacters(wordId, characterIds);
-  const { width = 0, height = 0, format } = await sharp(picture).metadata();
+  const { width = 0, height = 0, format } = await sharp(png).metadata();
   if (format !== "png") throw new Error("That isn't a PNG.");
+  logger("Setup")(`Picture is ${width}×${height}`);
+  if (signal.aborted) return;
 
-  let png = picture;
-  if (Math.max(width, height) < TRACE_SIZE) {
-    png = await sharp(picture)
-      .resize(TRACE_SIZE, TRACE_SIZE, { fit: "inside", kernel: "lanczos3" })
-      .png()
-      .toBuffer();
+  const log = logger("ChatGPT");
+  log("Started", "start");
+  const traced = await traceWithChatGpt(png, subjectLabel(word.english, characters), {
+    log: (message) => log(message),
+    signal,
+    model: svgModel.id,
+    onUsage: (usage) => {
+      const usd = svgCost(svgModel, usage);
+      log(`Cost: $${usd.toFixed(4)}`);
+      emit({ type: "cost", usd, estimateKey: svgEstimateKey(svgModel) });
+    },
+  });
+  const result: SvgResult =
+    signal.aborted && !traced.ok ? { ok: false, error: "Stopped." } : traced;
+  if (result.ok) {
     log(
-      `Picture is ${width}×${height} — scaled up to ${TRACE_SIZE}px for the tracers (their settings are tuned for that size)`,
+      `Done in ${seconds(result.ms)}: ${result.paths} paths, ${kb(result.bytes)}`,
+      "done",
     );
   } else {
-    log(`Picture is ${width}×${height}`);
+    log(`Failed: ${result.error}`, "error");
   }
-
-  const run = async (
-    key: SvgOptionKey,
-    source: string,
-    trace: (options: TraceOptions) => Promise<SvgResult>,
-  ) => {
-    if (signal.aborted) return;
-    const traceLog = logger(source);
-    traceLog("Started", "start");
-    const traced = await trace({ log: (message) => traceLog(message), signal });
-    const result: SvgResult =
-      signal.aborted && !traced.ok ? { ok: false, error: "Stopped." } : traced;
-    if (result.ok) {
-      traceLog(
-        `Done in ${seconds(result.ms)}: ${result.paths} paths, ${kb(result.bytes)}`,
-        "done",
-      );
-    } else {
-      traceLog(`Failed: ${result.error}`, "error");
-    }
-    emit({ type: "svg", key, result });
-  };
-
-  const subject = subjectLabel(word.english, characters);
-  await Promise.all([
-    run("vtracer", "vTracer", (options) => traceWithVtracer(png, options)),
-    run("vtracerClean", "vTracer (clean)", (options) =>
-      traceWithVtracerClean(png, options),
-    ),
-    run("potrace", "Potrace", (options) => traceWithPotrace(png, options)),
-    run("inkscape", "Inkscape", (options) => traceWithInkscape(png, options)),
-    run("imagetracer", "ImageTracer", (options) =>
-      traceWithImageTracer(png, options),
-    ),
-    svgModel
-      ? run("chatgpt", "ChatGPT", (options) =>
-          traceWithChatGpt(png, subject, {
-            ...options,
-            model: svgModel.id,
-            onUsage: (usage) => {
-              const usd = svgCost(svgModel, usage);
-              logger("ChatGPT")(
-                `Cost: $${usd.toFixed(4)}`,
-              );
-              emit({
-                type: "cost",
-                usd,
-                estimateKey: svgEstimateKey(svgModel),
-              });
-            },
-          }),
-        )
-      : emit({
-          type: "svg",
-          key: "chatgpt",
-          result: { ok: false, error: "Turned off." },
-        }),
-  ]);
-
-  logger("Done")(`All SVGs finished in ${seconds(Date.now() - start)}`, "done");
+  emit({ type: "svg", key: "chatgpt", result });
 }

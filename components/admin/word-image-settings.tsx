@@ -95,7 +95,7 @@ export async function readStream(
 const MODELS_STORAGE_KEY = "word-image-models";
 const COSTS_STORAGE_KEY = "word-image-costs";
 
-export type ModelChoice = { imageModel: ImageModelId; quality: ImageQuality; svgModel: SvgModelId | "off" };
+export type ModelChoice = { imageModel: ImageModelId; quality: ImageQuality; svgModel: SvgModelId };
 
 function readStored(key: string): Record<string, unknown> {
   try {
@@ -132,12 +132,11 @@ export function useWordImageSettings() {
     writeStored(MODELS_STORAGE_KEY, next);
   };
 
-  // GPT Image 2 on low quality and Sol for the ChatGPT SVG — or no ChatGPT
-  // SVG at all, which is cheaper still.
+  // GPT Image 2 on low quality and Sol for the ChatGPT SVG.
   const usingRecommended =
     models.imageModel === DEFAULT_IMAGE_MODEL &&
     models.quality === DEFAULT_IMAGE_QUALITY &&
-    (models.svgModel === DEFAULT_SVG_MODEL || models.svgModel === "off");
+    models.svgModel === DEFAULT_SVG_MODEL;
   const useRecommended = () =>
     chooseModels({ imageModel: DEFAULT_IMAGE_MODEL, quality: DEFAULT_IMAGE_QUALITY, svgModel: DEFAULT_SVG_MODEL });
 
@@ -146,7 +145,7 @@ export function useWordImageSettings() {
     setModels({
       imageModel: parseImageModel(stored.imageModel).id,
       quality: parseImageQuality(stored.quality),
-      svgModel: parseSvgModel(stored.svgModel)?.id ?? "off",
+      svgModel: parseSvgModel(stored.svgModel).id,
     });
     const costs = readStored(COSTS_STORAGE_KEY);
     setLastCosts(
@@ -181,12 +180,8 @@ export function useWordImageSettings() {
     const last = lastCosts[imageEstimateKey(imageModel, models.quality, inputImages)];
     return { usd: last ?? estimateImageCost(imageModel, models.quality, inputImages), measured: last !== undefined };
   };
-  const svgCostEach = svgModel
-    ? (() => {
-        const last = lastCosts[svgEstimateKey(svgModel)];
-        return { usd: last ?? estimateSvgCost(svgModel), measured: last !== undefined };
-      })()
-    : { usd: 0, measured: true };
+  const lastSvgCost = lastCosts[svgEstimateKey(svgModel)];
+  const svgCostEach = { usd: lastSvgCost ?? estimateSvgCost(svgModel), measured: lastSvgCost !== undefined };
 
   return {
     models,
@@ -446,7 +441,7 @@ export function ImageModelPicker({
   );
 }
 
-// Which model writes the ChatGPT SVG, or none.
+// Which model writes the ChatGPT SVG.
 export function SvgModelPicker({ settings, disabled }: { settings: WordImageSettings; disabled: boolean }) {
   const t = useTranslations();
   return (
@@ -454,7 +449,7 @@ export function SvgModelPicker({ settings, disabled }: { settings: WordImageSett
       {t("admin_category_words.svg_model", "ChatGPT SVG")}
       <select
         value={settings.models.svgModel}
-        onChange={(event) => settings.chooseModels({ svgModel: event.target.value as SvgModelId | "off" })}
+        onChange={(event) => settings.chooseModels({ svgModel: event.target.value as SvgModelId })}
         disabled={disabled}
         className={SELECT_CLASS}
       >
@@ -465,15 +460,8 @@ export function SvgModelPicker({ settings, disabled }: { settings: WordImageSett
               : model.name}
           </option>
         ))}
-        <option value="off">{t("admin_category_words.svg_model_off", "Off — free tracers only")}</option>
       </select>
-      {settings.svgModel ? (
-        <CostEstimate settings={settings} cost={settings.svgCostEach} />
-      ) : (
-        <span className="font-normal text-sumi-soft">
-          {t("admin_category_words.svg_model_off_note", "The other SVGs are made here, at no cost.")}
-        </span>
-      )}
+      <CostEstimate settings={settings} cost={settings.svgCostEach} />
     </label>
   );
 }

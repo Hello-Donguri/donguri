@@ -58,8 +58,8 @@ type Picture = { dataUrl: string; bytes: number };
 type Choice = Parameters<typeof chooseGeneratedWordImage>[1];
 
 // One word in the batch, through both stages: its picture drawn (and
-// approved or rejected by the admin), then — approved ones only — its
-// SVGs made and one chosen, then saved.
+// approved or rejected by the admin), then — approved ones only — its SVG
+// made (and redone, or the word rejected after all), then saved.
 type Item = {
   id: string;
   term: string;
@@ -90,34 +90,17 @@ type WordFilter = "missing" | "not-svg" | "all";
 // is also the most a batch can cost.
 const BATCH_MAX = 50;
 const DRAW_AT_ONCE = 3;
-// Tracing is heavy work on this server (six tracers each), so fewer at once.
-const TRACE_AT_ONCE = 2;
+const TRACE_AT_ONCE = 3;
 
-// Which made SVG is chosen for a word to start with: the first in this
-// order under the warning size, or failing that the smallest under the
-// maximum. The admin can choose another before saving.
-const PREFERRED: SvgOptionKey[] = [
-  "potrace",
-  "chatgpt",
-  "vtracerClean",
-  "vtracer",
-  "imagetracer",
-  "inkscape",
-];
-
+// The SVG is chosen for a word to start with unless it's too big to use.
 function autoChoose(
   svgs: Partial<Record<SvgOptionKey, SvgResult>>,
 ): string | null {
-  const ready = PREFERRED.flatMap((key) => {
-    const result = svgs[key];
-    return result?.ok ? [{ key, bytes: result.bytes }] : [];
-  });
   return (
-    ready.find((option) => option.bytes <= GENERATED_IMAGE_WARN_BYTES)?.key ??
-    ready
-      .filter((option) => option.bytes <= GENERATED_IMAGE_MAX_BYTES)
-      .sort((a, b) => a.bytes - b.bytes)[0]?.key ??
-    null
+    SVG_OPTIONS.find(({ key }) => {
+      const result = svgs[key];
+      return result?.ok && result.bytes <= GENERATED_IMAGE_MAX_BYTES;
+    })?.key ?? null
   );
 }
 
@@ -151,19 +134,21 @@ async function inPool<T>(
 }
 
 // One word's card: its picture and where it's up to, approve or reject it
-// (or redraw it) once it's drawn, and once its SVGs are made, which one to
-// use.
+// (or redraw it) once it's drawn, and once its SVG is made, whether to use
+// it — or redo the SVG, redraw the picture, or reject the word after all.
 function BatchCard({
   item,
   busy,
   onApprove,
   onRedraw,
+  onRetrace,
   onChoose,
 }: {
   item: Item;
   busy: boolean;
   onApprove: (approved: boolean) => void;
   onRedraw: () => void;
+  onRetrace: () => void;
   onChoose: (key: string) => void;
 }) {
   const t = useTranslations();
@@ -311,7 +296,7 @@ function BatchCard({
         )}
       </div>
 
-      {item.status === "failed" && item.picture && (
+      {item.error && item.picture && !working && (
         <p className="px-1 text-[11px] text-shu-dark">{item.error}</p>
       )}
 
@@ -374,7 +359,49 @@ function BatchCard({
         </button>
       )}
 
-      {/* Stage 2: which made version to use. */}
+      {/* Stage 2: redo the SVG, redraw the picture, or reject the word
+          after all (it's then left out of the save). */}
+      {item.status === "traced" && (
+        <div className="flex gap-1">
+          <button
+            type="button"
+            onClick={onRetrace}
+            disabled={busy}
+            className="flex flex-1 items-center justify-center gap-1 rounded-full border border-sumi/15 px-2 py-1 text-[11px] font-semibold text-sumi transition hover:border-ai/50 disabled:opacity-60"
+          >
+            <Shapes aria-hidden className="h-3 w-3" />
+            {t("admin_batch_images.redo_svg", "Redo SVG")}
+          </button>
+          <button
+            type="button"
+            onClick={() => onApprove(item.approved === false)}
+            disabled={busy}
+            aria-pressed={item.approved === false}
+            aria-label={t("admin_batch_images.reject", "Reject")}
+            title={t("admin_batch_images.reject", "Reject")}
+            className={cn(
+              "flex items-center justify-center rounded-full border px-2 py-1 transition disabled:opacity-60",
+              item.approved === false
+                ? "border-shu/40 bg-shu/10 text-shu-dark"
+                : "border-sumi/15 text-sumi-soft hover:border-shu/40",
+            )}
+          >
+            <ThumbsDown aria-hidden className="h-3 w-3" />
+          </button>
+          <button
+            type="button"
+            onClick={onRedraw}
+            disabled={busy}
+            aria-label={t("admin_batch_images.redraw", "Redraw")}
+            title={t("admin_batch_images.redraw", "Redraw")}
+            className="flex items-center justify-center rounded-full border border-sumi/15 px-2 py-1 text-sumi-soft transition hover:border-ai/50 hover:text-sumi disabled:opacity-60"
+          >
+            <RefreshCw aria-hidden className="h-3 w-3" />
+          </button>
+        </div>
+      )}
+
+      {/* Which made version to use. */}
       {options.length > 0 && item.status !== "saved" && (
         <div className="grid grid-cols-4 gap-1">
           {options.map((option) => {
@@ -660,43 +687,56 @@ export function BatchWordImages({
 
   const redraw = (id: string) => void run("draw", (signal) => draw(id, signal));
 
-  // Stage 2: SVGs for the approved pictures, each given a first choice.
+  // Stage 2: an SVG for an approved picture, given as the first choice
+  // unless it's too big.
+  const trace = async (item: Item, signal: AbortSignal) => {
+    if (!item.picture) return;
+    update(item.id, {
+      status: "tracing",
+      approved: true,
+      svgs: {},
+      chosen: null,
+      error: null,
+      activity: null,
+      startedAt: stepStart(),
+    });
+    const failed = await streamFor(
+      item.id,
+      "/api/admin/word-images/trace",
+      {
+        wordId: item.id,
+        characterIds,
+        png: item.picture.dataUrl.split(",")[1],
+        svgModel: settings.models.svgModel,
+      },
+      signal,
+    );
+    update(item.id, (current) => ({
+      status: "traced",
+      chosen: autoChoose(current.svgs ?? {}),
+      error: failed,
+      activity: null,
+    }));
+  };
+
   const approved = items.filter(
     (item) => item.approved === true && item.picture && item.status === "drawn",
   );
   const traceApproved = () =>
     void run("trace", (signal) =>
-      inPool(approved, TRACE_AT_ONCE, signal, async (item) => {
-        update(item.id, {
-          status: "tracing",
-          svgs: {},
-          error: null,
-          activity: null,
-          startedAt: stepStart(),
-        });
-        const failed = await streamFor(
-          item.id,
-          "/api/admin/word-images/trace",
-          {
-            wordId: item.id,
-            characterIds,
-            png: item.picture!.dataUrl.split(",")[1],
-            svgModel: settings.models.svgModel,
-          },
-          signal,
-        );
-        update(item.id, (current) => ({
-          status: "traced",
-          chosen: autoChoose(current.svgs ?? {}),
-          error: failed,
-          activity: null,
-        }));
-      }),
+      inPool(approved, TRACE_AT_ONCE, signal, (item) => trace(item, signal)),
     );
 
-  // Stage 3: the chosen versions saved as the words' images.
+  const retrace = (item: Item) =>
+    void run("trace", (signal) => trace(item, signal));
+
+  // Stage 3: the chosen versions saved as the words' images — not ones
+  // rejected after their SVG was made.
   const toSave = items.filter(
-    (item) => item.status === "traced" && choiceFor(item, item.chosen),
+    (item) =>
+      item.status === "traced" &&
+      item.approved !== false &&
+      choiceFor(item, item.chosen),
   );
   const saveChosen = () =>
     void run("save", async (signal) => {
@@ -767,7 +807,7 @@ export function BatchWordImages({
   const close = () => {
     if (running) stop();
     setItems((current) =>
-      current.some((item) => item.approved === true || item.status === "traced")
+      current.some((item) => item.approved === true)
         ? current
         : [],
     );
@@ -975,7 +1015,7 @@ export function BatchWordImages({
               <p className="rounded-xl border border-kin/40 bg-kin/10 px-3 py-2 text-xs text-sumi">
                 {t(
                   "admin_batch_images.estimate",
-                  "Pictures for {{count}} words ≈ {{pictures}}. SVGs for every approved one add ≈ {{svg}} each.",
+                  "Pictures for {{count}} words ≈ {{pictures}}. The SVG for every approved one adds ≈ {{svg}} each.",
                   {
                     count: batchSize,
                     pictures: settings.format(drawCost.usd * batchSize),
@@ -1019,7 +1059,7 @@ export function BatchWordImages({
                   <Sparkles aria-hidden className="h-6 w-6" />
                   {t(
                     "admin_batch_images.empty",
-                    "Pick a deck and the settings, then draw. You'll approve each picture before any SVGs are made.",
+                    "Pick a deck and the settings, then draw. You'll approve each picture before its SVG is made.",
                   )}
                 </div>
               ) : (
@@ -1107,6 +1147,7 @@ export function BatchWordImages({
                           update(item.id, { approved: value })
                         }
                         onRedraw={() => redraw(item.id)}
+                        onRetrace={() => retrace(item)}
                         onChoose={(key) => update(item.id, { chosen: key })}
                       />
                     ))}

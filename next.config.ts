@@ -2,10 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
-  // vTracer's native binding (a .node file per platform) and Potrace, whose
-  // image loader (Jimp) requires its codecs dynamically — loaded with
-  // Node's own require rather than bundled. See lib/svg-trace.ts.
-  serverExternalPackages: ["@neplex/vectorizer", "potrace"],
+  // The SVG optimiser's native binding (a .node file per platform) —
+  // loaded with Node's own require rather than bundled. See
+  // lib/svg-trace.ts.
+  serverExternalPackages: ["@neplex/vectorizer"],
   partialPrefetching: true,
   experimental: {
     serverActions: {

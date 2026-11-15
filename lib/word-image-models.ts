@@ -17,7 +17,7 @@ export const IMAGE_QUALITIES = ["low", "medium", "high"] as const;
 export type ImageQuality = (typeof IMAGE_QUALITIES)[number];
 
 // `side` is the square the picture is drawn at: as small as the model
-// takes, since it's traced into an SVG anyway. GPT Image 2 and 2.5 take
+// takes, since it's redrawn as an SVG anyway. GPT Image 2 and 2.5 take
 // any square whose side is a multiple of 16 with at least 655,360 pixels
 // (816² is the smallest); GPT Image 1 Mini only takes fixed sizes.
 // `outputTokens` is roughly what a 1024×1024 picture comes back as at each
@@ -62,8 +62,7 @@ export const IMAGE_MODELS = [
 export type ImageModel = (typeof IMAGE_MODELS)[number];
 export type ImageModelId = ImageModel["id"];
 
-// ChatGPT turning the picture into an SVG (the ChatGPT option among the
-// SVGs). `null` skips it, leaving only the free tracers. The estimate is
+// ChatGPT turning the picture into an SVG. The estimate is
 // one picture and the instructions in (~1,700 tokens) and the SVG plus
 // its reasoning out (~5,000) — Astra at about 20p.
 export const SVG_MODELS = [
@@ -79,7 +78,7 @@ export type SvgModelId = SvgModel["id"];
 const SVG_ESTIMATE_TOKENS = { in: 1700, out: 5000 };
 
 // The recommended choices, and the defaults: GPT Image 2 on low quality is
-// plenty for a picture that's traced into an SVG anyway, and GPT-6.1 Sol
+// plenty for a picture that's redrawn as an SVG anyway, and GPT-6.1 Sol
 // writes a usable SVG at about a fifth of Astra's cost.
 export const DEFAULT_IMAGE_MODEL: ImageModelId = "gpt-image-2";
 export const DEFAULT_IMAGE_QUALITY: ImageQuality = "low";
@@ -95,9 +94,7 @@ export function parseImageQuality(value: unknown): ImageQuality {
   return IMAGE_QUALITIES.find((quality) => quality === value) ?? DEFAULT_IMAGE_QUALITY;
 }
 
-// `null` (or "off") is no ChatGPT SVG.
-export function parseSvgModel(value: unknown): SvgModel | null {
-  if (value === null || value === "off") return null;
+export function parseSvgModel(value: unknown): SvgModel {
   return (
     SVG_MODELS.find((model) => model.id === value) ??
     SVG_MODELS.find((model) => model.id === DEFAULT_SVG_MODEL) ??
