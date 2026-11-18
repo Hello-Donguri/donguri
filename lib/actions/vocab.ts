@@ -1004,8 +1004,20 @@ export async function skipWord(wordId: string): Promise<void> {
   // Same reasoning as `submitAnswer` above — no revalidatePath here.
 }
 
+// The starter deck only gives guests their first words (see
+// getStarterWordIds in lib/dal.ts) — it's never one a learner chooses,
+// skips or restarts, though the deck lists already leave it out.
+async function isStarterDeck(languageDeckId: string) {
+  const deck = await prisma.languageDeck.findUnique({
+    where: { id: languageDeckId },
+    select: { isStarter: true },
+  });
+  return deck?.isStarter ?? false;
+}
+
 export async function skipLanguageDeck(languageDeckId: string): Promise<void> {
   const user = await requireLearner();
+  if (await isStarterDeck(languageDeckId)) return;
 
   const words = await prisma.word.findMany({
     where: { languageDeckId },
@@ -1064,6 +1076,7 @@ export async function toggleDeckActivation(
   active: boolean,
 ): Promise<void> {
   const user = await requireLearner();
+  if (await isStarterDeck(deckId)) return;
 
   await ensureDeckActivations(courseSlug);
   await prisma.userDeckActivation.upsert({
@@ -1081,6 +1094,7 @@ export async function toggleDeckActivation(
 // still happened.
 export async function restartDeck(courseSlug: string, deckId: string): Promise<void> {
   const user = await requireLearner();
+  if (await isStarterDeck(deckId)) return;
 
   await ensureDeckActivations(courseSlug);
 

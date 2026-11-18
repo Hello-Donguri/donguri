@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useDismissableMenu } from "@/components/ui/use-dismissable-menu";
 import { AnimatePresence, motion } from "framer-motion";
 import { Award, BookOpen, Bug, ChevronDown, RotateCcw, CreditCard, Flame, GraduationCap, LogIn, LogOut, Mail, Menu, Settings, User, UserPlus, Users, X } from "lucide-react";
 import { DonguriAvatar } from "@/components/icons/DonguriAvatar";
@@ -139,34 +140,6 @@ function HeaderStats({
       </div>
     </div>
   );
-}
-
-// Closes a dropdown on an outside click or Escape — shared by the account
-// and admin menus so their open/close behavior can't drift apart.
-function useDismissableMenu(open: boolean, onClose: () => void) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!ref.current?.contains(event.target as Node)) {
-        onClose();
-      }
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open, onClose]);
-
-  return ref;
 }
 
 function AdminMenu({ role, className }: { role: UserRole; className?: string }) {

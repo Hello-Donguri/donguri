@@ -1094,7 +1094,9 @@ const getActiveDeckIds = cache(
   async (courseId: string, userId: string): Promise<string[]> => {
     const user = await requireLearner();
     const activations = await prisma.userDeckActivation.findMany({
-      where: { userId, languageDeck: { courseId, ...testDeckFilter(user) } },
+      // Not the starter deck, even if it was chosen before it became one —
+      // it's only for guests' first words (see getStarterWordIds).
+      where: { userId, languageDeck: { courseId, isStarter: false, ...testDeckFilter(user) } },
       select: { languageDeckId: true, active: true },
     });
 

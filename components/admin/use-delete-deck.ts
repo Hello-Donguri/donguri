@@ -2,20 +2,23 @@
 
 import { useTransition } from "react";
 import { deleteCategory } from "@/lib/actions/admin-content";
-import { Button } from "@/components/ui/button";
 import { useTranslations } from "@/components/i18n/locale-provider";
 
-type DeleteDeckButtonProps = {
+// Deleting a deck after a confirm — for the "Delete" item in an admin deck
+// card's menu (see DeckActionsMenu).
+export function useDeleteDeck({
+  languageDeckId,
+  label,
+  wordCount,
+}: {
   languageDeckId: string;
   label: string;
   wordCount: number;
-};
-
-export function DeleteDeckButton({ languageDeckId, label, wordCount }: DeleteDeckButtonProps) {
+}) {
   const t = useTranslations();
   const [deleting, startDeleteTransition] = useTransition();
 
-  const handleDelete = () => {
+  const deleteDeck = () => {
     if (
       !confirm(
         t(
@@ -29,9 +32,5 @@ export function DeleteDeckButton({ languageDeckId, label, wordCount }: DeleteDec
     startDeleteTransition(() => deleteCategory(languageDeckId));
   };
 
-  return (
-    <Button variant="outline" tone="danger" size="sm" onClick={handleDelete} disabled={deleting}>
-      {t("common.delete", "Delete")}
-    </Button>
-  );
+  return { deleting, deleteDeck };
 }
