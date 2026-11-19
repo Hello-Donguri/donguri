@@ -171,16 +171,16 @@ export const TestSession = ({
   };
 
   // Shared by the two typed questions: a near miss (`result.retry`) keeps
-  // the question open for a second go at half XP; anything else is the
-  // answer's result.
-  const applyTypedResult = (result: TypedResult) => {
+  // the question open for another go; anything else is the answer's result.
+  // `answer` is what was sent — empty for a skip.
+  const applyTypedResult = (result: TypedResult, answer: string) => {
     if (result.retry) {
-      setRetry({ answer: result.correctAnswer, reason: result.retry, typed: typedAnswer });
+      setRetry({ answer: result.correctAnswer, reason: result.retry, typed: answer });
       setTypedAnswer("");
       return;
     }
     setFeedback({
-      selected: typedAnswer,
+      selected: answer,
       correct: result.correct,
       correctAnswer: result.correctAnswer,
       alternatives: result.alternatives,
@@ -192,8 +192,10 @@ export const TestSession = ({
     setXp(result.xp);
   };
 
-  const handleTypeFormSubmit = async () => {
-    if (feedback || pending || question.kind !== "type-form" || !answerReady) return;
+  // `skip` is the retry note's Skip: sent as an empty answer, which is
+  // marked wrong with the answer shown (see RetryReason).
+  const handleTypeFormSubmit = async (skip = false) => {
+    if (feedback || pending || question.kind !== "type-form" || (!skip && !answerReady)) return;
 
     setPending(true);
 
@@ -220,15 +222,17 @@ export const TestSession = ({
       return;
     }
 
+    const answer = skip ? "" : typedAnswer;
     try {
       applyTypedResult(
         await submitFormAnswer(
           question.wordId,
           question.formId,
-          typedAnswer,
+          answer,
           false,
           isHalfXpRetry(retry),
         ),
+        answer,
       );
     } finally {
       setPending(false);
@@ -292,20 +296,22 @@ export const TestSession = ({
     }
   };
 
-  const handleTypeAnswerSubmit = async () => {
-    if (feedback || pending || question.kind !== "type-answer" || typedAnswer.trim() === "") return;
+  const handleTypeAnswerSubmit = async (skip = false) => {
+    if (feedback || pending || question.kind !== "type-answer" || (!skip && typedAnswer.trim() === "")) return;
 
     setPending(true);
 
+    const answer = skip ? "" : typedAnswer;
     try {
       applyTypedResult(
         await submitTypedAnswer(
           question.wordId,
           question.direction,
-          typedAnswer,
+          answer,
           false,
           isHalfXpRetry(retry),
         ),
+        answer,
       );
     } finally {
       setPending(false);
@@ -537,7 +543,7 @@ export const TestSession = ({
                         next[index] = value;
                         return next;
                       }),
-                    onSubmit: handleTypeFormSubmit,
+                    onSubmit: () => handleTypeFormSubmit(),
                     disabled: pending || Boolean(feedback),
                     inputRef: answerInputRef,
                   }
@@ -557,9 +563,11 @@ export const TestSession = ({
           />
         ) : question.kind === "type-form" ? (
           <>
-            {retry && !feedback && <RetryNote retry={retry} />}
+            {retry && !feedback && (
+              <RetryNote retry={retry} onSkip={() => handleTypeFormSubmit(true)} skipping={pending} />
+            )}
             {typedInput(
-              handleTypeFormSubmit,
+              () => handleTypeFormSubmit(),
               t("test_session.type_answer_placeholder", "Type your answer"),
             )}
           </>
@@ -642,9 +650,11 @@ export const TestSession = ({
         </div>
         {question.kind === "type-answer" ? (
           <>
-            {retry && !feedback && <RetryNote retry={retry} />}
+            {retry && !feedback && (
+              <RetryNote retry={retry} onSkip={() => handleTypeAnswerSubmit(true)} skipping={pending} />
+            )}
             {typedInput(
-              handleTypeAnswerSubmit,
+              () => handleTypeAnswerSubmit(),
               question.answerRomanized
                 ? t("test_session.type_romanized_placeholder", "Type the romanization")
                 : t("test_session.type_answer_placeholder", "Type your answer"),

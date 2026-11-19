@@ -193,8 +193,10 @@ const ReviewSessionQuestions = ({
     announceReviewQueueChanged(courseSlug);
   };
 
-  const handleSubmit = async () => {
-    if (feedback || pending || !answerReady) return;
+  // `skip` is the retry note's Skip: sent as an empty answer, which is
+  // marked wrong with the answer shown (see RetryReason).
+  const handleSubmit = async (skip = false) => {
+    if (feedback || pending || (!skip && !answerReady)) return;
 
     setPending(true);
 
@@ -221,13 +223,14 @@ const ReviewSessionQuestions = ({
       return;
     }
 
+    const answer = skip ? "" : typedAnswer;
     try {
       const result =
         question.kind === "type-form"
           ? await submitFormAnswer(
               question.wordId,
               question.formId,
-              typedAnswer,
+              answer,
               true,
               isHalfXpRetry(retry),
             )
@@ -235,22 +238,22 @@ const ReviewSessionQuestions = ({
             ? await submitTypedAnswer(
                 question.wordId,
                 question.direction,
-                typedAnswer,
+                answer,
                 true,
                 isHalfXpRetry(retry),
               )
             : null;
       if (!result) return;
 
-      // Nearly right: show the answer and let them type it again.
+      // Nearly right, or another word or form: let them type it again.
       if (result.retry) {
-        setRetry({ answer: result.correctAnswer, reason: result.retry, typed: typedAnswer });
+        setRetry({ answer: result.correctAnswer, reason: result.retry, typed: answer });
         setTypedAnswer("");
         return;
       }
 
       setFeedback({
-        selected: typedAnswer,
+        selected: answer,
         correct: result.correct,
         correctAnswer: result.correctAnswer,
         alternatives: result.alternatives,
@@ -487,7 +490,7 @@ const ReviewSessionQuestions = ({
                             next[index] = value;
                             return next;
                           }),
-                        onSubmit: handleSubmit,
+                        onSubmit: () => handleSubmit(),
                         disabled: pending || Boolean(feedback),
                         inputRef: answerInputRef,
                       }
@@ -556,7 +559,9 @@ const ReviewSessionQuestions = ({
             />
           ) : (
             <>
-              {retry && !feedback && <RetryNote retry={retry} />}
+              {retry && !feedback && (
+                <RetryNote retry={retry} onSkip={() => handleSubmit(true)} skipping={pending} />
+              )}
               <form
                 className="mt-5 flex w-full flex-col gap-3"
                 onSubmit={(event) => {

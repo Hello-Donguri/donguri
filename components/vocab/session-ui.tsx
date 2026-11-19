@@ -250,9 +250,16 @@ export type ChoiceFeedback = {
 export type PendingRetry = { answer: string; reason: RetryReason; typed: string };
 
 // Whether the next answer is a second go after a near miss, recorded for
-// half XP. A "synonym" retry isn't: the learner just tries another word.
+// half XP. A "synonym" or "form" retry isn't: the learner just tries
+// another word or form, as many times as they need, for the full XP.
 export function isHalfXpRetry(retry: PendingRetry | null): retry is PendingRetry {
-  return retry !== null && retry.reason !== "synonym";
+  return retry !== null && !isOpenRetry(retry);
+}
+
+// A retry that doesn't give the answer away — another word or another
+// form is wanted — so it can be tried again and again, or skipped.
+function isOpenRetry(retry: PendingRetry) {
+  return retry.reason === "synonym" || retry.reason === "form";
 }
 
 // What the learner typed, word by word (Jyutping syllable by syllable),
@@ -285,9 +292,18 @@ function TypedComparison({ typed, answer }: { typed: string; answer: string }) {
 // Pops in when a typed answer was nearly right — a Jyutping answer with a
 // tone wrong, or an English answer with a small spelling slip: the correct
 // answer, and a prompt to type it in for half XP. For a synonym (one of
-// the word's alternate answers) the answer stays hidden — they're asked
-// for another word instead.
-export const RetryNote = ({ retry }: { retry: PendingRetry }) => {
+// the word's alternate answers) or another form of the word the answer
+// stays hidden — they're asked for another word or form instead, with
+// `onSkip` (marked wrong, answer shown) for when they really don't know.
+export const RetryNote = ({
+  retry,
+  onSkip,
+  skipping = false,
+}: {
+  retry: PendingRetry;
+  onSkip?: () => void;
+  skipping?: boolean;
+}) => {
   const t = useTranslations();
   const reduceMotion = useReducedMotion();
 
@@ -303,7 +319,7 @@ export const RetryNote = ({ retry }: { retry: PendingRetry }) => {
       className="mt-5 w-full rounded-3xl border border-card-border bg-washi-soft px-5 py-5 text-center text-sumi shadow-sm"
     >
       <p className="font-nunito text-xl font-extrabold">
-        {retry.reason === "synonym"
+        {isOpenRetry(retry)
           ? t("test_session.nearly_there", "You're nearly there!")
           : t("test_session.nearly", "Nearly!")}
       </p>
@@ -311,6 +327,11 @@ export const RetryNote = ({ retry }: { retry: PendingRetry }) => {
         <p className="mt-1 font-semibold">
           <strong className="text-lg">{retry.answer}</strong>{" "}
           {t("test_session.synonym_miss", "is close, but we're looking for another word.")}
+        </p>
+      ) : retry.reason === "form" ? (
+        <p className="mt-1 font-semibold">
+          <strong className="text-lg">{retry.answer}</strong>{" "}
+          {t("test_session.form_miss", "is close, but we're looking for another form.")}
         </p>
       ) : retry.reason === "tone" ? (
         <p className="mt-1 font-semibold">
@@ -328,7 +349,7 @@ export const RetryNote = ({ retry }: { retry: PendingRetry }) => {
           </strong>
         </p>
       )}
-      {retry.reason !== "synonym" && retry.typed.trim() && (
+      {!isOpenRetry(retry) && retry.typed.trim() && (
         <p className="mt-1 text-sm text-sumi-soft">
           {t("test_session.you_typed", "You typed")}{" "}
           <span className="font-semibold">
@@ -337,12 +358,22 @@ export const RetryNote = ({ retry }: { retry: PendingRetry }) => {
         </p>
       )}
       <p className="mt-2 text-sm text-sumi-soft">
-        {retry.reason === "synonym"
+        {isOpenRetry(retry)
           ? t("test_session.synonym_retry", "Have another go — no XP lost.")
           : retry.reason === "tone"
             ? t("test_session.tone_retry", "Type it again with the right tones for half XP.")
             : t("test_session.spelling_retry", "Type it in correctly for half XP.")}
       </p>
+      {isOpenRetry(retry) && onSkip && (
+        <button
+          type="button"
+          onClick={onSkip}
+          disabled={skipping}
+          className="mt-3 rounded-full px-4 py-1.5 text-sm font-semibold text-sumi-soft underline-offset-2 transition hover:bg-sumi/5 hover:text-sumi hover:underline disabled:opacity-60"
+        >
+          {t("test_session.skip_question", "Skip — I don't know")}
+        </button>
+      )}
     </motion.div>
   );
 };

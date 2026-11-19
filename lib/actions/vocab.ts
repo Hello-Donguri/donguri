@@ -259,8 +259,13 @@ function jyutpingSpellingMiss(typed: string, stored: string, leniency: AnswerLen
 // that second go counts as correct, for half the usual XP. "synonym" is
 // one of the word's alternate answers (see synonymFor) — close, but not
 // the word we're after — so the learner is asked for another word, with
-// nothing recorded and no XP lost.
-export type RetryReason = "tone" | "spelling" | "synonym";
+// nothing recorded and no XP lost. "form" is the same for another form of
+// the word ("going" when it's "went" — see otherFormFor). Those two can be
+// tried as often as needed, and the full XP is earned on getting it.
+//
+// An empty answer is the learner pressing Skip (Check needs something
+// typed): it's simply marked wrong, with no retry of any kind.
+export type RetryReason = "tone" | "spelling" | "synonym" | "form";
 const RETRY_XP = 0.5;
 
 // Whether a wrong typed answer gets a second go, and why. Latin-script
@@ -301,6 +306,21 @@ function synonymFor(
   const stored = alternates.map((alt) => alt.value).join(",");
   return matchTypedAnswer(typed, stored, leniency).correct
     ? { reason: "synonym", answer: typed.trim() }
+    : null;
+}
+
+// A wrong typed answer that's another form of the same word — "going" or
+// "goes" when the blank wants "went", or the term itself — comes back as a
+// "form" retry with what they typed, like a synonym. `others` are the
+// word's forms (and term) other than the one being asked for.
+function otherFormFor(
+  typed: string,
+  others: string[],
+): { reason: RetryReason; answer: string } | null {
+  const guess = normaliseAnswer(typed);
+  if (!guess) return null;
+  return others.some((value) => normaliseAnswer(value) === guess)
+    ? { reason: "form", answer: typed.trim() }
     : null;
 }
 
@@ -552,9 +572,11 @@ export async function submitTypedAnswer(
       romanization: true,
       path: true,
       alternateAnswers: { select: { value: true } },
+      forms: { select: { value: true } },
       languageDeck: { select: { course: { select: { targetLanguage: true } } } },
     },
   });
+  const skipped = typedAnswer.trim() === "";
 
   // Mirrors the direction/answer logic in buildTypedQuestion (lib/dal.ts):
   // a non-Latin-typeable vocab term is checked against its romanization
@@ -588,14 +610,21 @@ export async function submitTypedAnswer(
   // numbers already mark where each one ends.
   const answer = useRomanizedAnswer ? spaceJyutpingSyllables(typedAnswer) : typedAnswer;
   const { correct, fullAnswer } = matchTypedAnswer(answer, acceptedAnswers, leniency);
-  const synonym = correct ? null : synonymFor(answer, word.alternateAnswers, leniency);
+  const synonym = correct || skipped ? null : synonymFor(answer, word.alternateAnswers, leniency);
   if (synonym) return retryResponse(user.id, synonym);
+  // Another form of the term ("went" for "go") — only when the term itself
+  // is what's being typed.
+  const otherForm =
+    correct || skipped || direction !== "translation-to-term" || useRomanizedAnswer
+      ? null
+      : otherFormFor(answer, word.forms.map((form) => form.value));
+  if (otherForm) return retryResponse(user.id, otherForm);
   // A comma list shows just its first reading; slash alternatives
   // ("they / them") are shown whole, since they're one answer.
   const correctAnswer = storedAnswer.split(",")[0].trim();
 
   const retry =
-    correct || isRetry
+    correct || isRetry || skipped
       ? null
       : retryFor(
           answer,
@@ -645,6 +674,7 @@ export async function submitFormAnswer(
   meanings?: Record<string, OptionMeaning>;
 }> {
   const user = await requireLearner();
+  const skipped = typedAnswer.trim() === "";
   const courseSelect = {
     languageDeck: { select: { course: { select: { id: true, targetLanguage: true } } } },
   };
@@ -657,6 +687,7 @@ export async function submitFormAnswer(
         usSpelling: true,
         path: true,
         alternateAnswers: { select: { value: true } },
+        forms: { select: { value: true } },
         ...courseSelect,
       },
     });
@@ -673,10 +704,13 @@ export async function submitFormAnswer(
       [shownTerm, ...otherSpellings].join(","),
       leniency,
     );
-    const synonym = correct ? null : synonymFor(typedAnswer, word.alternateAnswers, leniency);
+    const synonym = correct || skipped ? null : synonymFor(typedAnswer, word.alternateAnswers, leniency);
     if (synonym) return retryResponse(user.id, synonym);
+    const otherForm =
+      correct || skipped ? null : otherFormFor(typedAnswer, word.forms.map((form) => form.value));
+    if (otherForm) return retryResponse(user.id, otherForm);
     const retry =
-      correct || isRetry
+      correct || isRetry || skipped
         ? null
         : retryFor(typedAnswer, shownTerm, leniency, targetLanguage, false);
     if (retry) return retryResponse(user.id, retry);
@@ -704,6 +738,7 @@ export async function submitFormAnswer(
           usSpelling: true,
           path: true,
           alternateAnswers: { select: { value: true } },
+          forms: { select: { id: true, value: true } },
           ...courseSelect,
         },
       },
@@ -729,13 +764,22 @@ export async function submitFormAnswer(
   );
   // The word's alternate answers are a "synonym" retry here too — the
   // blank may be a form ("chairs") rather than the term itself.
-  const synonym = correct
+  const synonym = correct || skipped
     ? null
     : synonymFor(typedAnswer, form.word.alternateAnswers, { vocab: form.word.path === "vocab" });
   if (synonym) return retryResponse(user.id, synonym);
+  // The word's other forms, or its term ("go" for "went").
+  const otherForm =
+    correct || skipped
+      ? null
+      : otherFormFor(typedAnswer, [
+          form.word.term,
+          ...form.word.forms.filter((other) => other.id !== formId).map((other) => other.value),
+        ]);
+  if (otherForm) return retryResponse(user.id, otherForm);
   // A form is one exact value, so it's checked as a single reading.
   const retry =
-    correct || isRetry
+    correct || isRetry || skipped
       ? null
       : retryFor(typedAnswer, shownForm, { vocab: false }, targetLanguage, false);
   if (retry) return retryResponse(user.id, retry);
