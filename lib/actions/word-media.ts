@@ -7,6 +7,7 @@ import { buildWordAudioKey, buildWordImageKey, uploadImage } from "@/lib/bunny";
 import { isSafeSvg, UNSAFE_SVG_MESSAGE } from "@/lib/svg";
 import { deleteUnusedAudio } from "@/lib/audio-cleanup";
 import { GENERATED_IMAGE_MAX_BYTES } from "@/lib/generated-word-image";
+import { suggestWordImageIdeas, type WordImageIdea } from "@/lib/word-image-ideas";
 import {
   AUDIO_MAX_BYTES,
   AUDIO_SIZE_ERROR,
@@ -181,4 +182,19 @@ export async function listWordsForBatchImages(
       hasSvg: Boolean(word.imageKey?.toLowerCase().endsWith(".svg")),
     })),
   };
+}
+
+// The image window's "Prompt ideas" (see suggestWordImageIdeas): ten
+// scenes for the word, each with the characters it stars.
+export async function suggestWordImagePrompts(
+  wordId: string,
+  noCharacters: boolean,
+): Promise<{ ideas: WordImageIdea[]; usd: number } | { error: string }> {
+  if (!(await isAdmin())) return { error: "Admins only." };
+  try {
+    return await suggestWordImageIdeas(wordId, { noCharacters: noCharacters === true });
+  } catch (error) {
+    console.error("Word image ideas failed:", error);
+    return { error: error instanceof Error ? error.message : "Couldn't come up with ideas." };
+  }
 }

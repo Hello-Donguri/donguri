@@ -93,7 +93,7 @@ function streamLogger(emit: Emit, start: number) {
 // term in a course teaching English (en-for-ja), and the translation in one
 // for English speakers (yue-for-en, fr-for-en); a course with neither side
 // in English falls back to the translation.
-async function wordAndCharacters(
+export async function wordAndCharacters(
   wordId: string,
   characterIds: WordImageCharacterId[],
 ) {

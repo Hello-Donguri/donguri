@@ -7,6 +7,7 @@ import {
   Check,
   ChevronDown,
   Download,
+  Lightbulb,
   Undo2,
   Loader2,
   Pencil,
@@ -16,8 +17,13 @@ import {
   Square,
   X,
 } from "lucide-react";
-import { chooseGeneratedWordImage } from "@/lib/actions/word-media";
-import { referenceImageCount, type WordImageCharacterId } from "@/lib/word-image-characters";
+import { chooseGeneratedWordImage, suggestWordImagePrompts } from "@/lib/actions/word-media";
+import {
+  WORD_IMAGE_CHARACTERS,
+  referenceImageCount,
+  type WordImageCharacterId,
+} from "@/lib/word-image-characters";
+import type { WordImageIdea } from "@/lib/word-image-ideas";
 import { CUSTOM_SCENE_ID, cleanCustomScene } from "@/lib/word-image-scenes";
 import {
   EDIT_INSTRUCTION_MAX_CHARS,
@@ -277,6 +283,114 @@ function RunLog({
             </li>
           ))}
         </ol>
+      )}
+    </div>
+  );
+}
+
+// "Prompt ideas": asks for ten ways to picture the word, each with the
+// characters it stars (or none), and on a click puts one in as the custom
+// scene with its characters ticked in place of the current ones. "No
+// characters" asks for ideas without anyone in them.
+function PromptIdeas({
+  wordId,
+  disabled,
+  activeScene,
+  onPick,
+  onCost,
+}: {
+  wordId: string;
+  disabled: boolean;
+  activeScene: string | null;
+  onPick: (idea: WordImageIdea) => void;
+  onCost: (usd: number) => void;
+}) {
+  const t = useTranslations();
+  const [noCharacters, setNoCharacters] = useState(false);
+  const [ideas, setIdeas] = useState<WordImageIdea[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, startLoading] = useTransition();
+
+  const suggest = () =>
+    startLoading(async () => {
+      setError(null);
+      const result = await suggestWordImagePrompts(wordId, noCharacters);
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
+      onCost(result.usd);
+      setIdeas(result.ideas);
+    });
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <Button type="button" variant="outline" size="sm" onClick={suggest} disabled={disabled || loading}>
+          {loading ? (
+            <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Lightbulb aria-hidden className="h-3.5 w-3.5" />
+          )}
+          {ideas
+            ? t("admin_category_words.prompt_ideas_again", "New ideas")
+            : t("admin_category_words.prompt_ideas", "Prompt ideas")}
+        </Button>
+        <label className="flex w-fit cursor-pointer items-center gap-2 text-xs font-semibold text-sumi has-disabled:cursor-not-allowed has-disabled:opacity-60">
+          <input
+            type="checkbox"
+            role="switch"
+            checked={noCharacters}
+            onChange={(event) => setNoCharacters(event.target.checked)}
+            disabled={disabled || loading}
+            className="peer sr-only"
+          />
+          <span
+            aria-hidden
+            className="relative h-5 w-9 shrink-0 rounded-full bg-sumi/20 transition peer-checked:bg-ai peer-focus-visible:ring-2 peer-focus-visible:ring-ai-soft after:absolute after:top-0.5 after:left-0.5 after:h-4 after:w-4 after:rounded-full after:bg-washi after:shadow-sm after:transition peer-checked:after:translate-x-4"
+          />
+          {t("admin_category_words.prompt_ideas_no_characters", "No characters")}
+        </label>
+      </div>
+
+      {error && <p className="text-xs font-semibold text-shu-dark">{error}</p>}
+
+      {ideas && (
+        <ul className="flex max-h-72 flex-col gap-1.5 overflow-y-auto pr-1">
+          {ideas.map((idea) => {
+            const characters = WORD_IMAGE_CHARACTERS.filter((character) => idea.characterIds.includes(character.id));
+            const active = activeScene === idea.scene;
+            return (
+              <li key={idea.scene}>
+                <button
+                  type="button"
+                  onClick={() => onPick(idea)}
+                  disabled={disabled}
+                  aria-pressed={active}
+                  className={cn(
+                    "flex w-full flex-col gap-1.5 rounded-xl border px-3 py-2 text-left text-xs transition disabled:cursor-not-allowed disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-ai-soft focus-visible:outline-none",
+                    active ? "border-ai bg-ai-soft text-ai-dark" : "border-sumi/15 bg-washi text-sumi hover:border-ai/40",
+                  )}
+                >
+                  <span className="leading-snug">{idea.scene}</span>
+                  <span className="flex flex-wrap items-center gap-1.5 font-semibold text-sumi-soft">
+                    {characters.length ? (
+                      characters.map((character) => (
+                        <span key={character.id} className="flex items-center gap-1">
+                          {/* eslint-disable-next-line @next/next/no-img-element -- a small local thumbnail. */}
+                          <img src={character.src} alt="" loading="lazy" className="h-4 w-4 rounded-full bg-white object-contain" />
+                          {character.name}
+                        </span>
+                      ))
+                    ) : (
+                      <span>{t("admin_category_words.prompt_ideas_none", "No characters")}</span>
+                    )}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </div>
   );
@@ -563,6 +677,17 @@ export function GenerateWordImage({ wordId, term }: { wordId: string; term: stri
                   customScene={customScene}
                   onCustomSceneChange={setCustomScene}
                   disabled={running !== null}
+                />
+                <PromptIdeas
+                  wordId={wordId}
+                  disabled={running !== null}
+                  activeScene={sceneId === CUSTOM_SCENE_ID ? cleanCustomScene(customScene) : null}
+                  onPick={(idea) => {
+                    setSceneId(CUSTOM_SCENE_ID);
+                    setCustomScene(idea.scene);
+                    setCharacterIds(idea.characterIds);
+                  }}
+                  onCost={(usd) => settings.recordCost({ type: "cost", usd, estimateKey: "ideas" })}
                 />
                 <RecommendedModelsNote settings={settings} disabled={running !== null} />
                 <ImageModelPicker settings={settings} disabled={running !== null} inputImages={referenceImageCount(characterIds)} />

@@ -1756,5 +1756,9 @@
   "admin_users.search_placeholder": "",
   "admin_users.subtitle": "",
   "admin_users.title": "",
-  "billing.tester_access": "テスターとしてすべての機能を利用できます。メンバーシップは不要です。"
+  "billing.tester_access": "テスターとしてすべての機能を利用できます。メンバーシップは不要です。",
+  "admin_category_words.prompt_ideas": "",
+  "admin_category_words.prompt_ideas_again": "",
+  "admin_category_words.prompt_ideas_no_characters": "",
+  "admin_category_words.prompt_ideas_none": ""
 }
