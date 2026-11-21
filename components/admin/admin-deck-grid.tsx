@@ -90,7 +90,9 @@ function MediaOverview({ media }: { media: Media }) {
           <Pill complete={imagesComplete}>
             {imagesComplete
               ? t("admin_course_decks.complete", "Complete")
-              : t("admin_course_decks.in_progress", "In progress")}
+              : media.svgImages === 0
+                ? t("admin_course_decks.empty", "Empty")
+                : t("admin_course_decks.in_progress", "In progress")}
           </Pill>
         </div>
       </div>
@@ -168,16 +170,16 @@ function AudioGroup({
 }
 
 // One deck's media, a row each: images, then word and sentence recordings
-// with both voices together — "Pending" until there are any.
+// with both voices together — "Empty" until any are uploaded.
 function DeckMediaRows({ media }: { media: Media }) {
   const t = useTranslations();
-  const pending = t("admin_course_decks.pending", "Pending");
+  const empty = t("admin_course_decks.empty", "Empty");
 
   const audio = (female: number, male: number, total: number, unit: string) => ({
     complete: total > 0 && female === total && male === total,
     value:
       female === 0 && male === 0
-        ? pending
+        ? empty
         : female === total && male === total
           ? `${total} / ${total} ${unit}`
           : `♀ ${female} · ♂ ${male} / ${total} ${unit}`,
@@ -189,7 +191,7 @@ function DeckMediaRows({ media }: { media: Media }) {
       label: t("admin_course_decks.media_images", "Images"),
       Icon: ImageIcon,
       complete: media.total > 0 && media.svgImages === media.total,
-      value: media.svgImages === 0 ? pending : `${media.svgImages} / ${media.total}`,
+      value: media.svgImages === 0 ? empty : `${media.svgImages} / ${media.total}`,
     },
     {
       key: "word-audio",

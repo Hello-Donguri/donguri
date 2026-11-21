@@ -239,7 +239,7 @@
   "admin_course_decks.media_word_audio": "",
   "admin_course_decks.more_actions": "",
   "admin_course_decks.no_sentences": "",
-  "admin_course_decks.pending": "",
+  "admin_course_decks.empty": "",
   "admin_course_decks.readiness_title": "",
   "admin_course_decks.starter_summary": "",
   "admin_course_decks.unit_sentences": "",
@@ -1791,5 +1791,7 @@
   "admin_auto_images.done": "",
   "admin_auto_images.step_prompt": "",
   "admin_auto_images.step_picture": "",
-  "admin_auto_images.step_svg": ""
+  "admin_auto_images.step_svg": "",
+  "admin_auto_images.group_size": "",
+  "admin_auto_images.group_size_next": ""
 }

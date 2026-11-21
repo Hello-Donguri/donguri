@@ -55,8 +55,22 @@ import { toast } from "@/components/ui/toast";
 import { useTranslations } from "@/components/i18n/locale-provider";
 import { cn } from "@/lib/utils";
 
-// How many words are worked on together.
-const GROUP_SIZE = 3;
+// How many words are worked on together — a choice in the window — and how
+// many pictures or SVGs are made at once within a group.
+const GROUP_SIZES = [3, 6, 9] as const;
+type GroupSize = (typeof GROUP_SIZES)[number];
+const AT_ONCE = 3;
+
+// Runs `work` over `items`, `limit` at a time, until they're done or
+// `signal` is aborted.
+async function inPool<T>(items: T[], limit: number, signal: AbortSignal, work: (item: T) => Promise<void>) {
+  const queue = [...items];
+  await Promise.all(
+    Array.from({ length: Math.min(limit, queue.length) }, async () => {
+      while (queue.length && !signal.aborted) await work(queue.shift()!);
+    }),
+  );
+}
 
 type AutoWord = { id: string; term: string };
 type Picture = { dataUrl: string; bytes: number };
@@ -386,10 +400,10 @@ function AutoCard({
 }
 
 // On the admin deck page: works through the words the list is showing,
-// top to bottom, three at a time. For each three: a prompt for each (the
+// top to bottom, 3, 6 or 9 at a time. For each group: a prompt for each (the
 // first of ten ideas, any of the others a click away, or the admin's own),
 // then — once they're happy — the pictures, then the SVGs, then the save,
-// which moves on to the next three. Any word can be skipped, and any
+// which moves on to the next group. Any word can be skipped, and any
 // picture or SVG redone, before moving on. Closing keeps the place.
 export function AutoWordImages({ words }: { words: AutoWord[] }) {
   const t = useTranslations();
@@ -406,6 +420,7 @@ export function AutoWordImages({ words }: { words: AutoWord[] }) {
   const [running, setRunning] = useState<"draw" | "trace" | "save" | null>(null);
   const [face, setFace] = useState(true);
   const [noCharacters, setNoCharacters] = useState(false);
+  const [groupSize, setGroupSize] = useState<GroupSize>(3);
 
   // Stop the server's work when the page goes.
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -437,11 +452,21 @@ export function AutoWordImages({ words }: { words: AutoWord[] }) {
     }));
   };
 
-  const startGroup = (list: AutoWord[], start: number) => {
-    const group = list.slice(start, start + GROUP_SIZE);
+  // The next `size` words, keeping the cards (and prompts) of any that are
+  // already on screen.
+  const startGroup = (list: AutoWord[], start: number, size: number = groupSize, keep: Card[] = []) => {
+    const group = list.slice(start, start + size);
     setGroupStart(start);
-    setCards(group.map(newCard));
-    for (const word of group) void fetchIdeas(word.id, true);
+    setCards(group.map((word) => keep.find((card) => card.id === word.id) ?? newCard(word)));
+    for (const word of group) if (!keep.some((card) => card.id === word.id)) void fetchIdeas(word.id, true);
+  };
+
+  // A new size takes effect straight away while the group is still on its
+  // prompts, and from the next group once pictures are being made.
+  const groupStillPrompting = cards.every((card) => card.status === "prompt");
+  const chooseGroupSize = (size: GroupSize) => {
+    setGroupSize(size);
+    if (queue && groupStillPrompting && running === null) startGroup(queue, groupStart, size, cards);
   };
 
   const begin = () => {
@@ -562,16 +587,16 @@ export function AutoWordImages({ words }: { words: AutoWord[] }) {
   );
   const ideasLoading = toDraw.some((card) => card.ideasLoading);
 
-  const drawAll = () => void run("draw", (signal) => Promise.all(toDraw.map((card) => draw(card, signal))).then(() => {}));
+  const drawAll = () => void run("draw", (signal) => inPool(toDraw, AT_ONCE, signal, (card) => draw(card, signal)));
   const traceAll = () =>
-    void run("trace", (signal) => Promise.all(toTrace.map((card) => trace(card, signal))).then(() => {}));
+    void run("trace", (signal) => inPool(toTrace, AT_ONCE, signal, (card) => trace(card, signal)));
   const redraw = (card: Card) => void run("draw", (signal) => draw(card, signal));
   const retrace = (card: Card) => void run("trace", (signal) => trace(card, signal));
 
-  const nextStart = groupStart + GROUP_SIZE;
+  const nextStart = groupStart + cards.length;
   const hasNext = queue !== null && nextStart < queue.length;
 
-  // Saves this group's SVGs, then moves on to the next three — unless a
+  // Saves this group's SVGs, then moves on to the next group — unless a
   // save failed, which stays on its card to try again.
   const saveAndNext = () =>
     void run("save", async (signal) => {
@@ -621,7 +646,7 @@ export function AutoWordImages({ words }: { words: AutoWord[] }) {
 
   const finished = queue !== null && groupStart >= queue.length;
   const total = queue?.length ?? 0;
-  const groupEnd = Math.min(groupStart + GROUP_SIZE, total);
+  const groupEnd = Math.min(groupStart + cards.length, total);
   const drawCost = toDraw.reduce(
     (sum, card) => sum + settings.imageCostFor(referenceImageCount(card.characterIds)).usd,
     0,
@@ -651,7 +676,7 @@ export function AutoWordImages({ words }: { words: AutoWord[] }) {
           label: hasNext
             ? toSave.length
               ? t("admin_auto_images.save_next", "Save {{count}} & next", { count: toSave.length })
-              : t("admin_auto_images.next", "Next {{count}} words", { count: Math.min(GROUP_SIZE, total - nextStart) })
+              : t("admin_auto_images.next", "Next {{count}} words", { count: Math.min(groupSize, total - nextStart) })
             : toSave.length
               ? t("admin_auto_images.save_finish", "Save {{count}} & finish", { count: toSave.length })
               : t("admin_auto_images.finish", "Finish"),
@@ -709,6 +734,34 @@ export function AutoWordImages({ words }: { words: AutoWord[] }) {
           <div className="grid gap-5 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
             {/* The settings, for every group. */}
             <div className="flex flex-col gap-3">
+              <fieldset disabled={running !== null} className="flex flex-col gap-1.5">
+                <legend className="mb-1.5 text-xs font-semibold text-sumi-soft">
+                  {t("admin_auto_images.group_size", "Words at a time")}
+                </legend>
+                <div className="flex gap-1.5">
+                  {GROUP_SIZES.map((size) => (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => chooseGroupSize(size)}
+                      aria-pressed={groupSize === size}
+                      className={cn(
+                        "min-w-11 rounded-full border px-3 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
+                        groupSize === size
+                          ? "border-ai bg-ai-soft text-ai-dark"
+                          : "border-sumi/15 bg-washi text-sumi hover:border-ai/40",
+                      )}
+                    >
+                      {size}
+                    </button>
+                  ))}
+                </div>
+                {!groupStillPrompting && groupSize !== cards.length && hasNext && (
+                  <p className="text-[11px] text-sumi-soft">
+                    {t("admin_auto_images.group_size_next", "From the next group.")}
+                  </p>
+                )}
+              </fieldset>
               <label className="flex w-fit cursor-pointer items-center gap-2 text-xs font-semibold text-sumi has-disabled:cursor-not-allowed has-disabled:opacity-60">
                 <input
                   type="checkbox"
@@ -742,7 +795,7 @@ export function AutoWordImages({ words }: { words: AutoWord[] }) {
               </button>
             </div>
 
-            {/* The current three. */}
+            {/* The current group. */}
             <div className="flex min-w-0 flex-col gap-3">
               {finished ? (
                 <div className="flex min-h-48 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-card-border p-6 text-center text-sm text-sumi-soft">

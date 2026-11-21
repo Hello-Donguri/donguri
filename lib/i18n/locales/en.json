@@ -252,7 +252,7 @@
   "admin_course_decks.media_word_audio": "Word audio",
   "admin_course_decks.more_actions": "More actions for {{label}}",
   "admin_course_decks.no_sentences": "No example sentences yet.",
-  "admin_course_decks.pending": "Pending",
+  "admin_course_decks.empty": "Empty",
   "admin_course_decks.readiness_title": "{{percent}}% of media ready — an image and both voices for every word, and both voices for every example sentence",
   "admin_course_decks.starter_summary": "{{count}} words · Guest preview",
   "admin_course_decks.unit_sentences": "sentences",
@@ -1557,5 +1557,7 @@
   "admin_auto_images.step_svg": "SVGs & save",
   "admin_category_words.prompt_ideas_again": "New ideas",
   "admin_category_words.prompt_ideas": "Prompt ideas",
-  "admin_category_words.prompt_ideas_no_characters": "No characters"
+  "admin_category_words.prompt_ideas_no_characters": "No characters",
+  "admin_auto_images.group_size": "Words at a time",
+  "admin_auto_images.group_size_next": "From the next group."
 }
