@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState } from "react";
 import { CheckSquare, XSquare } from "lucide-react";
+import { AutoWordImages } from "@/components/admin/auto-word-images";
 import { BatchWordImages } from "@/components/admin/batch-word-images";
 import { useTranslations } from "@/components/i18n/locale-provider";
 
@@ -45,6 +46,13 @@ export function WordBatchSelection({
   const chosen = words
     .filter((word) => selected.has(word.id))
     .map((word) => ({ ...word, deckTitle }));
+  // The words the list is showing, in its order, for auto mode to work
+  // through top to bottom (see AutoWordImages).
+  const byId = new Map(words.map((word) => [word.id, word]));
+  const shownWords = shownIds.flatMap((id) => {
+    const word = byId.get(id);
+    return word ? [word] : [];
+  });
   const allShownSelected =
     shownIds.length > 0 && shownIds.every((id) => selected.has(id));
 
@@ -95,6 +103,7 @@ export function WordBatchSelection({
             {t("admin_category_words.clear_selection", "Clear")}
           </button>
         )}
+        <AutoWordImages words={shownWords} />
         <BatchWordImages
           courseSlug={courseSlug}
           presetWords={chosen}
