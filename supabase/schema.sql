@@ -2241,3 +2241,21 @@ $$;
 alter table public.language_decks add column if not exists is_starter boolean not null default false;
 create unique index if not exists language_decks_one_starter_per_course
   on public.language_decks (course_id) where is_starter;
+
+-- 67. Determiner word type ----------------------------------------------------------------
+-- 'determiner' (this, every, some, a…) joins the word types, for both the
+-- first and secondary type. Kept in step with WORD_TYPES in lib/options.ts.
+
+alter table public.words drop constraint if exists words_word_type_check;
+alter table public.words add constraint words_word_type_check
+  check (word_type is null or word_type in (
+        'noun', 'verb', 'irregular_verb', 'adjective', 'adverb', 'pronoun', 'determiner', 'preposition',
+        'conjunction', 'interjection', 'phrase', 'numeral', 'particle'
+      ));
+
+alter table public.words drop constraint if exists words_secondary_word_type_check;
+alter table public.words add constraint words_secondary_word_type_check
+  check (secondary_word_type is null or secondary_word_type in (
+        'noun', 'verb', 'irregular_verb', 'adjective', 'adverb', 'pronoun', 'determiner', 'preposition',
+        'conjunction', 'interjection', 'phrase', 'numeral', 'particle'
+      ));

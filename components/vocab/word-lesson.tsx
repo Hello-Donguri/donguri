@@ -628,6 +628,8 @@ function wordTypeLabel(type: WordType, t: ReturnType<typeof useTranslations>): s
       return t("word_type.adverb", "Adverb");
     case "pronoun":
       return t("word_type.pronoun", "Pronoun");
+    case "determiner":
+      return t("word_type.determiner", "Determiner");
     case "preposition":
       return t("word_type.preposition", "Preposition");
     case "conjunction":

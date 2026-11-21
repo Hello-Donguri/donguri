@@ -39,6 +39,7 @@ export const WORD_TYPES = [
   "adjective",
   "adverb",
   "pronoun",
+  "determiner",
   "preposition",
   "conjunction",
   "interjection",
