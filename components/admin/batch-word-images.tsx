@@ -89,8 +89,8 @@ type WordFilter = "missing" | "not-svg" | "all";
 // How many words go in at once — each picture is one image call, so this
 // is also the most a batch can cost.
 const BATCH_MAX = 50;
-const DRAW_AT_ONCE = 3;
-const TRACE_AT_ONCE = 3;
+const DRAW_AT_ONCE = 25;
+const TRACE_AT_ONCE = 50;
 
 // The SVG is chosen for a word to start with unless it's too big to use.
 function autoChoose(

@@ -11,6 +11,7 @@ import {
   type WordImageSceneId,
 } from "@/lib/word-image-scenes";
 import type { WordImageEvent } from "@/lib/generated-word-image";
+import type { WordImageIdea } from "@/lib/word-image-ideas";
 import {
   DEFAULT_IMAGE_MODEL,
   DEFAULT_IMAGE_QUALITY,
@@ -58,6 +59,30 @@ export function formatBytes(bytes: number) {
 
 // Reads one of the word-picture streams (see app/api/admin/word-images),
 // one JSON event per line, handing each to `onEvent` as it arrives.
+// Ten prompt ideas for a word, from the ideas route (see
+// suggestWordImageIdeas) — fetched directly, so a group's run side by side.
+export async function fetchWordImageIdeas(
+  wordId: string,
+  noCharacters: boolean,
+): Promise<{ ideas: WordImageIdea[]; usd: number } | { error: string }> {
+  try {
+    const response = await fetch("/api/admin/word-images/ideas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ wordId, noCharacters }),
+    });
+    const result = (await response.json().catch(() => null)) as
+      | { ideas: WordImageIdea[]; usd: number }
+      | { error: string }
+      | null;
+    if (!result) return { error: "Couldn't come up with ideas." };
+    if (!response.ok && !("error" in result)) return { error: "Couldn't come up with ideas." };
+    return result;
+  } catch {
+    return { error: "Couldn't come up with ideas." };
+  }
+}
+
 export async function readStream(
   url: string,
   body: object,
@@ -368,7 +393,7 @@ export function RecommendedModelsNote({ settings, disabled }: { settings: WordIm
         <p>
           {t(
             "admin_category_words.models_recommendation",
-            "Use GPT Image 2 on Low quality and GPT-6.1 Sol for the ChatGPT SVG — good enough for tracing, for a fraction of the cost.",
+            "Use GPT Image 2 on Low quality and GPT-6.2 Sol for the ChatGPT SVG — good enough for tracing, for a fraction of the cost.",
           )}
         </p>
         <button

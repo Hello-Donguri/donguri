@@ -17,7 +17,7 @@ import {
   Square,
   X,
 } from "lucide-react";
-import { chooseGeneratedWordImage, suggestWordImagePrompts } from "@/lib/actions/word-media";
+import { chooseGeneratedWordImage } from "@/lib/actions/word-media";
 import {
   WORD_IMAGE_CHARACTERS,
   referenceImageCount,
@@ -48,6 +48,7 @@ import {
   SpendBadge,
   SvgModelPicker,
   formatBytes,
+  fetchWordImageIdeas,
   readStream,
   useWordImageSettings,
   type SceneChoice,
@@ -314,7 +315,7 @@ function PromptIdeas({
   const suggest = () =>
     startLoading(async () => {
       setError(null);
-      const result = await suggestWordImagePrompts(wordId, noCharacters);
+      const result = await fetchWordImageIdeas(wordId, noCharacters);
       if ("error" in result) {
         setError(result.error);
         return;

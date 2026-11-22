@@ -166,7 +166,7 @@
   "admin_category_words.cost_spent_label": "Spent this window",
   "admin_category_words.model_recommended": "{{name}} (recommended)",
   "admin_category_words.quality_low_recommended": "Low (recommended)",
-  "admin_category_words.models_recommendation": "Use GPT Image 2 on Low quality and GPT-6.1 Sol for the ChatGPT SVG — good enough for tracing, for a fraction of the cost.",
+  "admin_category_words.models_recommendation": "Use GPT Image 2 on Low quality and GPT-6.2 Sol for the ChatGPT SVG — good enough for tracing, for a fraction of the cost.",
   "admin_category_words.models_use_recommended": "Use recommended",
   "admin_category_words.image_model": "Image model",
   "admin_category_words.image_quality": "Quality",

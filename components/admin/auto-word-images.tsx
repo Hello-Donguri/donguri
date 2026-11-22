@@ -21,7 +21,7 @@ import {
   Wand2,
   X,
 } from "lucide-react";
-import { chooseGeneratedWordImage, suggestWordImagePrompts } from "@/lib/actions/word-media";
+import { chooseGeneratedWordImage } from "@/lib/actions/word-media";
 import {
   WORD_IMAGE_CHARACTERS,
   referenceImageCount,
@@ -46,6 +46,7 @@ import {
   SpendBadge,
   SvgModelPicker,
   formatBytes,
+  fetchWordImageIdeas,
   readStream,
   useWordImageSettings,
 } from "@/components/admin/word-image-settings";
@@ -59,7 +60,12 @@ import { cn } from "@/lib/utils";
 // many pictures or SVGs are made at once within a group.
 const GROUP_SIZES = [3, 15, 30] as const;
 type GroupSize = (typeof GROUP_SIZES)[number];
-const AT_ONCE = 3;
+// Well inside the account's limits: pictures against the image models'
+// 150 a minute (25 at once, each taking 15–60s, is at most ~100), SVGs
+// (~7,000 tokens each, so 50 at once is ~350,000) against the SVG model's
+// 4,000,000 tokens a minute.
+const DRAW_AT_ONCE = 25;
+const TRACE_AT_ONCE = 50;
 
 // Runs `work` over `items`, `limit` at a time, until they're done or
 // `signal` is aborted.
@@ -450,7 +456,7 @@ export function AutoWordImages({ words }: { words: AutoWord[] }) {
   // characters) unless the prompt's already been written.
   const fetchIdeas = async (id: string, replacePrompt: boolean) => {
     update(id, { ideasLoading: true, ideasError: null });
-    const result = await suggestWordImagePrompts(id, noCharacters);
+    const result = await fetchWordImageIdeas(id, noCharacters);
     if ("error" in result) {
       update(id, { ideasLoading: false, ideasError: result.error });
       return;
@@ -601,9 +607,9 @@ export function AutoWordImages({ words }: { words: AutoWord[] }) {
   );
   const ideasLoading = toDraw.some((card) => card.ideasLoading);
 
-  const drawAll = () => void run("draw", (signal) => inPool(toDraw, AT_ONCE, signal, (card) => draw(card, signal)));
+  const drawAll = () => void run("draw", (signal) => inPool(toDraw, DRAW_AT_ONCE, signal, (card) => draw(card, signal)));
   const traceAll = () =>
-    void run("trace", (signal) => inPool(toTrace, AT_ONCE, signal, (card) => trace(card, signal)));
+    void run("trace", (signal) => inPool(toTrace, TRACE_AT_ONCE, signal, (card) => trace(card, signal)));
   const redraw = (card: Card) => void run("draw", (signal) => draw(card, signal));
   const retrace = (card: Card) => void run("trace", (signal) => trace(card, signal));
 

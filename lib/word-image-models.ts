@@ -67,6 +67,7 @@ export type ImageModelId = ImageModel["id"];
 // its reasoning out (~5,000) — Astra at about 20p.
 export const SVG_MODELS = [
   { id: "gpt-6-astra", name: "GPT-6 Astra", price: { in: 10, cachedIn: 1, out: 50 } },
+  { id: "gpt-6.2-sol", name: "GPT-6.2 Sol", price: { in: 2, cachedIn: 0.1, out: 10 } },
   { id: "gpt-6.1-sol", name: "GPT-6.1 Sol", price: { in: 2, cachedIn: 0.1, out: 10 } },
   { id: "gpt-6.1-terra", name: "GPT-6.1 Terra", price: { in: 1, cachedIn: 0.05, out: 5 } },
   { id: "gpt-6-luna", name: "GPT-6 Luna", price: { in: 0.1, cachedIn: 0.01, out: 0.5 } },
@@ -78,11 +79,12 @@ export type SvgModelId = SvgModel["id"];
 const SVG_ESTIMATE_TOKENS = { in: 1700, out: 5000 };
 
 // The recommended choices, and the defaults: GPT Image 2 on low quality is
-// plenty for a picture that's redrawn as an SVG anyway, and GPT-6.1 Sol
-// writes a usable SVG at about a fifth of Astra's cost.
+// plenty for a picture that's redrawn as an SVG anyway, and GPT-6.2 Sol
+// writes a usable SVG at about a fifth of Astra's cost (the same price as
+// 6.1 Sol, with fewer reasoning tokens).
 export const DEFAULT_IMAGE_MODEL: ImageModelId = "gpt-image-2";
 export const DEFAULT_IMAGE_QUALITY: ImageQuality = "low";
-export const DEFAULT_SVG_MODEL: SvgModelId = "gpt-6.1-sol";
+export const DEFAULT_SVG_MODEL: SvgModelId = "gpt-6.2-sol";
 
 // The choices a request asked for, or the defaults for anything that isn't
 // one of them.
