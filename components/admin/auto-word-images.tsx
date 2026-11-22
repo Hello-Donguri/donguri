@@ -57,7 +57,7 @@ import { cn } from "@/lib/utils";
 
 // How many words are worked on together — a choice in the window — and how
 // many pictures or SVGs are made at once within a group.
-const GROUP_SIZES = [3, 6, 9] as const;
+const GROUP_SIZES = [3, 15, 30] as const;
 type GroupSize = (typeof GROUP_SIZES)[number];
 const AT_ONCE = 3;
 
@@ -414,7 +414,7 @@ function AutoCard({
 }
 
 // On the admin deck page: works through the words the list is showing,
-// top to bottom, 3, 6 or 9 at a time. For each group: a prompt for each (the
+// top to bottom, 3, 15 or 30 at a time. For each group: a prompt for each (the
 // first of ten ideas, any of the others a click away, or the admin's own),
 // then — once they're happy — the pictures, then the SVGs, then the save,
 // which moves on to the next group. Any word can be skipped, and any
