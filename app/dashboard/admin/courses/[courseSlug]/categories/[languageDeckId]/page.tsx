@@ -272,7 +272,9 @@ export default async function AdminCategoryWordsPage({ params, searchParams }: P
         <WordBatchSelection
           courseSlug={courseSlug}
           deckTitle={languageDeck.title}
-          words={words.filter((word) => word.path === "vocab").map((word) => ({ id: word.id, term: word.term }))}
+          words={words
+            .filter((word) => word.path === "vocab")
+            .map((word) => ({ id: word.id, term: word.term, hasSvg: isSvgImage(word.imageKey) }))}
           shownIds={shownWords.filter((word) => word.path === "vocab").map((word) => word.id)}
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">

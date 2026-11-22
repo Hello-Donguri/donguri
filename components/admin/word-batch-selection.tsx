@@ -28,7 +28,8 @@ export function WordBatchSelection({
 }: {
   courseSlug: string;
   deckTitle: string;
-  words: { id: string; term: string }[];
+  // `hasSvg`: the word's picture is already an SVG, so auto mode leaves it out.
+  words: { id: string; term: string; hasSvg: boolean }[];
   shownIds: string[];
   children: React.ReactNode;
 }) {
@@ -45,13 +46,13 @@ export function WordBatchSelection({
 
   const chosen = words
     .filter((word) => selected.has(word.id))
-    .map((word) => ({ ...word, deckTitle }));
-  // The words the list is showing, in its order, for auto mode to work
-  // through top to bottom (see AutoWordImages).
+    .map((word) => ({ id: word.id, term: word.term, deckTitle }));
+  // The words the list is showing still without an SVG picture, in its
+  // order, for auto mode to work through top to bottom (see AutoWordImages).
   const byId = new Map(words.map((word) => [word.id, word]));
   const shownWords = shownIds.flatMap((id) => {
     const word = byId.get(id);
-    return word ? [word] : [];
+    return word && !word.hasSvg ? [{ id: word.id, term: word.term }] : [];
   });
   const allShownSelected =
     shownIds.length > 0 && shownIds.every((id) => selected.has(id));
