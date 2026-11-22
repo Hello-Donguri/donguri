@@ -11,7 +11,10 @@ export const WORD_IMAGE_CHARACTERS = [
     mouth: false,
     name: "Donguri",
     src: "/images/mascot.png",
-    description: "Donguri, a round cream-coloured creature wearing an acorn-cap hat, with a dark blue button nose",
+    // The snout spelled out: without it the model often draws the nose on
+    // its own, straight on the face.
+    description:
+      "Donguri, a round, egg-shaped cream-coloured creature wearing a brown striped acorn-cap hat, with two small dot eyes, a small curved line on its tummy, stubby arms and feet and a little pointed tail. Its face has a snout: a round, paler cream circle with its own outline that sticks out from the side of the face, with a shiny dark blue button nose on the tip of the snout. Always draw the snout — the nose is never on the face by itself",
   },
   {
     id: "dad-donguri",
