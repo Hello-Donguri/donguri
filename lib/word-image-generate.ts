@@ -194,7 +194,9 @@ export async function generateWordPicture(
     sceneId: WordImageSceneId;
     customScene: string;
     // With no characters: whether the thing drawn gets a cute face, as the
-    // style reference has. Characters have their own faces either way.
+    // style reference has. Off only keeps faces off things that don't have
+    // them — an animal or person still has its own. Characters have their
+    // own faces either way.
     face: boolean;
     imageModel: ImageModel;
     quality: ImageQuality;
@@ -255,7 +257,7 @@ export async function generateWordPicture(
         `The reference image is only a guide to the style: draw "${word.english}" in the same style — the same outline weight and colour, flat colours, simple rounded shapes and cute, friendly look — but don't draw what's in the reference image or copy its subject.`,
         face
           ? "Give the main object a simple cute face like the reference's: two small dot eyes and a little smile."
-          : "No faces: nothing in the picture has eyes, a mouth or an expression. The reference's face belongs to its subject, not the style.",
+          : "Don't add faces to things that don't have them: objects, food, plants, buildings, vehicles and places have no eyes, mouth or expression. Anything that really has a face — an animal, a bird, a person — keeps its normal face, drawn simply in the same style. The reference's face belongs to its subject, not the style.",
       ].join(" ");
   const imageLog = logger("Image");
   const references = await Promise.all(

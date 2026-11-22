@@ -502,7 +502,7 @@ export function BatchWordImages({
   const candidates = presetWords ?? loadedWords;
   const [loadingWords, setLoadingWords] = useState(false);
   const [characterIds, setCharacterIds] = useState<WordImageCharacterId[]>([]);
-  const [face, setFace] = useState(true);
+  const [face, setFace] = useState(false);
   const [sceneId, setSceneId] = useState<SceneChoice>("auto");
   const [items, setItems] = useState<Item[]>([]);
   const [running, setRunning] = useState<"draw" | "trace" | "save" | null>(

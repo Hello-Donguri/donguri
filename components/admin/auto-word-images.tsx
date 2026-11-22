@@ -432,7 +432,7 @@ export function AutoWordImages({ words }: { words: AutoWord[] }) {
   const [groupStart, setGroupStart] = useState(0);
   const [cards, setCards] = useState<Card[]>([]);
   const [running, setRunning] = useState<"draw" | "trace" | "save" | null>(null);
-  const [face, setFace] = useState(true);
+  const [face, setFace] = useState(false);
   const [noCharacters, setNoCharacters] = useState(false);
   const [groupSize, setGroupSize] = useState<GroupSize>(3);
 

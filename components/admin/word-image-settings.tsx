@@ -467,7 +467,8 @@ export function SvgModelPicker({ settings, disabled }: { settings: WordImageSett
 }
 
 // With no characters: whether the drawn thing gets a cute face, like the
-// style reference's. Shown only then — characters have their own faces.
+// style reference's (off by default — an animal or person keeps its own
+// face either way). Shown only then — characters have their own faces.
 export function FaceToggle({
   value,
   onChange,

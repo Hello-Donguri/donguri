@@ -416,7 +416,7 @@ export function GenerateWordImage({ wordId, term }: { wordId: string; term: stri
   const abortRef = useRef<AbortController | null>(null);
 
   const [characterIds, setCharacterIds] = useState<WordImageCharacterId[]>([]);
-  const [face, setFace] = useState(true);
+  const [face, setFace] = useState(false);
   const [sceneId, setSceneId] = useState<SceneChoice>("auto");
   const [customScene, setCustomScene] = useState("");
   const needsCustomScene = sceneId === CUSTOM_SCENE_ID && !cleanCustomScene(customScene);
