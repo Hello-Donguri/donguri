@@ -10,7 +10,8 @@ import {
   WORD_IMAGE_SCENES,
   type WordImageSceneId,
 } from "@/lib/word-image-scenes";
-import type { WordImageEvent } from "@/lib/generated-word-image";
+import { SAVE_BATCH_BYTES, SAVE_BATCH_MAX, type WordImageEvent } from "@/lib/generated-word-image";
+import { chooseGeneratedWordImages } from "@/lib/actions/word-media";
 import type { WordImageIdea } from "@/lib/word-image-ideas";
 import {
   DEFAULT_IMAGE_MODEL,
@@ -59,6 +60,47 @@ export function formatBytes(bytes: number) {
 
 // Reads one of the word-picture streams (see app/api/admin/word-images),
 // one JSON event per line, handing each to `onEvent` as it arrives.
+// Saves many chosen SVGs as their words' images, as few calls as possible
+// (see chooseGeneratedWordImages) rather than one per word — each call
+// packed by size, so a run of small SVGs goes in one. `onBatch` hears how
+// each call went, as it lands; the reasons for any that didn't save come
+// back, by word.
+export async function saveSvgsInBatches(
+  images: { wordId: string; svg: string }[],
+  signal: AbortSignal,
+  onBatch: (wordIds: string[], errors: Record<string, string>) => void,
+) {
+  const batches: { wordId: string; svg: string }[][] = [];
+  let bytes = 0;
+  for (const image of images) {
+    // Escaping in the request can roughly double an SVG's size.
+    const size = image.svg.length * 2;
+    const last = batches[batches.length - 1];
+    if (!last || last.length >= SAVE_BATCH_MAX || bytes + size > SAVE_BATCH_BYTES) {
+      batches.push([image]);
+      bytes = size;
+    } else {
+      last.push(image);
+      bytes += size;
+    }
+  }
+
+  const errors: Record<string, string> = {};
+  for (const batch of batches) {
+    if (signal.aborted) break;
+    const wordIds = batch.map((image) => image.wordId);
+    let batchErrors: Record<string, string>;
+    try {
+      batchErrors = (await chooseGeneratedWordImages(batch)).errors;
+    } catch {
+      batchErrors = Object.fromEntries(wordIds.map((id) => [id, "Couldn't save. Try again."]));
+    }
+    Object.assign(errors, batchErrors);
+    onBatch(wordIds, batchErrors);
+  }
+  return errors;
+}
+
 // Ten prompt ideas for a word, from the ideas route (see
 // suggestWordImageIdeas) — fetched directly, so a group's run side by side.
 export async function fetchWordImageIdeas(

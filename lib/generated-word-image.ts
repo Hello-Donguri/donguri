@@ -9,6 +9,13 @@
 export const GENERATED_IMAGE_WARN_BYTES = 30 * 1024;
 export const GENERATED_IMAGE_MAX_BYTES = 100 * 1024;
 
+// One batch save (see chooseGeneratedWordImages): SVGs are packed in by
+// size, up to 5MB a request (inside the server actions' 6MB body limit),
+// and at most this many — a generated SVG is usually around 5KB, so a
+// whole 50-word batch goes in one request.
+export const SAVE_BATCH_MAX = 100;
+export const SAVE_BATCH_BYTES = 5 * 1024 * 1024;
+
 // How the picture is turned into an SVG: ChatGPT redrawing it by hand.
 export const SVG_OPTIONS = [{ key: "chatgpt", label: "ChatGPT" }] as const;
 

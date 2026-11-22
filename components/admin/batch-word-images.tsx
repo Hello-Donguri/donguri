@@ -16,8 +16,8 @@ import {
   X,
 } from "lucide-react";
 import {
-  chooseGeneratedWordImage,
   listWordsForBatchImages,
+  type chooseGeneratedWordImage,
 } from "@/lib/actions/word-media";
 import {
   referenceImageCount,
@@ -45,6 +45,7 @@ import {
   SvgModelPicker,
   formatBytes,
   readStream,
+  saveSvgsInBatches,
   useWordImageSettings,
   type SceneChoice,
 } from "@/components/admin/word-image-settings";
@@ -740,29 +741,35 @@ export function BatchWordImages({
   );
   const saveChosen = () =>
     void run("save", async (signal) => {
-      let saved = 0;
-      let failed = 0;
-      for (const item of toSave) {
-        if (signal.aborted) break;
+      const images = toSave.flatMap((item) => {
         const choice = choiceFor(item, item.chosen);
-        if (!choice) continue;
-        update(item.id, {
-          status: "saving",
-          activity: t("admin_batch_images.saving", "Saving…"),
-        });
-        const result = await chooseGeneratedWordImage(item.id, choice);
-        if (result.error) {
-          failed++;
-          update(item.id, {
-            status: "traced",
-            error: result.error,
-            activity: null,
-          });
-        } else {
-          saved++;
-          update(item.id, { status: "saved", error: null, activity: null });
-        }
-      }
+        return choice?.type === "image/svg+xml" ? [{ wordId: item.id, svg: choice.svg }] : [];
+      });
+      const saving = new Set(images.map((image) => image.wordId));
+      setItems((current) =>
+        current.map((item) =>
+          saving.has(item.id)
+            ? { ...item, status: "saving", activity: t("admin_batch_images.saving", "Saving…") }
+            : item,
+        ),
+      );
+      const errors = await saveSvgsInBatches(images, signal, (wordIds, batchErrors) =>
+        setItems((current) =>
+          current.map((item) =>
+            !wordIds.includes(item.id)
+              ? item
+              : batchErrors[item.id]
+                ? { ...item, status: "traced", error: batchErrors[item.id], activity: null }
+                : { ...item, status: "saved", error: null, activity: null },
+          ),
+        ),
+      );
+      // Any not sent (Stop pressed between batches) go back to unsaved.
+      setItems((current) =>
+        current.map((item) => (item.status === "saving" ? { ...item, status: "traced", activity: null } : item)),
+      );
+      const failed = Object.keys(errors).length;
+      const saved = images.length - failed;
       toast(
         t("admin_batch_images.saved", "Saved {{count}} pictures.", {
           count: saved,

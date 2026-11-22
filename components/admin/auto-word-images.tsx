@@ -21,7 +21,6 @@ import {
   Wand2,
   X,
 } from "lucide-react";
-import { chooseGeneratedWordImage } from "@/lib/actions/word-media";
 import {
   WORD_IMAGE_CHARACTERS,
   referenceImageCount,
@@ -48,6 +47,7 @@ import {
   formatBytes,
   fetchWordImageIdeas,
   readStream,
+  saveSvgsInBatches,
   useWordImageSettings,
 } from "@/components/admin/word-image-settings";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
@@ -620,20 +620,34 @@ export function AutoWordImages({ words }: { words: AutoWord[] }) {
   // save failed, which stays on its card to try again.
   const saveAndNext = () =>
     void run("save", async (signal) => {
-      let failed = 0;
-      for (const card of toSave) {
-        if (signal.aborted) return;
+      const images = toSave.flatMap((card) => {
         const svg = usableSvg(card);
-        if (!svg) continue;
-        update(card.id, { status: "saving", activity: t("admin_batch_images.saving", "Saving…") });
-        const result = await chooseGeneratedWordImage(card.id, { type: "image/svg+xml", svg: svg.svg });
-        if (result.error) {
-          failed++;
-          update(card.id, { status: "traced", error: result.error, activity: null });
-        } else {
-          update(card.id, { status: "saved", error: null, activity: null });
-        }
-      }
+        return svg ? [{ wordId: card.id, svg: svg.svg }] : [];
+      });
+      const saving = new Set(images.map((image) => image.wordId));
+      setCards((current) =>
+        current.map((card) =>
+          saving.has(card.id)
+            ? { ...card, status: "saving", activity: t("admin_batch_images.saving", "Saving…") }
+            : card,
+        ),
+      );
+      const errors = await saveSvgsInBatches(images, signal, (wordIds, batchErrors) =>
+        setCards((current) =>
+          current.map((card) =>
+            !wordIds.includes(card.id)
+              ? card
+              : batchErrors[card.id]
+                ? { ...card, status: "traced", error: batchErrors[card.id], activity: null }
+                : { ...card, status: "saved", error: null, activity: null },
+          ),
+        ),
+      );
+      // Any not sent (Stop pressed between batches) go back to unsaved.
+      setCards((current) =>
+        current.map((card) => (card.status === "saving" ? { ...card, status: "traced", activity: null } : card)),
+      );
+      const failed = Object.keys(errors).length;
       if (toSave.length) router.refresh();
       if (failed || signal.aborted) return;
       if (toSave.length) {
