@@ -373,6 +373,11 @@ function PromptIdeas({
                   )}
                 >
                   <span className="leading-snug">{idea.scene}</span>
+                  {idea.sceneJa && (
+                    <span lang="ja" className="leading-snug text-sumi-soft">
+                      {idea.sceneJa}
+                    </span>
+                  )}
                   <span className="flex flex-wrap items-center gap-1.5 font-semibold text-sumi-soft">
                     {characters.length ? (
                       characters.map((character) => (

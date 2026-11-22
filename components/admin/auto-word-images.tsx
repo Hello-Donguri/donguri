@@ -217,6 +217,15 @@ function AutoCard({
               className="resize-y rounded-xl border border-sumi/15 bg-washi px-3 py-2 text-sm font-normal text-sumi outline-none focus:border-ai focus:ring-2 focus:ring-ai-soft disabled:opacity-60"
             />
           </label>
+          {/* The Japanese of the prompt, while it's still one of the ideas as given. */}
+          {(() => {
+            const picked = card.ideas?.find((idea) => idea.scene === cleanCustomScene(card.scene));
+            return picked?.sceneJa ? (
+              <p lang="ja" className="-mt-1 text-xs text-sumi-soft">
+                {picked.sceneJa}
+              </p>
+            ) : null;
+          })()}
           {card.ideasError && <p className="text-[11px] font-semibold text-shu-dark">{card.ideasError}</p>}
 
           <CharacterPicker
@@ -272,6 +281,11 @@ function AutoCard({
                       )}
                     >
                       <span className="leading-snug">{idea.scene}</span>
+                      {idea.sceneJa && (
+                        <span lang="ja" className="leading-snug text-sumi-soft">
+                          {idea.sceneJa}
+                        </span>
+                      )}
                       <span className="text-[11px] font-semibold text-sumi-soft">
                         {ideaCharacters.length
                           ? ideaCharacters.map((character) => character.name).join(", ")

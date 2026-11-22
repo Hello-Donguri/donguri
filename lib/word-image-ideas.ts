@@ -13,7 +13,9 @@ export const WORD_IMAGE_IDEA_COUNT = 10;
 const IDEAS_MODEL = SVG_MODELS.find((model) => model.id === "gpt-6.1-terra") ?? SVG_MODELS[0];
 const IDEAS_TIMEOUT_MS = 60_000;
 
-export type WordImageIdea = { scene: string; characterIds: WordImageCharacterId[] };
+// `scene` is what goes into the prompt (always English); `sceneJa` is the
+// same idea in Japanese, only to read.
+export type WordImageIdea = { scene: string; sceneJa: string; characterIds: WordImageCharacterId[] };
 
 // Ten picture ideas for a word on the admin deck page, each a custom scene
 // (within the custom scene's word limit) and the characters it stars —
@@ -35,7 +37,8 @@ export async function suggestWordImageIdeas(
     noCharacters
       ? "None of the ideas has a character in it: show the thing, place or situation on its own. Give every idea an empty characters list."
       : `These are the characters that can star in a picture:\n${cast}\nMost ideas should use one or two of them, chosen to suit the idea — vary who appears across the ideas — and name them in the description. Two or three of the ideas should have no character at all, with an empty characters list.`,
-    'Reply with JSON only: {"ideas": [{"scene": "…", "characters": ["character id", …]}, …]}.',
+    'Also give each idea in natural Japanese, as "japanese" — the same picture described, keeping the character names as they are (in katakana).',
+    'Reply with JSON only: {"ideas": [{"scene": "…", "japanese": "…", "characters": ["character id", …]}, …]}.',
   ].join("\n\n");
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -71,11 +74,12 @@ export async function suggestWordImageIdeas(
   const seen = new Set<string>();
   const ideas = parsed.ideas.flatMap((entry): WordImageIdea[] => {
     if (typeof entry !== "object" || entry === null) return [];
-    const { scene: rawScene, characters } = entry as Record<string, unknown>;
+    const { scene: rawScene, japanese, characters } = entry as Record<string, unknown>;
     const scene = cleanCustomScene(rawScene);
     if (!scene || seen.has(scene.toLowerCase())) return [];
     seen.add(scene.toLowerCase());
-    return [{ scene, characterIds: noCharacters ? [] : parseCharacterIds(characters) }];
+    const sceneJa = typeof japanese === "string" ? japanese.replace(/[\r\n]+/g, " ").trim().slice(0, 200) : "";
+    return [{ scene, sceneJa, characterIds: noCharacters ? [] : parseCharacterIds(characters) }];
   });
   if (ideas.length === 0) throw new Error("No ideas came back. Try again.");
   return { ideas: ideas.slice(0, WORD_IMAGE_IDEA_COUNT), usd };
