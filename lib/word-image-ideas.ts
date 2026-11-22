@@ -36,7 +36,7 @@ export async function suggestWordImageIdeas(
     `Suggest ${WORD_IMAGE_IDEA_COUNT} different ideas for the picture. Make them varied — an object, an action, a place, a feeling, a little scene — and keep each one simple enough to draw as a flat icon-like illustration with a few elements. Each idea is a short description of what's in the picture, at most ${CUSTOM_SCENE_MAX_WORDS} words, with no text, letters or signs with writing in it.`,
     noCharacters
       ? "None of the ideas has a character in it: show the thing, place or situation on its own. Give every idea an empty characters list."
-      : `These are the characters that can star in a picture:\n${cast}\nMost ideas should use one or two of them, chosen to suit the idea — vary who appears across the ideas — and name them in the description. Two or three of the ideas should have no character at all, with an empty characters list.`,
+      : `These are the characters that can star in a picture:\n${cast}\nMost ideas should use one or two of them, chosen to suit the idea — vary who appears across the ideas — and name them in the description. Use them in about these proportions: Donguri, Hazel and Charles Duck most often; Dad Donguri and Child Donguri less often; Bonkus only now and then, where a big strong wrestler really suits the idea. Spread them through the list rather than front-loading one character. One or two of the ideas should have no character at all, with an empty characters list.`,
     'Also give each idea in natural Japanese, as "japanese" — the same picture described, keeping the character names as they are (in katakana).',
     'Reply with JSON only: {"ideas": [{"scene": "…", "japanese": "…", "characters": ["character id", …]}, …]}.',
   ].join("\n\n");

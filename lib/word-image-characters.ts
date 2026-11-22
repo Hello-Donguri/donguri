@@ -1,9 +1,12 @@
 // The cast a generated word picture can star (see generateWordImage) —
 // each one's artwork is sent along as the reference image, so the model
-// draws that character rather than inventing one.
+// draws that character rather than inventing one. `weight` is how often
+// each should turn up relative to the others (see pickIdea): Donguri,
+// Hazel and Charles most, then Dad and Child Donguri, then Bonkus.
 export const WORD_IMAGE_CHARACTERS = [
   {
     id: "donguri",
+    weight: 3,
     // Whether it has a mouth — see noMouths in lib/word-image-generate.ts.
     mouth: false,
     name: "Donguri",
@@ -12,6 +15,7 @@ export const WORD_IMAGE_CHARACTERS = [
   },
   {
     id: "dad-donguri",
+    weight: 2,
     mouth: false,
     name: "Dad Donguri",
     src: "/images/dad-donguri.png",
@@ -20,6 +24,7 @@ export const WORD_IMAGE_CHARACTERS = [
   },
   {
     id: "child-donguri",
+    weight: 2,
     mouth: false,
     name: "Child Donguri",
     src: "/images/child-donguri.png",
@@ -28,6 +33,7 @@ export const WORD_IMAGE_CHARACTERS = [
   },
   {
     id: "charles",
+    weight: 3,
     mouth: true,
     name: "Charles Duck",
     src: "/images/charles.png",
@@ -36,6 +42,7 @@ export const WORD_IMAGE_CHARACTERS = [
   },
   {
     id: "bonkus",
+    weight: 1,
     mouth: true,
     name: "Bonkus",
     src: "/images/bonkus.png",
@@ -44,6 +51,7 @@ export const WORD_IMAGE_CHARACTERS = [
   },
   {
     id: "rabbit",
+    weight: 3,
     mouth: false,
     name: "Hazel",
     src: "/images/rabbit-reading.webp",
@@ -69,4 +77,40 @@ export const STYLE_REFERENCE_SRC = "/vocab-images/cheese.webp";
 // style reference when there are none.
 export function referenceImageCount(characterIds: readonly string[]) {
   return characterIds.length || 1;
+}
+
+// Ideas with nobody in them count as this weight (as rare as Bonkus).
+export const NO_CHARACTER_WEIGHT = 1;
+
+// The idea to start a word with in auto mode: of its ten, the one whose
+// cast has appeared least so far for how often each should (by `weight`),
+// so a run mixes the characters in about those proportions. `used` counts
+// each character (and "none") picked so far in the run. Ties go to the
+// earlier idea, the model's own order.
+export function pickIdea<T extends { characterIds: readonly WordImageCharacterId[] }>(
+  ideas: readonly T[],
+  used: Readonly<Record<string, number>>,
+): T | undefined {
+  const score = (idea: T) => {
+    const keys = idea.characterIds.length ? idea.characterIds : ["none"];
+    return Math.min(
+      ...keys.map((key) => {
+        const weight =
+          key === "none"
+            ? NO_CHARACTER_WEIGHT
+            : (WORD_IMAGE_CHARACTERS.find((character) => character.id === key)?.weight ?? 1);
+        return weight / (1 + (used[key] ?? 0));
+      }),
+    );
+  };
+  let best: T | undefined;
+  let bestScore = -Infinity;
+  for (const idea of ideas) {
+    const ideaScore = score(idea);
+    if (ideaScore > bestScore) {
+      best = idea;
+      bestScore = ideaScore;
+    }
+  }
+  return best;
 }

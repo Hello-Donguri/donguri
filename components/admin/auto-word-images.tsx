@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import {
   WORD_IMAGE_CHARACTERS,
+  pickIdea,
   referenceImageCount,
   type WordImageCharacterId,
 } from "@/lib/word-image-characters";
@@ -441,6 +442,9 @@ export function AutoWordImages({ words }: { words: AutoWord[] }) {
   const [face, setFace] = useState(false);
   const [noCharacters, setNoCharacters] = useState(false);
   const [groupSize, setGroupSize] = useState<GroupSize>(3);
+  // How many starting ideas this run has given each character (and "none"),
+  // to keep the mix in proportion (see pickIdea).
+  const castUsedRef = useRef<Record<string, number>>({});
 
   // Stop the server's work when the page goes.
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -462,7 +466,14 @@ export function AutoWordImages({ words }: { words: AutoWord[] }) {
       return;
     }
     settings.recordCost({ type: "cost", usd: result.usd, estimateKey: "ideas" });
-    const [first] = result.ideas;
+    // The starting idea is the one that keeps the run's mix of characters
+    // closest to how often each should appear (see pickIdea).
+    const first = pickIdea(result.ideas, castUsedRef.current);
+    if (first) {
+      for (const key of first.characterIds.length ? first.characterIds : ["none"]) {
+        castUsedRef.current[key] = (castUsedRef.current[key] ?? 0) + 1;
+      }
+    }
     update(id, (card) => ({
       ideas: result.ideas,
       ideasLoading: false,
@@ -490,6 +501,7 @@ export function AutoWordImages({ words }: { words: AutoWord[] }) {
   };
 
   const begin = () => {
+    castUsedRef.current = {};
     abortRef.current?.abort();
     setRunning(null);
     setQueue(words);
