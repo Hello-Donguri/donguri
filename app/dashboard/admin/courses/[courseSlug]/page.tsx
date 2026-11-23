@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { requireAdminProfile, getAdminCategoryOverview } from "@/lib/dal";
+import { requireAdminProfile, getAdminCategoryOverview, getCourseDuplicateWords } from "@/lib/dal";
 import { AdminDeckGrid } from "@/components/admin/admin-deck-grid";
+import { DuplicateWords } from "@/components/admin/duplicate-words";
 import { BatchWordImages } from "@/components/admin/batch-word-images";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button } from "@/components/ui/button";
@@ -20,8 +21,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function AdminCourseCategoriesPage({ params }: PageProps) {
   await requireAdminProfile();
   const { courseSlug } = await params;
-  const [{ course, categories }, { t }] = await Promise.all([
+  const [{ course, categories }, duplicates, { t }] = await Promise.all([
     getAdminCategoryOverview(courseSlug),
+    getCourseDuplicateWords(courseSlug),
     getTranslator(),
   ]);
 
@@ -54,6 +56,8 @@ export default async function AdminCourseCategoriesPage({ params }: PageProps) {
       {categories.length === 0 && (
         <p className="text-sumi-soft">{t("admin_course_decks.no_decks", "No decks yet.")}</p>
       )}
+
+      {categories.length > 0 && <DuplicateWords groups={duplicates} courseSlug={courseSlug} />}
 
       <AdminDeckGrid categories={categories} courseSlug={courseSlug} />
     </div>

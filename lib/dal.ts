@@ -474,6 +474,95 @@ export const getAdminCategoryOverview = cache(
   },
 );
 
+// How the course page's duplicate check compares words: case, spacing,
+// a leading "to " / "a " / "an " / "the " and end punctuation don't count,
+// so "To run", "run" and "run!" are the same word.
+function duplicateKey(term: string) {
+  return term
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^(to|a|an|the) (?=\S)/, "")
+    .replace(/[.!?。！？、,]+$/, "")
+    .trim();
+}
+
+export type DuplicateWordGroup = {
+  term: string;
+  sameDeck: boolean;
+  words: {
+    id: string;
+    term: string;
+    translation: string;
+    active: boolean;
+    deck: { id: string; title: string; active: boolean };
+  }[];
+};
+
+// The course's vocab words that appear more than once in its live decks —
+// in one deck or across decks — for the admin course page (see DuplicateWords). A word's
+// US spelling counts too, so "colour" in one deck finds "color" in
+// another. Groups come in the course's deck order; `sameDeck` when two
+// copies share a deck.
+export async function getCourseDuplicateWords(courseSlug: string): Promise<DuplicateWordGroup[]> {
+  const words = await prisma.word.findMany({
+    // Only the live decks — not test decks (copies for trying things
+    // out) or the starter deck (guests' first words, taken from the others).
+    where: { path: "vocab", languageDeck: { course: { slug: courseSlug }, isTest: false, isStarter: false } },
+    orderBy: [{ languageDeck: { position: "asc" } }, { position: "asc" }],
+    select: {
+      id: true,
+      term: true,
+      usSpelling: true,
+      translation: true,
+      active: true,
+      languageDeck: { select: { id: true, title: true, active: true } },
+    },
+  });
+
+  // Words sharing any key end up in one group (a word's term and US
+  // spelling are both its keys).
+  const parent = new Map<string, string>();
+  const find = (id: string): string => {
+    const up = parent.get(id) ?? id;
+    if (up === id) return id;
+    const root = find(up);
+    parent.set(id, root);
+    return root;
+  };
+  const byKey = new Map<string, string>();
+  for (const word of words) {
+    for (const spelling of [word.term, word.usSpelling]) {
+      const key = spelling ? duplicateKey(spelling) : "";
+      if (!key) continue;
+      const other = byKey.get(key);
+      if (other) parent.set(find(word.id), find(other));
+      else byKey.set(key, word.id);
+    }
+  }
+
+  const groups = new Map<string, typeof words>();
+  for (const word of words) {
+    const root = find(word.id);
+    groups.set(root, [...(groups.get(root) ?? []), word]);
+  }
+
+  return [...groups.values()]
+    .filter((group) => group.length > 1)
+    .map((group) => ({
+      term: group[0].term,
+      sameDeck: new Set(group.map((word) => word.languageDeck.id)).size < group.length,
+      words: group.map((word) => ({
+        id: word.id,
+        term: word.term,
+        translation: word.translation,
+        active: word.active,
+        deck: word.languageDeck,
+      })),
+    }));
+}
+
 // What the admin deck page's recording windows (see RecordDeckAudio) take
 // the recorder through, in deck order: each vocab word, then its example
 // sentences — always in the language being learnt (`term` is; an example's

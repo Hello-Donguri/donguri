@@ -283,7 +283,9 @@ export default async function AdminCategoryWordsPage({ params, searchParams }: P
             {shownWords.map((word) => (
               <div
                 key={word.id}
-                className="flex flex-col gap-3 rounded-2xl border border-card-border bg-washi-soft p-4 transition has-[[data-word-select]:checked]:border-ai has-[[data-word-select]:checked]:bg-ai-soft/40"
+                // The course page's duplicate list links here (see DuplicateWords).
+                id={`word-${word.id}`}
+                className="flex scroll-mt-20 flex-col gap-3 rounded-2xl border border-card-border bg-washi-soft p-4 transition target:border-kin target:ring-2 target:ring-kin/50 has-[[data-word-select]:checked]:border-ai has-[[data-word-select]:checked]:bg-ai-soft/40"
               >
                 <div className="flex items-center gap-3">
                   {word.path === "vocab" && (

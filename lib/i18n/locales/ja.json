@@ -1806,5 +1806,10 @@
   "admin_move_words.note": "",
   "admin_move_words.back": "",
   "admin_move_words.moving": "",
-  "admin_move_words.move": ""
+  "admin_move_words.move": "",
+  "admin_duplicate_words.none": "",
+  "admin_duplicate_words.title": "",
+  "admin_duplicate_words.same_deck_count": "",
+  "admin_duplicate_words.hint": "",
+  "admin_duplicate_words.same_deck": ""
 }
