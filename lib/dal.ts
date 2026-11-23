@@ -571,6 +571,43 @@ export const getAdminCategoryWords = cache(async (languageDeckId: string) => {
   };
 });
 
+// The decks an admin can move a deck's words to (see moveWords): every
+// other deck in a course teaching the same language to speakers of the
+// same language — the words' translations and recordings still fit there.
+// The course's own decks first, then any others, each in order.
+export const getMoveTargetDecks = cache(async (languageDeckId: string) => {
+  const deck = await prisma.languageDeck.findUnique({
+    where: { id: languageDeckId },
+    select: { courseId: true, course: { select: { targetLanguage: true, sourceLanguage: true } } },
+  });
+  if (!deck) return [];
+  const decks = await prisma.languageDeck.findMany({
+    where: {
+      id: { not: languageDeckId },
+      course: { targetLanguage: deck.course.targetLanguage, sourceLanguage: deck.course.sourceLanguage },
+    },
+    orderBy: [{ course: { position: "asc" } }, { position: "asc" }],
+    select: {
+      id: true,
+      title: true,
+      isTest: true,
+      isStarter: true,
+      courseId: true,
+      course: { select: { title: true } },
+    },
+  });
+  return decks
+    .map((target) => ({
+      id: target.id,
+      title: target.title,
+      courseTitle: target.course.title,
+      sameCourse: target.courseId === deck.courseId,
+      isTest: target.isTest,
+      isStarter: target.isStarter,
+    }))
+    .sort((a, b) => Number(b.sameCourse) - Number(a.sameCourse));
+});
+
 // Single deck (LanguageDeck) for the admin edit-deck page, with just enough
 // course context to build the "back to deck" link — mirrors `getAdminWord`.
 export const getAdminCategory = cache(async (languageDeckId: string) => {

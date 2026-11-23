@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Check, Eye, FileX2, ImageOff, Volume2 } from "lucide-react";
-import { requireAdminProfile, getAdminCategoryWords, getDeckRecordingItems } from "@/lib/dal";
+import { requireAdminProfile, getAdminCategoryWords, getDeckRecordingItems, getMoveTargetDecks } from "@/lib/dal";
 import { previewWordLesson, setWordActive } from "@/lib/actions/admin-content";
 import { LessonButton } from "@/components/vocab/word-lesson";
 import { DeleteWordButton } from "@/components/admin/delete-word-button";
@@ -46,9 +46,10 @@ export default async function AdminCategoryWordsPage({ params, searchParams }: P
   await requireAdminProfile();
   const [{ courseSlug, languageDeckId }, { missing }] = await Promise.all([params, searchParams]);
   const filter: "all" | "image" | "svg" = missing === "image" || missing === "svg" ? missing : "all";
-  const [{ languageDeck, course, words }, recordingItems] = await Promise.all([
+  const [{ languageDeck, course, words }, recordingItems, moveTargets] = await Promise.all([
     getAdminCategoryWords(languageDeckId),
     getDeckRecordingItems(languageDeckId),
+    getMoveTargetDecks(languageDeckId),
   ]);
   const { t } = await getTranslator();
 
@@ -276,6 +277,7 @@ export default async function AdminCategoryWordsPage({ params, searchParams }: P
             .filter((word) => word.path === "vocab")
             .map((word) => ({ id: word.id, term: word.term, hasSvg: isSvgImage(word.imageKey) }))}
           shownIds={shownWords.filter((word) => word.path === "vocab").map((word) => word.id)}
+          moveTargets={moveTargets}
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {shownWords.map((word) => (

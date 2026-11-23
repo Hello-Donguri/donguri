@@ -883,6 +883,73 @@ async function recordingKeys(where: Prisma.WordWhereInput) {
   ]);
 }
 
+// Moves words (the ones ticked on the admin deck page) to another deck —
+// the same word, not a copy, so its forms, examples, media and every
+// learner's progress go with it. Only to a deck in a course with the same
+// languages (see getMoveTargetDecks). They're added to the end of the
+// deck, in the order they were in; the gaps left behind are harmless, as
+// only the order of positions matters.
+export async function moveWords(
+  wordIds: string[],
+  targetLanguageDeckId: string,
+): Promise<{ error?: string; moved?: number }> {
+  const profile = await requireProfile();
+  if (profile.role !== "admin") return { error: "You don't have permission to do that." };
+  if (!Array.isArray(wordIds) || wordIds.length === 0 || typeof targetLanguageDeckId !== "string") {
+    return { error: "Choose the words and a deck." };
+  }
+
+  const target = await prisma.languageDeck.findUnique({
+    where: { id: targetLanguageDeckId },
+    select: { id: true, course: { select: { slug: true, targetLanguage: true, sourceLanguage: true } } },
+  });
+  if (!target) return { error: "That deck no longer exists." };
+
+  const words = await prisma.word.findMany({
+    where: { id: { in: wordIds.filter((id) => typeof id === "string") }, languageDeckId: { not: target.id } },
+    orderBy: [{ languageDeckId: "asc" }, { position: "asc" }],
+    select: {
+      id: true,
+      languageDeckId: true,
+      languageDeck: { select: { course: { select: { slug: true, targetLanguage: true, sourceLanguage: true } } } },
+    },
+  });
+  if (words.length === 0) return { error: "Those words are already there, or no longer exist." };
+  if (
+    words.some(
+      (word) =>
+        word.languageDeck.course.targetLanguage !== target.course.targetLanguage ||
+        word.languageDeck.course.sourceLanguage !== target.course.sourceLanguage,
+    )
+  ) {
+    return { error: "Words can only move to a deck in the same language." };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const { _max } = await tx.word.aggregate({
+      where: { languageDeckId: target.id },
+      _max: { position: true },
+    });
+    const base = _max.position ?? 0;
+    for (const [index, word] of words.entries()) {
+      await tx.word.update({
+        where: { id: word.id },
+        data: { languageDeckId: target.id, position: base + 1 + index },
+      });
+    }
+  }, { timeout: 30_000 });
+
+  const pages = new Map<string, string>([[target.id, target.course.slug]]);
+  for (const word of words) pages.set(word.languageDeckId, word.languageDeck.course.slug);
+  for (const [deckId, slug] of pages) {
+    revalidatePath(`/dashboard/admin/courses/${slug}/categories/${deckId}`);
+    revalidatePath(`/dashboard/courses/${slug}/decks/${deckId}`);
+    revalidatePath(`/dashboard/admin/courses/${slug}`);
+    revalidatePath(`/dashboard/courses/${slug}`);
+  }
+  return { moved: words.length };
+}
+
 // Unlike setWordActive (reversible — hide the word, keep everything), this
 // is permanent: WordForm/WordExample/WordAlternateAnswer/WordQuizQuestion
 // and — critically — every learner's UserWordProgress on this word all

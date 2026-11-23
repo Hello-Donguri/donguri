@@ -4,6 +4,7 @@ import { createContext, useContext, useState } from "react";
 import { CheckSquare, XSquare } from "lucide-react";
 import { AutoWordImages } from "@/components/admin/auto-word-images";
 import { BatchWordImages } from "@/components/admin/batch-word-images";
+import { MoveWords, type MoveTargetDeck } from "@/components/admin/move-words";
 import { useTranslations } from "@/components/i18n/locale-provider";
 
 type Selection = {
@@ -24,6 +25,7 @@ export function WordBatchSelection({
   deckTitle,
   words,
   shownIds,
+  moveTargets,
   children,
 }: {
   courseSlug: string;
@@ -31,6 +33,8 @@ export function WordBatchSelection({
   // `hasSvg`: the word's picture is already an SVG, so auto mode leaves it out.
   words: { id: string; term: string; hasSvg: boolean }[];
   shownIds: string[];
+  // Where the ticked words can be moved to (see MoveWords).
+  moveTargets: MoveTargetDeck[];
   children: React.ReactNode;
 }) {
   const t = useTranslations();
@@ -105,6 +109,7 @@ export function WordBatchSelection({
           </button>
         )}
         <AutoWordImages words={shownWords} />
+        <MoveWords words={chosen} decks={moveTargets} onMoved={() => setSelected(new Set())} />
         <BatchWordImages
           courseSlug={courseSlug}
           presetWords={chosen}

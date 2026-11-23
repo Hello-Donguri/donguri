@@ -1559,5 +1559,18 @@
   "admin_category_words.prompt_ideas": "Prompt ideas",
   "admin_category_words.prompt_ideas_no_characters": "No characters",
   "admin_auto_images.group_size": "Words at a time",
-  "admin_auto_images.group_size_next": "From the next group."
+  "admin_auto_images.group_size_next": "From the next group.",
+  "admin_move_words.starter": "(starter)",
+  "admin_move_words.test": "(test)",
+  "admin_move_words.moved": "Moved {{count}} words to {{deck}}.",
+  "admin_move_words.button": "Move ({{count}})",
+  "admin_move_words.title": "Move words",
+  "admin_move_words.confirm_title": "Are you sure?",
+  "admin_move_words.deck": "Move {{count}} words to",
+  "admin_move_words.next": "Next",
+  "admin_move_words.confirm": "You'll move the following {{count}} words to {{deck}}:",
+  "admin_move_words.note": "They'll leave this deck, keeping their pictures, recordings, examples and every learner's progress, and go to the end of that deck.",
+  "admin_move_words.back": "Back",
+  "admin_move_words.moving": "Moving…",
+  "admin_move_words.move": "Yes, move {{count}} words"
 }

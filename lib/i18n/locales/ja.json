@@ -1793,5 +1793,18 @@
   "admin_auto_images.step_picture": "",
   "admin_auto_images.step_svg": "",
   "admin_auto_images.group_size": "",
-  "admin_auto_images.group_size_next": ""
+  "admin_auto_images.group_size_next": "",
+  "admin_move_words.starter": "",
+  "admin_move_words.test": "",
+  "admin_move_words.moved": "",
+  "admin_move_words.button": "",
+  "admin_move_words.title": "",
+  "admin_move_words.confirm_title": "",
+  "admin_move_words.deck": "",
+  "admin_move_words.next": "",
+  "admin_move_words.confirm": "",
+  "admin_move_words.note": "",
+  "admin_move_words.back": "",
+  "admin_move_words.moving": "",
+  "admin_move_words.move": ""
 }
